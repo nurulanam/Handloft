@@ -63,24 +63,24 @@ new #[Layout('layouts.guest')] #[Title('Log in')] class extends Component
 ?>
 
 <div>
-    <h1 class="mb-6 text-xl font-semibold text-slate-900">Log in to your account</h1>
+    <h1 class="mb-6 text-xl font-semibold text-zinc-900">Log in to your account</h1>
 
     @if (session('status'))
-        <div class="mb-4 rounded-md bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+        <div class="mb-4 rounded-lg border border-brand/20 bg-brand/5 px-4 py-3 text-sm text-brand">
             {{ session('status') }}
         </div>
     @endif
 
     <form wire:submit="login" class="space-y-4">
         <div>
-            <label for="email" class="block text-sm font-medium text-slate-700">User ID / Email</label>
+            <label for="email" class="block text-sm font-medium text-zinc-700">User ID / Email</label>
             <input
                 wire:model="email"
                 id="email"
                 type="text"
                 autofocus
                 autocomplete="username"
-                class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm"
+                class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40"
             >
             @error('email')
                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -88,13 +88,13 @@ new #[Layout('layouts.guest')] #[Title('Log in')] class extends Component
         </div>
 
         <div>
-            <label for="password" class="block text-sm font-medium text-slate-700">Password</label>
+            <label for="password" class="block text-sm font-medium text-zinc-700">Password</label>
             <input
                 wire:model="password"
                 id="password"
                 type="password"
                 autocomplete="current-password"
-                class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm"
+                class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40"
             >
             @error('password')
                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -102,19 +102,19 @@ new #[Layout('layouts.guest')] #[Title('Log in')] class extends Component
         </div>
 
         <div class="flex items-center justify-between">
-            <label class="flex items-center gap-2 text-sm text-slate-600">
-                <input wire:model="remember" type="checkbox" class="rounded border-slate-300 text-slate-900 shadow-sm focus:ring-slate-500">
+            <label class="flex items-center gap-2 text-sm text-zinc-600">
+                <input wire:model="remember" type="checkbox" class="rounded border-zinc-300 text-brand focus:ring-brand-lime/40">
                 Remember me
             </label>
 
-            <a href="{{ route('password.request') }}" wire:navigate class="text-sm text-slate-600 hover:text-slate-900 hover:underline">
+            <a href="{{ route('password.request') }}" wire:navigate class="text-sm text-zinc-600 hover:text-brand hover:underline">
                 Forgot password?
             </a>
         </div>
 
         <button
             type="submit"
-            class="w-full rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+            class="w-full rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90"
             wire:loading.attr="disabled"
             wire:target="login"
         >

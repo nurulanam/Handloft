@@ -64,17 +64,17 @@ new #[Layout('layouts.guest')] #[Title('Reset password')] class extends Componen
 ?>
 
 <div>
-    <h1 class="mb-6 text-xl font-semibold text-slate-900">Reset your password</h1>
+    <h1 class="mb-6 text-xl font-semibold text-zinc-900">Reset your password</h1>
 
     <form wire:submit="resetPassword" class="space-y-4">
         <div>
-            <label for="email" class="block text-sm font-medium text-slate-700">Email</label>
+            <label for="email" class="block text-sm font-medium text-zinc-700">Email</label>
             <input
                 wire:model="email"
                 id="email"
                 type="email"
                 autofocus
-                class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm"
+                class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40"
             >
             @error('email')
                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -82,12 +82,12 @@ new #[Layout('layouts.guest')] #[Title('Reset password')] class extends Componen
         </div>
 
         <div>
-            <label for="password" class="block text-sm font-medium text-slate-700">New password</label>
+            <label for="password" class="block text-sm font-medium text-zinc-700">New password</label>
             <input
                 wire:model="password"
                 id="password"
                 type="password"
-                class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm"
+                class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40"
             >
             @error('password')
                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -95,18 +95,18 @@ new #[Layout('layouts.guest')] #[Title('Reset password')] class extends Componen
         </div>
 
         <div>
-            <label for="password_confirmation" class="block text-sm font-medium text-slate-700">Confirm new password</label>
+            <label for="password_confirmation" class="block text-sm font-medium text-zinc-700">Confirm new password</label>
             <input
                 wire:model="password_confirmation"
                 id="password_confirmation"
                 type="password"
-                class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm"
+                class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40"
             >
         </div>
 
         <button
             type="submit"
-            class="w-full rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+            class="w-full rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90"
         >
             Reset password
         </button>

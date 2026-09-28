@@ -127,8 +127,86 @@ class TaskWorkflowTest extends TestCase
 
         Livewire::actingAs($karim)
             ->test('tasks.show', ['task' => $task])
-            ->set('reassign_to', $hasan->id)
-            ->call('reassign')
+            ->set('assignee_value', (string) $hasan->id)
+            ->call('saveAssignee')
             ->assertForbidden();
+    }
+
+    public function test_moving_a_kanban_card_updates_status_and_logs_activity(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+
+        $workflow = app(TaskWorkflowService::class);
+        $task = $workflow->createTask(['title' => 'Website Audit'], $rahim, $karim);
+
+        Livewire::actingAs($rahim)
+            ->test('tasks.index')
+            ->call('moveTask', $task->id, 'in_progress');
+
+        $task->refresh();
+
+        $this->assertSame(TaskStatus::InProgress, $task->status);
+        $this->assertTrue($task->activities()->where('type', 'status_changed')->exists());
+    }
+
+    public function test_moving_a_kanban_card_to_completed_opens_the_hours_modal_in_place(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+
+        $workflow = app(TaskWorkflowService::class);
+        $task = $workflow->createTask(['title' => 'Website Audit'], $rahim, $karim);
+
+        Livewire::actingAs($karim)
+            ->test('tasks.index')
+            ->call('moveTask', $task->id, 'completed')
+            ->assertSet('completingTaskId', $task->id)
+            ->assertNoRedirect();
+
+        $task->refresh();
+
+        $this->assertSame(TaskStatus::Pending, $task->status);
+        $this->assertNull($task->workHistory);
+    }
+
+    public function test_only_the_current_assignee_can_open_the_completion_modal_from_the_board(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+
+        $workflow = app(TaskWorkflowService::class);
+        $task = $workflow->createTask(['title' => 'Website Audit'], $rahim, $karim);
+
+        Livewire::actingAs($rahim)
+            ->test('tasks.index')
+            ->call('moveTask', $task->id, 'completed')
+            ->assertSet('completingTaskId', null);
+
+        $task->refresh();
+
+        $this->assertSame(TaskStatus::Pending, $task->status);
+    }
+
+    public function test_completing_a_task_from_the_board_modal_creates_work_history(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+
+        $workflow = app(TaskWorkflowService::class);
+        $task = $workflow->createTask(['title' => 'Website Audit'], $rahim, $karim);
+
+        Livewire::actingAs($karim)
+            ->test('tasks.index')
+            ->call('moveTask', $task->id, 'completed')
+            ->set('actual_hours', '2.5')
+            ->call('completeTask')
+            ->assertSet('completingTaskId', null);
+
+        $task->refresh();
+
+        $this->assertSame(TaskStatus::Completed, $task->status);
+        $this->assertNotNull($task->workHistory);
+        $this->assertEquals(2.5, $task->workHistory->actual_hours);
     }
 }

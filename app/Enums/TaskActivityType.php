@@ -8,4 +8,6 @@ enum TaskActivityType: string
     case Assigned = 'assigned';
     case Reassigned = 'reassigned';
     case Completed = 'completed';
+    case StatusChanged = 'status_changed';
+    case MetaUpdated = 'meta_updated';
 }

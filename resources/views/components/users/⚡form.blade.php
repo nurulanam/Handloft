@@ -99,50 +99,50 @@ new #[Layout('layouts.app')] #[Title('User')] class extends Component
 
 <div class="max-w-2xl space-y-6">
     <div>
-        <h1 class="text-2xl font-semibold text-slate-900">{{ $user ? 'Edit User' : 'Create User' }}</h1>
-        <p class="text-sm text-slate-500">Admin-managed account — there is no public registration.</p>
+        <h1 class="text-2xl font-semibold text-zinc-900">{{ $user ? 'Edit User' : 'Create User' }}</h1>
+        <p class="text-sm text-zinc-500">Admin-managed account — there is no public registration.</p>
     </div>
 
-    <form wire:submit="save" class="space-y-4 rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+    <form wire:submit="save" class="space-y-4 rounded-lg border border-zinc-200 bg-white p-6">
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-                <label class="block text-sm font-medium text-slate-700">Full Name</label>
-                <input wire:model="name" type="text" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm">
+                <label class="block text-sm font-medium text-zinc-700">Full Name</label>
+                <input wire:model="name" type="text" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
                 @error('name') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-slate-700">User ID</label>
-                <input wire:model="user_id" type="text" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm">
+                <label class="block text-sm font-medium text-zinc-700">User ID</label>
+                <input wire:model="user_id" type="text" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
                 @error('user_id') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-slate-700">Email</label>
-                <input wire:model="email" type="email" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm">
+                <label class="block text-sm font-medium text-zinc-700">Email</label>
+                <input wire:model="email" type="email" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
                 @error('email') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-slate-700">Phone</label>
-                <input wire:model="phone" type="text" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm">
+                <label class="block text-sm font-medium text-zinc-700">Phone</label>
+                <input wire:model="phone" type="text" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
                 @error('phone') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-slate-700">Password {{ $user ? '(leave blank to keep current)' : '' }}</label>
-                <input wire:model="password" type="password" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm">
+                <label class="block text-sm font-medium text-zinc-700">Password {{ $user ? '(leave blank to keep current)' : '' }}</label>
+                <input wire:model="password" type="password" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
                 @error('password') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-slate-700">Confirm Password</label>
-                <input wire:model="password_confirmation" type="password" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm">
+                <label class="block text-sm font-medium text-zinc-700">Confirm Password</label>
+                <input wire:model="password_confirmation" type="password" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-slate-700">Role</label>
-                <select wire:model="role" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm">
+                <label class="block text-sm font-medium text-zinc-700">Role</label>
+                <select wire:model="role" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
                     <option value="">Select a role</option>
                     @foreach (Role::cases() as $roleOption)
                         <option value="{{ $roleOption->value }}">{{ $roleOption->label() }}</option>
@@ -152,35 +152,35 @@ new #[Layout('layouts.app')] #[Title('User')] class extends Component
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-slate-700">Department/Team</label>
-                <input wire:model="department" type="text" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm">
+                <label class="block text-sm font-medium text-zinc-700">Department/Team</label>
+                <input wire:model="department" type="text" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
                 @error('department') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-slate-700">Joining Date</label>
-                <input wire:model="joining_date" type="date" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm">
+                <label class="block text-sm font-medium text-zinc-700">Joining Date</label>
+                <input wire:model="joining_date" type="date" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
                 @error('joining_date') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-slate-700">Status</label>
-                <select wire:model="status" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm">
+                <label class="block text-sm font-medium text-zinc-700">Status</label>
+                <select wire:model="status" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                 </select>
             </div>
 
             <div class="sm:col-span-2">
-                <label class="block text-sm font-medium text-slate-700">Profile Photo</label>
-                <input wire:model="photo" type="file" accept="image/*" class="mt-1 block w-full text-sm text-slate-600">
+                <label class="block text-sm font-medium text-zinc-700">Profile Photo</label>
+                <input wire:model="photo" type="file" accept="image/*" class="mt-1 block w-full text-sm text-zinc-600">
                 @error('photo') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
         </div>
 
         <div class="flex items-center justify-end gap-3 pt-2">
-            <a href="{{ route('users.index') }}" wire:navigate class="text-sm font-medium text-slate-600 hover:text-slate-900">Cancel</a>
-            <button type="submit" class="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800" wire:loading.attr="disabled">
+            <a href="{{ route('users.index') }}" wire:navigate class="text-sm font-medium text-zinc-600 hover:text-zinc-900">Cancel</a>
+            <button type="submit" class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90" wire:loading.attr="disabled">
                 {{ $user ? 'Save Changes' : 'Create User' }}
             </button>
         </div>

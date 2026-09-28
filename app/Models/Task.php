@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-#[Fillable(['title', 'description', 'created_by', 'task_category_id', 'priority', 'status', 'start_date', 'deadline', 'notes'])]
+#[Fillable(['title', 'description', 'created_by', 'task_category_id', 'qa_id', 'parent_task_id', 'priority', 'status', 'start_date', 'deadline', 'notes'])]
 class Task extends Model
 {
     /** @use HasFactory<TaskFactory> */
@@ -90,6 +90,38 @@ class Task extends Model
     public function workHistory(): HasOne
     {
         return $this->hasOne(WorkHistory::class);
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function qa(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'qa_id');
+    }
+
+    /**
+     * @return BelongsTo<Task, $this>
+     */
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(Task::class, 'parent_task_id');
+    }
+
+    /**
+     * @return HasMany<Task, $this>
+     */
+    public function children(): HasMany
+    {
+        return $this->hasMany(Task::class, 'parent_task_id');
+    }
+
+    /**
+     * @return HasMany<TaskComment, $this>
+     */
+    public function comments(): HasMany
+    {
+        return $this->hasMany(TaskComment::class)->oldest();
     }
 
     public function isOverdue(): bool

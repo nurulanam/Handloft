@@ -31,24 +31,24 @@ new #[Layout('layouts.guest')] #[Title('Forgot password')] class extends Compone
 ?>
 
 <div>
-    <h1 class="mb-2 text-xl font-semibold text-slate-900">Forgot your password?</h1>
-    <p class="mb-6 text-sm text-slate-500">Enter your email and we'll send you a password reset link.</p>
+    <h1 class="mb-2 text-xl font-semibold text-zinc-900">Forgot your password?</h1>
+    <p class="mb-6 text-sm text-zinc-500">Enter your email and we'll send you a password reset link.</p>
 
     @if ($status)
-        <div class="mb-4 rounded-md bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+        <div class="mb-4 rounded-lg border border-brand/20 bg-brand/5 px-4 py-3 text-sm text-brand">
             {{ $status }}
         </div>
     @endif
 
     <form wire:submit="sendResetLink" class="space-y-4">
         <div>
-            <label for="email" class="block text-sm font-medium text-slate-700">Email</label>
+            <label for="email" class="block text-sm font-medium text-zinc-700">Email</label>
             <input
                 wire:model="email"
                 id="email"
                 type="email"
                 autofocus
-                class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm"
+                class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40"
             >
             @error('email')
                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -57,13 +57,13 @@ new #[Layout('layouts.guest')] #[Title('Forgot password')] class extends Compone
 
         <button
             type="submit"
-            class="w-full rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+            class="w-full rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90"
         >
             Send reset link
         </button>
     </form>
 
-    <div class="mt-6 text-center text-sm text-slate-500">
-        <a href="{{ route('login') }}" wire:navigate class="hover:text-slate-900 hover:underline">Back to log in</a>
+    <div class="mt-6 text-center text-sm text-zinc-500">
+        <a href="{{ route('login') }}" wire:navigate class="hover:text-brand hover:underline">Back to log in</a>
     </div>
 </div>

@@ -48,4 +48,23 @@ class TaskPolicy
     {
         return $task->currentAssignee()?->id === $user->id;
     }
+
+    /**
+     * Determine whether the user can edit task metadata (description, priority,
+     * due date, QA, parent link).
+     */
+    public function updateMeta(User $user, Task $task): bool
+    {
+        return $user->can('reassign-task')
+            || $task->created_by === $user->id
+            || $task->currentAssignee()?->id === $user->id;
+    }
+
+    /**
+     * Determine whether the user can comment on the task.
+     */
+    public function comment(User $user, Task $task): bool
+    {
+        return $this->view($user, $task);
+    }
 }

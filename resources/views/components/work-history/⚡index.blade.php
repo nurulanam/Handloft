@@ -94,8 +94,8 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
 <div class="space-y-6">
     <div class="flex items-center justify-between">
         <div>
-            <h1 class="text-2xl font-semibold text-slate-900">Work History</h1>
-            <p class="text-sm text-slate-500">Automatically recorded from completed tasks.</p>
+            <h1 class="text-2xl font-semibold text-zinc-900">Work History</h1>
+            <p class="text-sm text-zinc-500">Automatically recorded from completed tasks.</p>
         </div>
     </div>
 
@@ -105,7 +105,7 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
                 <button
                     type="button"
                     wire:click="$set('range', '{{ $key }}')"
-                    class="rounded-md border px-3 py-1.5 text-sm font-medium {{ $range === $key ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 text-slate-600 hover:bg-slate-50' }}"
+                    class="rounded-lg border px-3 py-1.5 text-sm font-medium {{ $range === $key ? 'border-brand bg-brand text-white' : 'border-zinc-300 text-zinc-600 hover:bg-zinc-50' }}"
                 >
                     {{ $label }}
                 </button>
@@ -114,43 +114,43 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
 
         @if ($range === 'custom')
             <div class="flex items-center gap-2">
-                <input wire:model.live="from" type="date" class="rounded-md border-slate-300 text-sm shadow-sm focus:border-slate-500 focus:ring-slate-500">
-                <span class="text-sm text-slate-500">to</span>
-                <input wire:model.live="to" type="date" class="rounded-md border-slate-300 text-sm shadow-sm focus:border-slate-500 focus:ring-slate-500">
+                <input wire:model.live="from" type="date" class="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                <span class="text-sm text-zinc-500">to</span>
+                <input wire:model.live="to" type="date" class="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
             </div>
         @endif
 
-        <div class="ml-auto rounded-md bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700">
+        <div class="ml-auto rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700">
             Total: {{ number_format($summaryHours, 2) }}h
         </div>
     </div>
 
-    <div class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
-        <table class="min-w-full divide-y divide-slate-200">
-            <thead class="bg-slate-50">
+    <div class="overflow-hidden rounded-lg border border-zinc-200 bg-white">
+        <table class="min-w-full divide-y divide-zinc-200">
+            <thead class="bg-zinc-50">
                 <tr>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Date</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Task</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Assigned By</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Hours</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Date</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Task</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Assigned By</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Hours</th>
                     @if ($canEdit)
                         <th class="px-4 py-3"></th>
                     @endif
                 </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100">
+            <tbody class="divide-y divide-zinc-100">
                 @forelse ($histories as $history)
                     <tr>
-                        <td class="px-4 py-3 text-sm text-slate-500">{{ $history->completed_date->format('d M Y') }}</td>
-                        <td class="px-4 py-3 text-sm font-medium text-slate-900">{{ $history->task->title }}</td>
-                        <td class="px-4 py-3 text-sm text-slate-500">{{ $history->assignedBy->name }}</td>
-                        <td class="px-4 py-3 text-sm text-slate-500">
+                        <td class="px-4 py-3 text-sm text-zinc-500">{{ $history->completed_date->format('d M Y') }}</td>
+                        <td class="px-4 py-3 text-sm font-medium text-zinc-900">{{ $history->task->title }}</td>
+                        <td class="px-4 py-3 text-sm text-zinc-500">{{ $history->assignedBy->name }}</td>
+                        <td class="px-4 py-3 text-sm text-zinc-500">
                             @if ($editingId === $history->id)
                                 <div class="flex items-center gap-2">
-                                    <input wire:model="edit_hours" type="number" step="0.1" class="w-20 rounded-md border-slate-300 text-sm shadow-sm">
-                                    <input wire:model="edit_reason" type="text" placeholder="Reason" class="w-40 rounded-md border-slate-300 text-sm shadow-sm">
-                                    <button type="button" wire:click="saveEdit" class="text-sm font-medium text-emerald-600 hover:underline">Save</button>
-                                    <button type="button" wire:click="$set('editingId', null)" class="text-sm text-slate-500 hover:underline">Cancel</button>
+                                    <input wire:model="edit_hours" type="number" step="0.1" class="w-20 rounded-lg border border-zinc-300 px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                    <input wire:model="edit_reason" type="text" placeholder="Reason" class="w-40 rounded-lg border border-zinc-300 px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                    <button type="button" wire:click="saveEdit" class="text-sm font-medium text-brand hover:underline">Save</button>
+                                    <button type="button" wire:click="$set('editingId', null)" class="text-sm text-zinc-500 hover:underline">Cancel</button>
                                 </div>
                                 @error('edit_hours') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
                                 @error('edit_reason') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
@@ -161,14 +161,14 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
                         @if ($canEdit)
                             <td class="px-4 py-3 text-right text-sm">
                                 @if ($editingId !== $history->id)
-                                    <button type="button" wire:click="startEdit({{ $history->id }})" class="text-slate-600 hover:text-slate-900 hover:underline">Edit</button>
+                                    <button type="button" wire:click="startEdit({{ $history->id }})" class="text-zinc-600 hover:text-brand hover:underline">Edit</button>
                                 @endif
                             </td>
                         @endif
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" class="px-4 py-8 text-center text-sm text-slate-500">No work history for this period.</td>
+                        <td colspan="5" class="px-4 py-8 text-center text-sm text-zinc-500">No work history for this period.</td>
                     </tr>
                 @endforelse
             </tbody>
