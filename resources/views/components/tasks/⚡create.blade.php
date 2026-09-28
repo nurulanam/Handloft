@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\TaskPriority;
+use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskCategory;
 use App\Models\User;
@@ -34,6 +35,8 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
 
     public string $task_category_id = '';
 
+    public string $project_id = '';
+
     public string $notes = '';
 
     /** @var array<int, mixed> */
@@ -42,6 +45,8 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
     public function mount(): void
     {
         Gate::authorize('create', Task::class);
+
+        $this->project_id = (string) request()->query('project', '');
     }
 
     /**
@@ -70,6 +75,7 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
             'start_date' => ['nullable', 'date'],
             'deadline' => ['nullable', 'date', 'after_or_equal:start_date'],
             'task_category_id' => ['nullable', 'exists:task_categories,id'],
+            'project_id' => ['nullable', 'exists:projects,id'],
             'notes' => ['nullable', 'string'],
             'attachments.*' => ['file', 'max:10240'],
         ]);
@@ -83,6 +89,7 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
             'start_date' => $data['start_date'] ?: null,
             'deadline' => $data['deadline'] ?: null,
             'task_category_id' => $data['task_category_id'] ?: null,
+            'project_id' => $data['project_id'] ?: null,
             'qa_id' => $data['qa_id'] ?: null,
             'notes' => $data['notes'] ?: null,
         ], auth()->user(), $assignee);
@@ -104,6 +111,7 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
         return [
             'users' => User::query()->orderBy('name')->get(),
             'categories' => TaskCategory::query()->orderBy('name')->get(),
+            'projects' => Project::query()->orderBy('name')->get(),
         ];
     }
 };
@@ -327,6 +335,27 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
                                     <option value="">None</option>
                                     @foreach ($categories as $category)
                                         <option value="{{ $category->id }}">{{ $category->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+
+                        {{-- Project --}}
+                        <div
+                            class="flex items-center justify-between gap-3 py-2.5"
+                            x-data="inlineSelect(@js($project_id), @js(optional($projects->firstWhere('id', $project_id))->name ?? 'None'))"
+                        >
+                            <span class="text-sm text-zinc-500">Project</span>
+
+                            <div x-show="!editing">
+                                <button type="button" @click="editing = true" class="text-sm hover:text-brand" :class="value ? 'text-zinc-900' : 'text-zinc-400'" x-text="label"></button>
+                            </div>
+
+                            <div x-show="editing" x-cloak class="max-w-[65%] flex-1" @click.outside="editing = false">
+                                <select wire:model.live="project_id" @change="sync($event)" class="block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                    <option value="">None</option>
+                                    @foreach ($projects as $option)
+                                        <option value="{{ $option->id }}">{{ $option->name }}</option>
                                     @endforeach
                                 </select>
                             </div>

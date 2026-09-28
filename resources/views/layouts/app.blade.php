@@ -27,6 +27,7 @@
                         $navigation = [
                             ['label' => 'Dashboard', 'route' => 'dashboard'],
                             ['label' => 'Team', 'route' => 'users.index', 'hidden' => auth()->user()->cannot('manage-users')],
+                            ['label' => 'Projects', 'route' => 'projects.index'],
                             ['label' => 'Tasks', 'route' => 'tasks.index'],
                             ['label' => 'Work History', 'route' => 'work-history.index'],
                             ['label' => 'Leads', 'disabled' => true],

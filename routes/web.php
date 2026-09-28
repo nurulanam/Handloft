@@ -27,6 +27,10 @@ Route::middleware('auth')->group(function () {
     Route::livewire('/users/create', 'users.form')->name('users.create');
     Route::livewire('/users/{user}/edit', 'users.form')->name('users.edit');
 
+    Route::livewire('/projects', 'projects.index')->name('projects.index');
+    Route::livewire('/projects/create', 'projects.create')->name('projects.create');
+    Route::livewire('/projects/{project}', 'projects.show')->name('projects.show');
+
     Route::livewire('/tasks', 'tasks.index')->name('tasks.index');
     Route::livewire('/tasks/create', 'tasks.create')->name('tasks.create');
     Route::livewire('/tasks/{task}', 'tasks.show')->name('tasks.show');

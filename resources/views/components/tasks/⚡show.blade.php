@@ -3,6 +3,7 @@
 use App\Enums\TaskActivityType;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\TaskWorkflowService;
@@ -44,6 +45,8 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
     public string $qa_value = '';
 
     public string $parent_value = '';
+
+    public string $project_value = '';
 
     public string $newComment = '';
 
@@ -120,6 +123,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
             'due_date' => $this->due_date_value = $this->task->deadline?->toDateString() ?? '',
             'qa' => $this->qa_value = (string) $this->task->qa_id,
             'parent' => $this->parent_value = (string) $this->task->parent_task_id,
+            'project' => $this->project_value = (string) $this->task->project_id,
             default => null,
         };
 
@@ -241,6 +245,19 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         $this->task->refresh();
     }
 
+    public function saveProject(): void
+    {
+        Gate::authorize('updateMeta', $this->task);
+
+        $data = $this->validate(['project_value' => ['nullable', 'exists:projects,id']]);
+
+        $this->task->update(['project_id' => $data['project_value'] ?: null]);
+        $this->logMetaChange('Project updated');
+
+        $this->editingField = null;
+        $this->task->refresh();
+    }
+
     public function saveParent(): void
     {
         Gate::authorize('updateMeta', $this->task);
@@ -353,6 +370,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         $workflow->createTask([
             'title' => $data['subtask_title'],
             'parent_task_id' => $this->task->id,
+            'project_id' => $this->task->project_id,
         ], auth()->user(), $assignee);
 
         $this->subtask_title = '';
@@ -404,6 +422,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
             'timeline' => $this->task->activities()->with('causer')->get(),
             'currentAssignee' => $this->task->currentAssignee(),
             'users' => User::query()->orderBy('name')->get(),
+            'projects' => Project::query()->orderBy('name')->get(),
             'availableParents' => Task::query()->where('id', '!=', $this->task->id)->orderBy('title')->get(),
             'availableStatuses' => collect(TaskStatus::cases())->filter(
                 fn ($s) => ($s !== TaskStatus::Completed || $canComplete) && ($s !== TaskStatus::Cancelled || $canCancel)
@@ -423,6 +442,11 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
     <div>
         <div class="flex items-center gap-2">
             <span class="rounded-full bg-violet-100 px-2.5 py-1 font-mono text-xs font-semibold text-violet-700">{{ $task->task_key }}</span>
+            @if ($task->project)
+                <a href="{{ route('projects.show', $task->project) }}" wire:navigate class="text-xs font-medium text-zinc-500 hover:text-brand">
+                    {{ $task->project->name }} /
+                </a>
+            @endif
             @if ($task->parent)
                 <a href="{{ route('tasks.show', $task->parent) }}" wire:navigate class="text-xs font-medium text-zinc-500 hover:text-brand">
                     {{ $task->parent->task_key }} {{ $task->parent->title }} /
@@ -812,6 +836,34 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                     <div class="flex items-center justify-between gap-3 py-2.5">
                         <span class="text-sm text-zinc-500">Category</span>
                         <span class="text-sm text-zinc-900">{{ $task->category?->name ?? '—' }}</span>
+                    </div>
+
+                    {{-- Project --}}
+                    <div class="flex items-center justify-between gap-3 py-2.5">
+                        <span class="text-sm text-zinc-500">Project</span>
+                        @if ($editingField === 'project')
+                            <div class="flex-1 max-w-[65%]">
+                                <select wire:model="project_value" class="block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                    <option value="">None</option>
+                                    @foreach ($projects as $option)
+                                        <option value="{{ $option->id }}">{{ $option->name }}</option>
+                                    @endforeach
+                                </select>
+                                @error('project_value') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                                <div class="mt-1 flex justify-end gap-2">
+                                    <button type="button" wire:click="cancelEditField" class="text-xs text-zinc-500 hover:text-zinc-700">Cancel</button>
+                                    <button type="button" wire:click="saveProject" class="text-xs font-medium text-brand hover:underline">Save</button>
+                                </div>
+                            </div>
+                        @elseif ($task->project)
+                            <button type="button" wire:click="startEditField('project')" @disabled(! $canEditMeta) class="inline-flex items-center gap-1 rounded border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-xs font-medium text-zinc-700 {{ $canEditMeta ? 'hover:border-brand/40' : '' }}">
+                                {{ $task->project->name }}
+                            </button>
+                        @else
+                            <button type="button" wire:click="startEditField('project')" @disabled(! $canEditMeta) class="text-sm text-zinc-400 {{ $canEditMeta ? 'hover:text-brand' : '' }}">
+                                {{ $canEditMeta ? 'Add project' : 'None' }}
+                            </button>
+                        @endif
                     </div>
 
                     {{-- Parent --}}

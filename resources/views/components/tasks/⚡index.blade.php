@@ -27,9 +27,13 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
 
     public string $completion_note = '';
 
-    public function mount(): void
+    public ?int $projectId = null;
+
+    public function mount(?int $projectId = null): void
     {
         Gate::authorize('viewAny', Task::class);
+
+        $this->projectId = $projectId;
     }
 
     /**
@@ -139,6 +143,8 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
 
         $query = Task::query()->with(['category', 'currentAssignment.assignedTo', 'creator'])->latest();
 
+        $query->when($this->projectId, fn ($q) => $q->where('project_id', $this->projectId));
+
         match ($this->tab) {
             'all' => $query,
             'assigned-to-me' => $query->whereHas('currentAssignment', fn ($q) => $q->where('assigned_to', $userId)),
@@ -169,12 +175,16 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
 
 <div class="space-y-6">
     <div class="flex items-center justify-between">
-        <div>
-            <h1 class="text-2xl font-semibold text-zinc-900">Tasks</h1>
-            <p class="text-sm text-zinc-500">Create, assign, and track work across the team.</p>
-        </div>
+        @unless ($projectId)
+            <div>
+                <h1 class="text-2xl font-semibold text-zinc-900">Tasks</h1>
+                <p class="text-sm text-zinc-500">Create, assign, and track work across the team.</p>
+            </div>
+        @else
+            <h2 class="text-lg font-semibold text-zinc-900">Tasks</h2>
+        @endunless
 
-        <a href="{{ route('tasks.create') }}" wire:navigate class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90">
+        <a href="{{ route('tasks.create', $projectId ? ['project' => $projectId] : []) }}" wire:navigate class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90">
             Create Task
         </a>
     </div>
