@@ -209,4 +209,39 @@ class TaskWorkflowTest extends TestCase
         $this->assertNotNull($task->workHistory);
         $this->assertEquals(2.5, $task->workHistory->actual_hours);
     }
+
+    public function test_team_member_dragging_a_card_to_cancelled_on_the_board_is_a_no_op(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+
+        $workflow = app(TaskWorkflowService::class);
+        $task = $workflow->createTask(['title' => 'Website Audit'], $rahim, $karim);
+
+        Livewire::actingAs($karim)
+            ->test('tasks.index')
+            ->call('moveTask', $task->id, 'cancelled');
+
+        $task->refresh();
+
+        $this->assertNotEquals(TaskStatus::Cancelled, $task->status);
+    }
+
+    public function test_admin_dragging_a_card_to_cancelled_on_the_board_cancels_it(): void
+    {
+        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+
+        $workflow = app(TaskWorkflowService::class);
+        $task = $workflow->createTask(['title' => 'Website Audit'], $rahim, $karim);
+
+        Livewire::actingAs($admin)
+            ->test('tasks.index')
+            ->call('moveTask', $task->id, 'cancelled');
+
+        $task->refresh();
+
+        $this->assertSame(TaskStatus::Cancelled, $task->status);
+    }
 }

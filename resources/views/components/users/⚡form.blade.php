@@ -54,6 +54,15 @@ new #[Layout('layouts.app')] #[Title('User')] class extends Component
         }
     }
 
+    /**
+     * Clear a field's validation error as soon as the user changes it,
+     * instead of leaving a stale error message on screen until re-submit.
+     */
+    public function updated(string $name): void
+    {
+        $this->resetErrorBag($name);
+    }
+
     public function save(): void
     {
         $data = $this->validate([

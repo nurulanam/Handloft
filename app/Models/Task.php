@@ -6,6 +6,7 @@ use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,6 +20,11 @@ class Task extends Model
     use HasFactory;
 
     /**
+     * Prefix for the human-readable task key (e.g. "AMD-42"), Jira-style.
+     */
+    public const KEY_PREFIX = 'AMD';
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -29,6 +35,16 @@ class Task extends Model
             'start_date' => 'date',
             'deadline' => 'date',
         ];
+    }
+
+    /**
+     * A stable, unique, human-readable identifier (e.g. "AMD-42"), Jira-style.
+     * Derived from the primary key rather than a separate counter, so it's
+     * always unique with no extra schema or race conditions to manage.
+     */
+    protected function taskKey(): Attribute
+    {
+        return Attribute::make(get: fn () => self::KEY_PREFIX.'-'.$this->id);
     }
 
     /**

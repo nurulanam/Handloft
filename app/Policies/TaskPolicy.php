@@ -50,6 +50,15 @@ class TaskPolicy
     }
 
     /**
+     * Determine whether the user can cancel the task. Restricted to Manager
+     * and Super Admin — Team Members cannot cancel tasks even their own.
+     */
+    public function cancel(User $user, Task $task): bool
+    {
+        return $user->can('cancel-task');
+    }
+
+    /**
      * Determine whether the user can edit task metadata (description, priority,
      * due date, QA, parent link).
      */

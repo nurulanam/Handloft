@@ -20,6 +20,7 @@ new #[Layout('layouts.app')] #[Title('Team')] class extends Component
     {
         return [
             'users' => User::query()->orderBy('name')->paginate(15),
+            'canViewAllWorkHistory' => auth()->user()->can('view-all-work-history'),
         ];
     }
 };
@@ -62,6 +63,9 @@ new #[Layout('layouts.app')] #[Title('Team')] class extends Component
                             </span>
                         </td>
                         <td class="px-4 py-3 text-right text-sm">
+                            @if ($canViewAllWorkHistory)
+                                <a href="{{ route('work-history.show', $user) }}" wire:navigate class="mr-3 text-zinc-600 hover:text-brand hover:underline">Work History</a>
+                            @endif
                             <a href="{{ route('users.edit', $user) }}" wire:navigate class="text-zinc-600 hover:text-brand hover:underline">Edit</a>
                         </td>
                     </tr>

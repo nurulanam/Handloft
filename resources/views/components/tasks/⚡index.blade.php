@@ -32,6 +32,15 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
         Gate::authorize('viewAny', Task::class);
     }
 
+    /**
+     * Clear a field's validation error as soon as the user changes it,
+     * instead of leaving a stale error message on screen until re-submit.
+     */
+    public function updated(string $name): void
+    {
+        $this->resetErrorBag($name);
+    }
+
     public function tabs(): array
     {
         $tabs = [
@@ -66,6 +75,10 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
         }
 
         if (! in_array($status, [TaskStatus::Pending->value, TaskStatus::InProgress->value, TaskStatus::Cancelled->value], true)) {
+            return;
+        }
+
+        if ($status === TaskStatus::Cancelled->value && Gate::denies('cancel', $task)) {
             return;
         }
 
@@ -245,7 +258,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                 >
                     <div class="flex items-center justify-between border-b border-zinc-200 px-3 py-2">
                         <h3 class="text-sm font-semibold text-zinc-900">{{ $status->label() }}</h3>
-                        <span class="rounded-full bg-zinc-200 px-2 py-0.5 text-xs font-medium text-zinc-600">{{ $board[$status->value]->count() }}</span>
+                        <span class="rounded-full px-2 py-0.5 text-xs font-semibold {{ $status->pillClasses() }}">{{ $board[$status->value]->count() }}</span>
                     </div>
 
                     <div class="flex-1 space-y-2 p-2">
@@ -255,6 +268,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                                 :class="draggingId === {{ $task->id }} && moved ? 'opacity-40' : ''"
                                 class="cursor-grab select-none rounded-lg border border-zinc-200 bg-white p-3 hover:border-brand/40 active:cursor-grabbing"
                             >
+                                <span class="mb-1 inline-block rounded-full bg-violet-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-violet-700">{{ $task->task_key }}</span>
                                 <p class="text-sm font-medium text-zinc-900">{{ $task->title }}</p>
                                 <p class="mt-1 text-xs text-zinc-500">{{ $task->currentAssignment?->assignedTo?->name ?? 'Unassigned' }}</p>
                                 <div class="mt-2 flex items-center justify-between">
@@ -301,6 +315,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
             <table class="min-w-full divide-y divide-zinc-200">
                 <thead class="bg-zinc-50">
                     <tr>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Key</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Title</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Assigned To</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Priority</th>
@@ -311,11 +326,14 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                 <tbody class="divide-y divide-zinc-100">
                     @forelse ($tasks as $task)
                         <tr class="cursor-pointer hover:bg-zinc-50" onclick="window.location='{{ route('tasks.show', $task) }}'">
+                            <td class="px-4 py-3">
+                                <span class="inline-block rounded-full bg-violet-100 px-2 py-0.5 font-mono text-xs font-semibold text-violet-700">{{ $task->task_key }}</span>
+                            </td>
                             <td class="px-4 py-3 text-sm font-medium text-zinc-900">{{ $task->title }}</td>
                             <td class="px-4 py-3 text-sm text-zinc-500">{{ $task->currentAssignment?->assignedTo?->name ?? '—' }}</td>
                             <td class="px-4 py-3 text-sm text-zinc-500">{{ $task->priority->label() }}</td>
                             <td class="px-4 py-3 text-sm">
-                                <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">{{ $task->status->label() }}</span>
+                                <span class="rounded-full px-2 py-0.5 text-xs font-medium {{ $task->status->pillClasses() }}">{{ $task->status->label() }}</span>
                                 @if ($task->isOverdue())
                                     <span class="ml-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600">Overdue</span>
                                 @endif
@@ -324,7 +342,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-4 py-8 text-center text-sm text-zinc-500">No tasks here yet.</td>
+                            <td colspan="6" class="px-4 py-8 text-center text-sm text-zinc-500">No tasks here yet.</td>
                         </tr>
                     @endforelse
                 </tbody>

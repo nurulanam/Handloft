@@ -74,4 +74,41 @@ class WorkHistoryTest extends TestCase
         $this->assertSame('4', $activity->properties['new_hours']);
         $this->assertSame('Incorrect time entry', $activity->properties['reason']);
     }
+
+    public function test_admin_can_compare_multiple_team_members_side_by_side(): void
+    {
+        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+
+        $workflow = app(TaskWorkflowService::class);
+        $task1 = $workflow->createTask(['title' => 'Task for Rahim'], $rahim, $rahim);
+        $workflow->completeTask($task1, $rahim, 3.0);
+        $task2 = $workflow->createTask(['title' => 'Task for Karim'], $karim, $karim);
+        $workflow->completeTask($task2, $karim, 5.0);
+
+        $component = Livewire::actingAs($admin)
+            ->test('work-history.index')
+            ->set('compareUserIds', [$rahim->id, $karim->id]);
+
+        $component->assertSet('compareUserIds', [$rahim->id, $karim->id]);
+
+        $comparison = $component->viewData('comparison');
+
+        $this->assertCount(2, $comparison);
+        $this->assertEqualsCanonicalizing(
+            [$rahim->id, $karim->id],
+            $comparison->pluck('user.id')->all()
+        );
+    }
+
+    public function test_team_member_cannot_view_another_users_work_history_via_route_parameter(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+
+        $this->actingAs($karim)
+            ->get(route('work-history.show', $rahim))
+            ->assertForbidden();
+    }
 }

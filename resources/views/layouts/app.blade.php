@@ -14,7 +14,7 @@
         <div class="flex min-h-screen">
             {{-- Sidebar --}}
             <aside
-                class="fixed inset-y-0 left-0 z-30 w-64 transform bg-zinc-900 text-zinc-300 transition-transform lg:static lg:translate-x-0"
+                class="fixed inset-y-0 left-0 z-30 w-64 transform overflow-y-auto bg-zinc-900 text-zinc-300 transition-transform lg:translate-x-0"
                 :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
             >
                 <div class="flex h-16 items-center gap-2 px-6 text-lg font-semibold text-white">
@@ -66,7 +66,7 @@
             ></div>
 
             {{-- Main column --}}
-            <div class="flex flex-1 flex-col lg:pl-0">
+            <div class="flex flex-1 flex-col lg:pl-64">
                 <header class="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-zinc-200 bg-white px-4 sm:px-6">
                     <button
                         type="button"
