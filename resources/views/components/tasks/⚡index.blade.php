@@ -145,12 +145,16 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
 
         $query->when($this->projectId, fn ($q) => $q->where('project_id', $this->projectId));
 
-        match ($this->tab) {
-            'all' => $query,
-            'assigned-to-me' => $query->whereHas('currentAssignment', fn ($q) => $q->where('assigned_to', $userId)),
-            'assigned-by-me' => $query->whereHas('currentAssignment', fn ($q) => $q->where('assigned_by', $userId)),
-            default => $query->where('created_by', $userId),
-        };
+        // Inside a project, tasks are scoped by project alone — no "My Tasks" /
+        // "Assigned to Me" split, since the project itself is the relevant scope.
+        if (! $this->projectId) {
+            match ($this->tab) {
+                'all' => $query,
+                'assigned-to-me' => $query->whereHas('currentAssignment', fn ($q) => $q->where('assigned_to', $userId)),
+                'assigned-by-me' => $query->whereHas('currentAssignment', fn ($q) => $q->where('assigned_by', $userId)),
+                default => $query->where('created_by', $userId),
+            };
+        }
 
         if ($this->view === 'board') {
             $tasks = (clone $query)->limit(200)->get();
@@ -191,15 +195,17 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
 
     <div class="flex items-center justify-between border-b border-zinc-200">
         <div class="flex gap-2">
-            @foreach ($this->tabs() as $key => $label)
-                <button
-                    type="button"
-                    wire:click="$set('tab', '{{ $key }}')"
-                    class="border-b-2 px-3 py-2 text-sm font-medium {{ $tab === $key ? 'border-brand text-brand' : 'border-transparent text-zinc-500 hover:text-zinc-700' }}"
-                >
-                    {{ $label }}
-                </button>
-            @endforeach
+            @unless ($projectId)
+                @foreach ($this->tabs() as $key => $label)
+                    <button
+                        type="button"
+                        wire:click="$set('tab', '{{ $key }}')"
+                        class="border-b-2 px-3 py-2 text-sm font-medium {{ $tab === $key ? 'border-brand text-brand' : 'border-transparent text-zinc-500 hover:text-zinc-700' }}"
+                    >
+                        {{ $label }}
+                    </button>
+                @endforeach
+            @endunless
         </div>
 
         <div class="mb-2 flex rounded-lg border border-zinc-200 p-0.5">
