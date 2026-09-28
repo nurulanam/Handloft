@@ -33,9 +33,9 @@ new #[Layout('layouts.guest')] #[Title('Log in')] class extends Component
             return;
         }
 
-        $user = User::where('email', $this->email)->first();
+        $user = User::where('email', $this->email)->orWhere('user_id', $this->email)->first();
 
-        if (! $user || ! Auth::attempt(['email' => $this->email, 'password' => $this->password], $this->remember)) {
+        if (! $user || ! Auth::attempt(['email' => $user->email, 'password' => $this->password], $this->remember)) {
             RateLimiter::hit($throttleKey, 60);
 
             $this->addError('email', 'These credentials do not match our records.');

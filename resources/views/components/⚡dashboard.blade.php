@@ -1,12 +1,34 @@
 <?php
 
+use App\Enums\TaskStatus;
+use App\Models\Task;
+use App\Models\User;
+use App\Models\WorkHistory;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
 new #[Layout('layouts.app')] #[Title('Dashboard')] class extends Component
 {
-    //
+    public function with(): array
+    {
+        return [
+            'team' => [
+                'total' => User::count(),
+                'active' => User::where('status', 'active')->count(),
+                'hoursToday' => (float) WorkHistory::whereDate('completed_date', now())->sum('actual_hours'),
+                'hoursWeek' => (float) WorkHistory::whereBetween('completed_date', [now()->startOfWeek(), now()->endOfWeek()])->sum('actual_hours'),
+                'hoursMonth' => (float) WorkHistory::whereBetween('completed_date', [now()->startOfMonth(), now()->endOfMonth()])->sum('actual_hours'),
+            ],
+            'tasks' => [
+                'total' => Task::count(),
+                'pending' => Task::where('status', TaskStatus::Pending)->count(),
+                'inProgress' => Task::where('status', TaskStatus::InProgress)->count(),
+                'completed' => Task::where('status', TaskStatus::Completed)->count(),
+                'overdue' => Task::whereDate('deadline', '<', now())->whereNotIn('status', [TaskStatus::Completed, TaskStatus::Cancelled])->count(),
+            ],
+        ];
+    }
 };
 ?>
 
@@ -17,17 +39,38 @@ new #[Layout('layouts.app')] #[Title('Dashboard')] class extends Component
     </div>
 
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        @foreach ([
-            'Team' => 'Members, active count, hours today/week/month',
-            'Tasks' => 'Total, pending, in progress, completed, overdue',
-            'Leads' => 'Total, new, hot, warm, cold, converted',
-            'Outreach' => 'Messages, follow-ups, replies',
-        ] as $title => $description)
-            <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-                <h2 class="text-sm font-semibold text-slate-900">{{ $title }}</h2>
-                <p class="mt-1 text-xs text-slate-500">{{ $description }}</p>
-                <p class="mt-4 text-xs font-medium uppercase tracking-wide text-amber-600">Data arrives in later phases</p>
-            </div>
-        @endforeach
+        <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+            <h2 class="text-sm font-semibold text-slate-900">Team</h2>
+            <dl class="mt-3 space-y-1 text-sm text-slate-600">
+                <div class="flex justify-between"><dt>Total Members</dt><dd class="font-medium text-slate-900">{{ $team['total'] }}</dd></div>
+                <div class="flex justify-between"><dt>Active</dt><dd class="font-medium text-slate-900">{{ $team['active'] }}</dd></div>
+                <div class="flex justify-between"><dt>Hours Today</dt><dd class="font-medium text-slate-900">{{ number_format($team['hoursToday'], 1) }}</dd></div>
+                <div class="flex justify-between"><dt>Hours This Week</dt><dd class="font-medium text-slate-900">{{ number_format($team['hoursWeek'], 1) }}</dd></div>
+                <div class="flex justify-between"><dt>Hours This Month</dt><dd class="font-medium text-slate-900">{{ number_format($team['hoursMonth'], 1) }}</dd></div>
+            </dl>
+        </div>
+
+        <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+            <h2 class="text-sm font-semibold text-slate-900">Tasks</h2>
+            <dl class="mt-3 space-y-1 text-sm text-slate-600">
+                <div class="flex justify-between"><dt>Total</dt><dd class="font-medium text-slate-900">{{ $tasks['total'] }}</dd></div>
+                <div class="flex justify-between"><dt>Pending</dt><dd class="font-medium text-slate-900">{{ $tasks['pending'] }}</dd></div>
+                <div class="flex justify-between"><dt>In Progress</dt><dd class="font-medium text-slate-900">{{ $tasks['inProgress'] }}</dd></div>
+                <div class="flex justify-between"><dt>Completed</dt><dd class="font-medium text-slate-900">{{ $tasks['completed'] }}</dd></div>
+                <div class="flex justify-between"><dt>Overdue</dt><dd class="font-medium text-red-600">{{ $tasks['overdue'] }}</dd></div>
+            </dl>
+        </div>
+
+        <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+            <h2 class="text-sm font-semibold text-slate-900">Leads</h2>
+            <p class="mt-1 text-xs text-slate-500">Total, new, hot, warm, cold, converted</p>
+            <p class="mt-4 text-xs font-medium uppercase tracking-wide text-amber-600">Data arrives in later phases</p>
+        </div>
+
+        <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+            <h2 class="text-sm font-semibold text-slate-900">Outreach</h2>
+            <p class="mt-1 text-xs text-slate-500">Messages, follow-ups, replies</p>
+            <p class="mt-4 text-xs font-medium uppercase tracking-wide text-amber-600">Data arrives in later phases</p>
+        </div>
     </div>
 </div>

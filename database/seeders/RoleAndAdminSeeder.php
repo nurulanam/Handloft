@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Enums\Role as RoleEnum;
+use App\Models\TaskCategory;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
@@ -70,14 +71,23 @@ class RoleAndAdminSeeder extends Seeder
             ['email' => 'admin@am2amdesk.test'],
             [
                 'name' => 'Super Admin',
+                'user_id' => 'admin',
                 'password' => bcrypt('password'),
                 'status' => 'active',
                 'email_verified_at' => now(),
             ]
         );
 
+        if (! $admin->user_id) {
+            $admin->update(['user_id' => 'admin']);
+        }
+
         if (! $admin->hasRole(RoleEnum::SuperAdmin->value)) {
             $admin->assignRole(RoleEnum::SuperAdmin->value);
+        }
+
+        foreach (['General', 'Marketing', 'Development', 'Client Work'] as $category) {
+            TaskCategory::firstOrCreate(['name' => $category]);
         }
     }
 }

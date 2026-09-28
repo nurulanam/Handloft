@@ -22,4 +22,15 @@ Route::post('/logout', function () {
 
 Route::middleware('auth')->group(function () {
     Route::livewire('/dashboard', 'dashboard')->name('dashboard');
+
+    Route::livewire('/users', 'users.index')->name('users.index');
+    Route::livewire('/users/create', 'users.form')->name('users.create');
+    Route::livewire('/users/{user}/edit', 'users.form')->name('users.edit');
+
+    Route::livewire('/tasks', 'tasks.index')->name('tasks.index');
+    Route::livewire('/tasks/create', 'tasks.create')->name('tasks.create');
+    Route::livewire('/tasks/{task}', 'tasks.show')->name('tasks.show');
+
+    Route::livewire('/work-history', 'work-history.index')->name('work-history.index');
+    Route::livewire('/work-history/{user}', 'work-history.index')->name('work-history.show');
 });

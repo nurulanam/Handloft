@@ -25,8 +25,9 @@
                     @php
                         $navigation = [
                             ['label' => 'Dashboard', 'route' => 'dashboard'],
-                            ['label' => 'Team', 'disabled' => true],
-                            ['label' => 'Tasks', 'disabled' => true],
+                            ['label' => 'Team', 'route' => 'users.index', 'hidden' => auth()->user()->cannot('manage-users')],
+                            ['label' => 'Tasks', 'route' => 'tasks.index'],
+                            ['label' => 'Work History', 'route' => 'work-history.index'],
                             ['label' => 'Leads', 'disabled' => true],
                             ['label' => 'Outreach', 'disabled' => true],
                             ['label' => 'Calendar', 'disabled' => true],
@@ -37,6 +38,8 @@
                     @endphp
 
                     @foreach ($navigation as $item)
+                        @continue(! empty($item['hidden']))
+
                         @if (! empty($item['disabled']))
                             <span class="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-slate-500">
                                 {{ $item['label'] }}
@@ -45,7 +48,7 @@
                         @else
                             <a
                                 href="{{ route($item['route']) }}"
-                                class="flex items-center rounded-lg px-3 py-2 text-sm font-medium transition {{ request()->routeIs($item['route']) ? 'bg-slate-800 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}"
+                                class="flex items-center rounded-lg px-3 py-2 text-sm font-medium transition {{ request()->routeIs($item['route'], \Illuminate\Support\Str::before($item['route'], '.').'.*') ? 'bg-slate-800 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}"
                             >
                                 {{ $item['label'] }}
                             </a>
