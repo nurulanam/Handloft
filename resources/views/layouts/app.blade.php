@@ -63,13 +63,21 @@
                             'cog' => 'M11.078 2.25c-.917-1.5-3.239-1.5-4.156 0l-.114.185c-.494.804-1.454 1.201-2.373.98a2.638 2.638 0 00-3.223 3.222c.22.919-.177 1.88-.98 2.374l-.185.113c-1.5.917-1.5 3.24 0 4.156l.185.114c.803.494 1.2 1.454.98 2.373a2.638 2.638 0 003.222 3.223c.919-.22 1.88.177 2.374.98l.113.185c.917 1.5 3.24 1.5 4.156 0l.114-.185c.494-.803 1.454-1.2 2.373-.98a2.638 2.638 0 003.223-3.222c-.22-.919.177-1.88.98-2.374l.185-.113c1.5-.917 1.5-3.24 0-4.156l-.185-.114c-.803-.494-1.2-1.454-.98-2.373a2.638 2.638 0 00-3.222-3.223c-.919.22-1.88-.177-2.374-.98l-.113-.185zM10 13a3 3 0 100-6 3 3 0 000 6z',
                         ];
 
+                        $chevron = 'M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z';
+
                         $navigation = [
                             ['label' => 'Dashboard', 'route' => 'dashboard', 'icon' => $icons['dashboard']],
                             ['label' => 'For You', 'route' => 'for-you', 'icon' => $icons['for-you']],
                             ['label' => 'Starred', 'route' => 'starred', 'icon' => $icons['star']],
                             ['label' => 'Team', 'route' => 'users.index', 'icon' => $icons['users'], 'hidden' => auth()->user()->cannot('manage-users')],
-                            ['label' => 'Projects', 'route' => 'projects.index', 'icon' => $icons['folder']],
-                            ['label' => 'Tasks', 'route' => 'tasks.index', 'icon' => $icons['clipboard']],
+                            ['label' => 'Projects', 'icon' => $icons['folder'], 'children' => [
+                                ['label' => 'All Projects', 'route' => 'projects.index'],
+                                ['label' => 'Create Project', 'route' => 'projects.create'],
+                            ]],
+                            ['label' => 'Tasks', 'icon' => $icons['clipboard'], 'children' => [
+                                ['label' => 'All Tasks', 'route' => 'tasks.index'],
+                                ['label' => 'Create Task', 'route' => 'tasks.create'],
+                            ]],
                             ['label' => 'Work History', 'route' => 'work-history.index', 'icon' => $icons['clock']],
                             ['label' => 'Leads', 'icon' => $icons['user-plus'], 'disabled' => true],
                             ['label' => 'Outreach', 'icon' => $icons['megaphone'], 'disabled' => true],
@@ -83,7 +91,57 @@
                     @foreach ($navigation as $item)
                         @continue(! empty($item['hidden']))
 
-                        @if (! empty($item['disabled']))
+                        @if (! empty($item['children']))
+                            @php
+                                $childActive = collect($item['children'])->contains(
+                                    fn ($child) => request()->routeIs($child['route'], \Illuminate\Support\Str::before($child['route'], '.').'.*')
+                                );
+                            @endphp
+                            <div
+                                x-data="{ open: {{ $childActive ? 'true' : 'false' }}, height: '0px' }"
+                                x-effect="height = open ? $refs.submenuPanel.scrollHeight + 'px' : '0px'"
+                            >
+                                <button
+                                    type="button"
+                                    title="{{ $item['label'] }}"
+                                    @click="sidebarCollapsed ? Livewire.navigate('{{ route($item['children'][0]['route']) }}') : (open = ! open)"
+                                    class="flex w-full items-center gap-2.5 overflow-hidden rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors duration-200 ease-in-out {{ $childActive ? 'bg-brand text-white' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' }}"
+                                    :class="sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4.5 shrink-0"><path fill-rule="evenodd" d="{{ $item['icon'] }}" clip-rule="evenodd" /></svg>
+                                    <span class="flex-1 whitespace-nowrap text-left transition-all duration-200" :class="sidebarCollapsed ? 'lg:hidden' : ''">{{ $item['label'] }}</span>
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+                                        class="size-3.5 shrink-0 opacity-60 transition-transform duration-300 ease-in-out"
+                                        :class="[open ? 'rotate-90' : '', sidebarCollapsed ? 'lg:hidden' : '']"
+                                    ><path fill-rule="evenodd" d="{{ $chevron }}" clip-rule="evenodd" /></svg>
+                                </button>
+
+                                {{-- Animates the exact measured pixel height of the panel (via
+                                     scrollHeight) rather than relying on the Alpine collapse
+                                     plugin, which isn't actually bundled with Livewire's Alpine
+                                     build — x-collapse there is silently a no-op. This works in
+                                     every browser with no plugin and no "jumps early" artifact
+                                     that a generous max-height guess would cause. --}}
+                                <div
+                                    class="overflow-hidden transition-[height] duration-300 ease-in-out"
+                                    :style="{ height: height }"
+                                    :class="sidebarCollapsed ? 'lg:hidden' : ''"
+                                >
+                                    <div x-ref="submenuPanel" class="ml-4 mt-1 space-y-0.5 border-l border-zinc-800 pl-4">
+                                        @foreach ($item['children'] as $child)
+                                            <a
+                                                href="{{ route($child['route']) }}"
+                                                wire:navigate
+                                                class="block rounded-lg px-3 py-1.5 text-sm transition {{ request()->routeIs($child['route']) ? 'font-medium text-white' : 'text-zinc-400 hover:text-white' }}"
+                                            >
+                                                {{ $child['label'] }}
+                                            </a>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
+                        @elseif (! empty($item['disabled']))
                             <span
                                 class="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-zinc-500"
                                 :class="sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''"
@@ -100,7 +158,7 @@
                                 href="{{ route($item['route']) }}"
                                 wire:navigate
                                 title="{{ $item['label'] }}"
-                                class="flex items-center gap-2.5 overflow-hidden rounded-lg px-3 py-2 text-sm font-medium transition {{ request()->routeIs($item['route'], \Illuminate\Support\Str::before($item['route'], '.').'.*') ? 'bg-brand text-white' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' }}"
+                                class="flex items-center gap-2.5 overflow-hidden rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200 ease-in-out {{ request()->routeIs($item['route'], \Illuminate\Support\Str::before($item['route'], '.').'.*') ? 'bg-brand text-white' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' }}"
                                 :class="sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4.5 shrink-0"><path fill-rule="evenodd" d="{{ $item['icon'] }}" clip-rule="evenodd" /></svg>
@@ -136,7 +194,7 @@
             ></div>
 
             {{-- Main column --}}
-            <div class="flex flex-1 flex-col transition-[padding] duration-300 ease-in-out" :class="sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'">
+            <div class="flex flex-1 flex-col" :class="sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'">
                 <header class="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-zinc-200 bg-white px-4 sm:px-6">
                     <button
                         type="button"
