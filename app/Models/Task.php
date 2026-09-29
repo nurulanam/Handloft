@@ -118,6 +118,28 @@ class Task extends Model
     }
 
     /**
+     * @return HasMany<TaskTimeLog, $this>
+     */
+    public function timeLogs(): HasMany
+    {
+        return $this->hasMany(TaskTimeLog::class)->latest('logged_date');
+    }
+
+    /**
+     * Sum of every daily time-log entry, computed from the loaded relation
+     * when available so listing pages that eager-load `timeLogs` don't fire
+     * an extra query per task.
+     */
+    protected function totalLoggedHours(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->relationLoaded('timeLogs')
+                ? (float) $this->timeLogs->sum('hours')
+                : (float) $this->timeLogs()->sum('hours'),
+        );
+    }
+
+    /**
      * @return BelongsTo<User, $this>
      */
     public function qa(): BelongsTo

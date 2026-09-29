@@ -25,6 +25,8 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
 
     public string $assigned_to = '';
 
+    public string $reporter_id = '';
+
     public string $qa_id = '';
 
     public string $priority = 'medium';
@@ -47,6 +49,7 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
         Gate::authorize('create', Task::class);
 
         $this->project_id = (string) request()->query('project', '');
+        $this->reporter_id = (string) auth()->id();
     }
 
     /**
@@ -70,6 +73,7 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'assigned_to' => ['required', 'exists:users,id'],
+            'reporter_id' => ['required', 'exists:users,id'],
             'qa_id' => ['nullable', 'exists:users,id'],
             'priority' => ['required', Rule::in(array_column(TaskPriority::cases(), 'value'))],
             'start_date' => ['nullable', 'date'],
@@ -85,6 +89,7 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
         $task = $workflow->createTask([
             'title' => $data['title'],
             'description' => Html::sanitize($data['description']),
+            'created_by' => $data['reporter_id'],
             'priority' => $data['priority'],
             'start_date' => $data['start_date'] ?: null,
             'deadline' => $data['deadline'] ?: null,
@@ -229,14 +234,29 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
                         </div>
                         @error('assigned_to') <p class="pb-2 text-xs text-red-600">{{ $message }}</p> @enderror
 
-                        {{-- Reporter (fixed — the person filling out this form) --}}
+                        {{-- Reporter --}}
                         <div class="flex items-center justify-between gap-3 py-2.5">
                             <span class="text-sm text-zinc-500">Reporter</span>
-                            <span class="flex items-center gap-2">
-                                <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-[10px] font-semibold text-white">{{ \App\Support\Avatar::initials(auth()->user()->name) }}</span>
-                                <span class="text-sm text-zinc-900">{{ auth()->user()->name }}</span>
-                            </span>
+
+                            <div class="relative" x-data="dropdownMenu(@js($reporter_id), @js(optional($users->firstWhere('id', $reporter_id))->name ?? 'Select reporter'))">
+                                <button type="button" @click="open = ! open" class="flex items-center gap-2 hover:opacity-75">
+                                    <template x-if="value">
+                                        <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-[10px] font-semibold text-white" x-text="initialsOf(label)"></span>
+                                    </template>
+                                    <span class="text-sm" :class="value ? 'text-zinc-900' : 'text-zinc-400'" x-text="label"></span>
+                                </button>
+
+                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                                    @foreach ($users as $option)
+                                        <button type="button" wire:click="$set('reporter_id', {{ $option->id }})" @click="choose('{{ $option->id }}', @js($option->name))" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50">
+                                            <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($option->name) }}</span>
+                                            {{ $option->name }}
+                                        </button>
+                                    @endforeach
+                                </div>
+                            </div>
                         </div>
+                        @error('reporter_id') <p class="pb-2 text-xs text-red-600">{{ $message }}</p> @enderror
 
                         {{-- QA / Reviewer --}}
                         <div class="flex items-center justify-between gap-3 py-2.5">

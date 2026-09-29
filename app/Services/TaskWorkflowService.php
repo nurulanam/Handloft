@@ -5,8 +5,10 @@ namespace App\Services;
 use App\Enums\TaskActivityType;
 use App\Enums\TaskStatus;
 use App\Models\Task;
+use App\Models\TaskTimeLog;
 use App\Models\User;
 use App\Models\WorkHistory;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 
 class TaskWorkflowService
@@ -22,7 +24,10 @@ class TaskWorkflowService
             $task = Task::create([
                 'status' => TaskStatus::Todo,
                 ...$data,
-                'created_by' => $creator->id,
+                // The Reporter can be set explicitly (e.g. logging a task on
+                // someone else's behalf) via $data['created_by']; otherwise
+                // it defaults to whoever is actually performing the create.
+                'created_by' => $data['created_by'] ?? $creator->id,
             ]);
 
             $now = now();
@@ -126,6 +131,44 @@ class TaskWorkflowService
             ->log('Completed hours edited');
 
         $workHistory->update(['actual_hours' => $newHours]);
+    }
+
+    /**
+     * Log (or update) one day's worked hours on a task. A person gets at most
+     * one entry per day — logging the same day again updates that entry
+     * rather than adding a second one, so the running total stays correct.
+     */
+    public function logTime(Task $task, User $user, CarbonInterface $date, float $hours, ?string $note = null): TaskTimeLog
+    {
+        // Not a plain updateOrCreate(): the `date` cast stores `logged_date`
+        // as a full datetime string, so a raw string match condition would
+        // never find the existing row and would hit the unique constraint on
+        // the next insert attempt instead. whereDate() compares by calendar
+        // day regardless of the stored format.
+        $log = TaskTimeLog::query()
+            ->where('task_id', $task->id)
+            ->where('user_id', $user->id)
+            ->whereDate('logged_date', $date->toDateString())
+            ->first() ?? new TaskTimeLog([
+                'task_id' => $task->id,
+                'user_id' => $user->id,
+                'logged_date' => $date->toDateString(),
+            ]);
+
+        $log->fill(['hours' => $hours, 'note' => $note])->save();
+
+        $this->recordActivity($task, TaskActivityType::MetaUpdated, $user, "{$user->name} logged {$hours}h on {$date->format('d M Y')}", now());
+
+        return $log;
+    }
+
+    public function deleteTimeLog(TaskTimeLog $timeLog, User $actor): void
+    {
+        $task = $timeLog->task;
+
+        $this->recordActivity($task, TaskActivityType::MetaUpdated, $actor, "{$actor->name} removed a time entry for {$timeLog->logged_date->format('d M Y')}", now());
+
+        $timeLog->delete();
     }
 
     private function recordActivity(Task $task, TaskActivityType $type, User $causer, string $description, \DateTimeInterface $occurredAt): void

@@ -40,6 +40,33 @@ enum TaskStatus: string
     }
 
     /**
+     * How far along the workflow this status sits, for "has this task at
+     * least reached X" checks (e.g. gating who may log time). Rejected sits
+     * alongside QaTesting rather than after it, since a task can bounce
+     * between the two — it's a sibling outcome of testing, not a further
+     * stage past it.
+     */
+    private function rank(): int
+    {
+        return match ($this) {
+            self::Todo => 0,
+            self::InProgress => 1,
+            self::QaTesting, self::Rejected => 2,
+            self::ReadyToDeploy => 3,
+            self::Done => 4,
+        };
+    }
+
+    /**
+     * Whether this status has progressed at least as far as $status in the
+     * workflow (based on current status, not whether it was ever reached).
+     */
+    public function isAtLeast(self $status): bool
+    {
+        return $this->rank() >= $status->rank();
+    }
+
+    /**
      * The statuses a task in this status is allowed to move to next. This is
      * the single source of truth for the workflow's shape; TaskPolicy layers
      * on top of it to decide who may perform each specific move.

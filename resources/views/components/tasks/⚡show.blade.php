@@ -25,8 +25,6 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
 
     public bool $showSubmitQaModal = false;
 
-    public string $actual_hours = '';
-
     public string $submission_note = '';
 
     public string $description = '';
@@ -49,12 +47,21 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
 
     public string $subtask_assigned_to = '';
 
+    public bool $showLogTime = false;
+
+    public string $log_date = '';
+
+    public string $log_hours = '';
+
+    public string $log_note = '';
+
     public function mount(Task $task): void
     {
         Gate::authorize('view', $task);
 
         $this->task = $task;
         $this->description = (string) $task->description;
+        $this->log_date = now()->toDateString();
     }
 
     public function toggleStar(): void
@@ -76,11 +83,12 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         Gate::authorize('transitionStatus', [$this->task, TaskStatus::QaTesting]);
 
         $data = $this->validate([
-            'actual_hours' => ['required', 'numeric', 'min:0.1', 'max:24'],
             'submission_note' => ['nullable', 'string'],
         ]);
 
-        $workflow->submitForQa($this->task, auth()->user(), (float) $data['actual_hours'], $data['submission_note'] ?: null);
+        // Hours are no longer asked for here — they're already captured via
+        // the daily Time Logs, so the total worked so far is used as-is.
+        $workflow->submitForQa($this->task, auth()->user(), $this->task->total_logged_hours, $data['submission_note'] ?: null);
 
         $this->showSubmitQaModal = false;
         $this->task->refresh();
@@ -89,7 +97,6 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
     public function cancelSubmitForQa(): void
     {
         $this->showSubmitQaModal = false;
-        $this->actual_hours = '';
         $this->submission_note = '';
         $this->resetErrorBag();
     }
@@ -159,7 +166,6 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                 return;
             }
 
-            $this->actual_hours = (string) ($this->task->workHistory?->actual_hours ?? '');
             $this->submission_note = '';
             $this->showSubmitQaModal = true;
 
@@ -191,7 +197,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
 
     public function saveReporter(int $userId): void
     {
-        Gate::authorize('reassign', $this->task);
+        Gate::authorize('updateMeta', $this->task);
 
         $data = Validator::make(['reporter_value' => $userId], [
             'reporter_value' => ['required', 'exists:users,id'],
@@ -380,6 +386,98 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         $this->task->refresh();
     }
 
+    public function logTime(TaskWorkflowService $workflow): void
+    {
+        $this->authorizeTimeLogging();
+
+        $data = $this->validate([
+            'log_date' => [
+                'required',
+                'date',
+                'before_or_equal:today',
+                ...($this->task->start_date ? ['after_or_equal:'.$this->task->start_date->toDateString()] : []),
+            ],
+            'log_hours' => ['required', 'numeric', 'min:0.1', 'max:24'],
+            'log_note' => ['nullable', 'string'],
+        ], [
+            'log_date.after_or_equal' => 'Time can\'t be logged before the task\'s start date ('.optional($this->task->start_date)->format('d M Y').').',
+        ]);
+
+        $workflow->logTime(
+            $this->task,
+            auth()->user(),
+            \Illuminate\Support\Carbon::parse($data['log_date']),
+            (float) $data['log_hours'],
+            $data['log_note'] ?: null
+        );
+
+        $this->log_date = now()->toDateString();
+        $this->log_hours = '';
+        $this->log_note = '';
+        $this->showLogTime = false;
+        $this->task->refresh();
+    }
+
+    public function cancelLogTime(): void
+    {
+        $this->showLogTime = false;
+        $this->log_date = now()->toDateString();
+        $this->log_hours = '';
+        $this->log_note = '';
+        $this->resetErrorBag();
+    }
+
+    public function deleteTimeLog(TaskWorkflowService $workflow, int $timeLogId): void
+    {
+        $timeLog = $this->task->timeLogs()->findOrFail($timeLogId);
+
+        abort_unless($timeLog->user_id === auth()->id() || Gate::allows('updateMeta', $this->task), 403);
+
+        $workflow->deleteTimeLog($timeLog, auth()->user());
+
+        $this->task->refresh();
+    }
+
+    /**
+     * Anyone connected to the task — the assignee doing the work, the QA/
+     * Reviewer testing it, or the Reporter who filed it — spends real time on
+     * it and can log their own hours, not just the assignee. A reassign-task
+     * holder (e.g. a Manager) may also log time on someone else's behalf,
+     * regardless of status.
+     *
+     * The QA/Reviewer and Reporter's own time only makes sense once the task
+     * has actually reached their stage of the workflow — a reviewer isn't
+     * testing anything before QA Testing, and a reporter isn't signing off on
+     * anything before Ready to Deploy. This still applies even when the
+     * Reporter happens to be the task's creator, so it's checked separately
+     * from the assignee/permission-holder cases rather than via the more
+     * permissive `updateMeta` ability (which lets a creator edit metadata
+     * unconditionally).
+     */
+    private function authorizeTimeLogging(): void
+    {
+        abort_unless($this->canCurrentUserLogTime(), 403);
+    }
+
+    private function canCurrentUserLogTime(): bool
+    {
+        $user = auth()->user();
+
+        if ($user->can('reassign-task') || $this->task->isAssignedTo($user)) {
+            return true;
+        }
+
+        if ($this->task->isReviewedBy($user)) {
+            return $this->task->status->isAtLeast(TaskStatus::QaTesting);
+        }
+
+        if ($this->task->isReportedBy($user)) {
+            return $this->task->status->isAtLeast(TaskStatus::ReadyToDeploy);
+        }
+
+        return false;
+    }
+
     private function logMetaChange(string $description): void
     {
         $this->task->activities()->create([
@@ -431,6 +529,9 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
             'canEditMeta' => Gate::allows('updateMeta', $this->task),
             'canComment' => Gate::allows('comment', $this->task),
             'isStarred' => auth()->user()->starredTasks()->where('tasks.id', $this->task->id)->exists(),
+            'timeLogs' => $this->task->timeLogs()->with('user')->get(),
+            'totalLoggedHours' => $this->task->timeLogs()->sum('hours'),
+            'canLogTime' => $this->canCurrentUserLogTime(),
         ];
     }
 };
@@ -477,13 +578,16 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                 <div x-show="!editing">
                     @if ($task->description)
                         <div x-data="{ expanded: false, overflowing: false }" x-init="$nextTick(() => { overflowing = $refs.descriptionContent.scrollHeight > $refs.descriptionContent.clientHeight })">
+                            {{-- The `ql-editor` class sets `white-space: pre-wrap` so intentional
+                                 blank lines in the description render correctly — which means any
+                                 whitespace *outside* the description itself (e.g. this template's own
+                                 indentation) would render as stray blank space too, so the tags must
+                                 hug the interpolation with no whitespace in between. --}}
                             <div
                                 x-ref="descriptionContent"
                                 class="ql-editor mt-2 p-0! text-sm! text-zinc-600 [&_a]:text-brand [&_a]:underline [&_blockquote]:text-zinc-500 [&_code]:rounded [&_code]:bg-zinc-100 [&_code]:px-1"
                                 :class="expanded ? '' : 'line-clamp-10'"
-                            >
-                                {!! $task->description !!}
-                            </div>
+                            >{!! $task->description !!}</div>
 
                             <div x-show="overflowing" class="mt-2 flex justify-center">
                                 <button type="button" @click="expanded = ! expanded" class="flex items-center gap-1 text-xs font-medium text-brand hover:underline">
@@ -731,12 +835,12 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                     <div class="flex items-center justify-between gap-3 py-2.5">
                         <span class="text-sm text-zinc-500">Reporter</span>
                         <div class="relative" x-data="dropdownMenu()">
-                            <button type="button" @click="open = ! open" @disabled(! $canReassign) class="flex items-center gap-2 {{ $canReassign ? 'hover:opacity-75' : '' }}">
+                            <button type="button" @click="open = ! open" @disabled(! $canEditMeta) class="flex items-center gap-2 {{ $canEditMeta ? 'hover:opacity-75' : '' }}">
                                 <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-[10px] font-semibold text-white">{{ \App\Support\Avatar::initials($task->creator->name) }}</span>
                                 <span class="text-sm text-zinc-900">{{ $task->creator->name }}</span>
                             </button>
 
-                            @if ($canReassign)
+                            @if ($canEditMeta)
                                 <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
                                     @foreach ($users as $option)
                                         <button type="button" wire:click="saveReporter({{ $option->id }})" @click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50">
@@ -930,6 +1034,66 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                     @endif
                 @endif
             </div>
+
+            <div class="rounded-lg border border-zinc-200 bg-white p-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Time Logs</h3>
+                    <span class="text-sm font-semibold text-brand">{{ rtrim(rtrim(number_format((float) $totalLoggedHours, 2), '0'), '.') ?: '0' }}h</span>
+                </div>
+
+                <div class="mt-2 space-y-2">
+                    @forelse ($timeLogs as $log)
+                        <div class="flex items-center justify-between gap-2 rounded-md border border-zinc-100 px-2 py-1.5 text-sm">
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="font-medium text-zinc-900">{{ $log->logged_date->format('d M Y') }}</span>
+                                    <span class="text-zinc-400">·</span>
+                                    <span class="text-zinc-600">{{ $log->user->name }}</span>
+                                </div>
+                                @if ($log->note)
+                                    <p class="truncate text-xs text-zinc-500">{{ $log->note }}</p>
+                                @endif
+                            </div>
+
+                            <div class="flex shrink-0 items-center gap-2">
+                                <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">{{ rtrim(rtrim(number_format((float) $log->hours, 2), '0'), '.') ?: '0' }}h</span>
+
+                                @if ($log->user_id === auth()->id() || $canEditMeta)
+                                    <button type="button" wire:click="deleteTimeLog({{ $log->id }})" wire:confirm="Remove this time entry?" class="text-zinc-300 hover:text-red-600" title="Remove">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4">
+                                            <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clip-rule="evenodd" />
+                                        </svg>
+                                    </button>
+                                @endif
+                            </div>
+                        </div>
+                    @empty
+                        <p class="text-sm text-zinc-400">No time logged yet.</p>
+                    @endforelse
+                </div>
+
+                @if ($canLogTime)
+                    @if ($showLogTime)
+                        <div class="mt-3 space-y-2 rounded-md border border-zinc-200 p-2">
+                            <div class="flex gap-2">
+                                <input wire:model="log_date" type="date" min="{{ $task->start_date?->toDateString() }}" max="{{ now()->toDateString() }}" class="block w-1/2 rounded-md border border-zinc-300 px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                <input wire:model="log_hours" type="number" step="0.25" min="0.1" max="24" placeholder="Hours" class="block w-1/2 rounded-md border border-zinc-300 px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                            </div>
+                            @error('log_date') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
+                            @error('log_hours') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
+
+                            <input wire:model="log_note" type="text" placeholder="Note (optional)" class="block w-full rounded-md border border-zinc-300 px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+
+                            <div class="flex justify-end gap-3">
+                                <button type="button" wire:click="cancelLogTime" class="text-xs text-zinc-500 hover:text-zinc-700">Cancel</button>
+                                <button type="button" wire:click="logTime" class="text-xs font-medium text-brand hover:underline">Save</button>
+                            </div>
+                        </div>
+                    @else
+                        <button type="button" wire:click="$set('showLogTime', true)" class="mt-3 text-xs font-medium text-brand hover:underline">+ Log time</button>
+                    @endif
+                @endif
+            </div>
         </div>
     </div>
 
@@ -940,11 +1104,9 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                 <h3 class="text-lg font-semibold text-zinc-900">Submit for QA Testing</h3>
                 <p class="mt-1 text-sm text-zinc-500">{{ $task->title }}</p>
 
-                <div class="mt-4">
-                    <label class="block text-sm font-medium text-zinc-700">Actual Hours Worked</label>
-                    <input wire:model="actual_hours" type="number" step="0.1" min="0.1" max="24" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                    @error('actual_hours') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-                </div>
+                <p class="mt-4 text-sm text-zinc-500">
+                    Time logged so far: <span class="font-semibold text-zinc-900">{{ rtrim(rtrim(number_format($task->total_logged_hours, 2), '0'), '.') ?: '0' }}h</span>
+                </p>
 
                 <div class="mt-4">
                     <label class="block text-sm font-medium text-zinc-700">Note (Optional)</label>

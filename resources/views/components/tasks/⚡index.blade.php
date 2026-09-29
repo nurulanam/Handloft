@@ -24,8 +24,6 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
 
     public ?int $submittingTaskId = null;
 
-    public string $actual_hours = '';
-
     public string $submission_note = '';
 
     public ?int $projectId = null;
@@ -87,7 +85,6 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
             }
 
             $this->submittingTaskId = $task->id;
-            $this->actual_hours = (string) ($task->workHistory?->actual_hours ?? '');
             $this->submission_note = '';
 
             return;
@@ -135,21 +132,20 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
         Gate::authorize('transitionStatus', [$task, TaskStatus::QaTesting]);
 
         $data = $this->validate([
-            'actual_hours' => ['required', 'numeric', 'min:0.1', 'max:24'],
             'submission_note' => ['nullable', 'string'],
         ]);
 
-        $workflow->submitForQa($task, auth()->user(), (float) $data['actual_hours'], $data['submission_note'] ?: null);
+        // Hours are no longer asked for here — they're already captured via
+        // the daily Time Logs, so the total worked so far is used as-is.
+        $workflow->submitForQa($task, auth()->user(), $task->total_logged_hours, $data['submission_note'] ?: null);
 
         $this->submittingTaskId = null;
-        $this->actual_hours = '';
         $this->submission_note = '';
     }
 
     public function cancelSubmitForQa(): void
     {
         $this->submittingTaskId = null;
-        $this->actual_hours = '';
         $this->submission_note = '';
         $this->resetErrorBag();
     }
@@ -438,15 +434,13 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                 <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
                     <h3 class="text-lg font-semibold text-zinc-900">Submit for QA Testing</h3>
 
-                    <div class="mt-4">
-                        <label class="block text-sm font-medium text-zinc-700">Actual Hours Worked</label>
-                        <input wire:model="actual_hours" type="number" step="0.1" min="0.1" max="24" autofocus class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                        @error('actual_hours') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-                    </div>
+                    <p class="mt-4 text-sm text-zinc-500">
+                        Time logged so far: <span class="font-semibold text-zinc-900">{{ rtrim(rtrim(number_format(\App\Models\Task::find($submittingTaskId)?->total_logged_hours ?? 0, 2), '0'), '.') ?: '0' }}h</span>
+                    </p>
 
                     <div class="mt-4">
                         <label class="block text-sm font-medium text-zinc-700">Note (Optional)</label>
-                        <textarea wire:model="submission_note" rows="2" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40"></textarea>
+                        <textarea wire:model="submission_note" rows="2" autofocus class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40"></textarea>
                     </div>
 
                     <div class="mt-6 flex justify-end gap-3">

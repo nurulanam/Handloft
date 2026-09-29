@@ -87,6 +87,43 @@ class TaskDetailTest extends TestCase
         $this->assertSame('low', $task->priority->value);
     }
 
+    public function test_the_assignee_can_update_the_reporter(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+        $hasan = $this->teamMember('Hasan');
+
+        $workflow = app(TaskWorkflowService::class);
+        $task = $workflow->createTask(['title' => 'Website Audit'], $rahim, $karim);
+
+        // The reporter is task metadata like Project/Parent/Priority, not a
+        // reassignment — so the assignee can correct it, not only someone
+        // with reassign-task permission.
+        Livewire::actingAs($karim)
+            ->test('tasks.show', ['task' => $task])
+            ->call('saveReporter', $hasan->id)
+            ->assertHasNoErrors();
+
+        $this->assertSame($hasan->id, $task->fresh()->created_by);
+    }
+
+    public function test_an_unrelated_team_member_cannot_update_the_reporter(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+        $hasan = $this->teamMember('Hasan');
+
+        $workflow = app(TaskWorkflowService::class);
+        $task = $workflow->createTask(['title' => 'Website Audit', 'qa_id' => $hasan->id], $rahim, $karim);
+
+        Livewire::actingAs($hasan)
+            ->test('tasks.show', ['task' => $task])
+            ->call('saveReporter', $hasan->id)
+            ->assertForbidden();
+
+        $this->assertSame($rahim->id, $task->fresh()->created_by);
+    }
+
     public function test_adding_a_comment_with_an_attachment_persists(): void
     {
         $rahim = $this->teamMember('Rahim');

@@ -122,9 +122,7 @@ new #[Layout('layouts.app')] #[Title('Project')] class extends Component
         </div>
 
         @if ($project->description)
-            <div class="ql-editor mt-4 p-0! text-sm! text-zinc-600 [&_a]:text-brand [&_a]:underline [&_blockquote]:text-zinc-500 [&_code]:rounded [&_code]:bg-zinc-100 [&_code]:px-1">
-                {!! $project->description !!}
-            </div>
+            <div class="ql-editor mt-4 p-0! text-sm! text-zinc-600 [&_a]:text-brand [&_a]:underline [&_blockquote]:text-zinc-500 [&_code]:rounded [&_code]:bg-zinc-100 [&_code]:px-1">{!! $project->description !!}</div>
         @endif
 
         <div class="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-zinc-500">

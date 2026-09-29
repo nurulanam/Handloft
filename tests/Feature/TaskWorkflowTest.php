@@ -51,6 +51,28 @@ class TaskWorkflowTest extends TestCase
         $this->assertSame(2, $task->activities()->count());
     }
 
+    public function test_creating_a_task_can_report_it_on_behalf_of_someone_else(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+        $hasan = $this->teamMember('Hasan');
+
+        Livewire::actingAs($rahim)
+            ->test('tasks.create')
+            ->set('title', 'Create Client List')
+            ->set('assigned_to', $karim->id)
+            ->set('reporter_id', $hasan->id)
+            ->set('priority', 'medium')
+            ->call('save');
+
+        $task = Task::firstOrFail();
+
+        $this->assertSame($hasan->id, $task->created_by);
+        // The activity timeline still credits Rahim, who actually filled out
+        // the form, not Hasan, who's merely recorded as the Reporter.
+        $this->assertStringContainsString('Rahim', $task->activities()->first()->description);
+    }
+
     public function test_reassignment_preserves_full_history_across_three_hops(): void
     {
         $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
@@ -126,7 +148,7 @@ class TaskWorkflowTest extends TestCase
         $this->assertSame(TaskStatus::InProgress, $task->fresh()->status);
     }
 
-    public function test_assignee_moving_to_qa_testing_logs_hours_and_creates_work_history(): void
+    public function test_assignee_moving_to_qa_testing_uses_logged_time_to_create_work_history(): void
     {
         $rahim = $this->teamMember('Rahim');
         $karim = $this->teamMember('Karim');
@@ -134,12 +156,13 @@ class TaskWorkflowTest extends TestCase
 
         $workflow = app(TaskWorkflowService::class);
         $task = $workflow->createTask(['title' => 'Create Client List', 'status' => TaskStatus::InProgress, 'qa_id' => $qa->id], $rahim, $karim);
+        $workflow->logTime($task, $karim, now()->subDay(), 2.0);
+        $workflow->logTime($task, $karim, now(), 1.5);
 
         Livewire::actingAs($karim)
             ->test('tasks.show', ['task' => $task])
             ->call('saveStatus', 'qa_testing')
             ->assertSet('showSubmitQaModal', true)
-            ->set('actual_hours', '3.5')
             ->call('submitForQa');
 
         $task->refresh();
@@ -209,13 +232,14 @@ class TaskWorkflowTest extends TestCase
 
         $workflow = app(TaskWorkflowService::class);
         $task = $workflow->createTask(['title' => 'Website Audit', 'status' => TaskStatus::InProgress, 'qa_id' => $qa->id], $rahim, $karim);
-        $workflow->submitForQa($task, $karim, 3.0);
+        $workflow->logTime($task, $karim, now()->subDays(2), 3.0);
+        $workflow->submitForQa($task, $karim, $task->total_logged_hours);
         $task->update(['status' => TaskStatus::Rejected]);
+        $workflow->logTime($task, $karim, now(), 2.0);
 
         Livewire::actingAs($karim)
             ->test('tasks.show', ['task' => $task])
             ->call('saveStatus', 'qa_testing')
-            ->set('actual_hours', '5')
             ->call('submitForQa');
 
         $task->refresh();
@@ -439,11 +463,11 @@ class TaskWorkflowTest extends TestCase
 
         $workflow = app(TaskWorkflowService::class);
         $task = $workflow->createTask(['title' => 'Website Audit', 'status' => TaskStatus::InProgress, 'qa_id' => $qa->id], $rahim, $karim);
+        $workflow->logTime($task, $karim, now(), 2.5);
 
         Livewire::actingAs($karim)
             ->test('tasks.index')
             ->call('moveTask', $task->id, 'qa_testing')
-            ->set('actual_hours', '2.5')
             ->call('submitForQa')
             ->assertSet('submittingTaskId', null);
 
