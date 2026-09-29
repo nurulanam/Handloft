@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['name', 'description', 'status', 'created_by', 'start_date', 'deadline'])]
+#[Fillable(['name', 'description', 'status', 'created_by', 'coordinator_id', 'start_date', 'deadline'])]
 class Project extends Model
 {
     /** @use HasFactory<ProjectFactory> */
@@ -39,6 +39,14 @@ class Project extends Model
     }
 
     /**
+     * @return BelongsTo<User, $this>
+     */
+    public function coordinator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'coordinator_id');
+    }
+
+    /**
      * All tasks in this project, including subtasks.
      *
      * @return HasMany<Task, $this>
@@ -58,14 +66,19 @@ class Project extends Model
         return $this->tasks()->whereNull('parent_task_id');
     }
 
+    /**
+     * Reads the eager-loaded `task_count` from `withCount()` when available
+     * (e.g. on the projects list, to avoid an N+1 query per project) and
+     * falls back to a live count otherwise (e.g. on a single project's page).
+     */
     protected function taskCount(): Attribute
     {
-        return Attribute::make(get: fn () => $this->topLevelTasks()->count());
+        return Attribute::make(get: fn () => $this->attributes['task_count'] ?? $this->topLevelTasks()->count());
     }
 
     protected function completedCount(): Attribute
     {
-        return Attribute::make(get: fn () => $this->topLevelTasks()->where('status', TaskStatus::Done)->count());
+        return Attribute::make(get: fn () => $this->attributes['completed_count'] ?? $this->topLevelTasks()->where('status', TaskStatus::Done)->count());
     }
 
     protected function progressPercent(): Attribute

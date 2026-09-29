@@ -40,6 +40,26 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
+    // A field that displays as plain text/avatar until clicked, then opens a
+    // floating menu of options (rather than a native <select>) — used for
+    // every "pick a user/status/priority/etc." field across Task and Project
+    // pages. `choose()` gives instant optimistic feedback on unsaved forms
+    // (Create Task/Project); pages editing an already-saved record just wire
+    // each option's click straight to a Livewire save method and ignore
+    // value/label, since the server round-trip re-renders the real value.
+    Alpine.data('dropdownMenu', (initialValue = '', initialLabel = '') => ({
+        open: false,
+        value: initialValue,
+        label: initialLabel,
+        initialsOf,
+        priorityColor: (value) => PRIORITY_COLORS[value] ?? 'text-zinc-400',
+        choose(value, label) {
+            this.value = value;
+            this.label = label;
+            this.open = false;
+        },
+    }));
+
     Alpine.data('quillEditor', (initialValue = '') => ({
         quill: null,
 

@@ -87,8 +87,7 @@ class TaskWorkflowTest extends TestCase
 
         Livewire::actingAs($karim)
             ->test('tasks.show', ['task' => $task])
-            ->set('status_value', 'in_progress')
-            ->call('saveStatus');
+            ->call('saveStatus', 'in_progress');
 
         $this->assertSame(TaskStatus::InProgress, $task->fresh()->status);
     }
@@ -105,8 +104,7 @@ class TaskWorkflowTest extends TestCase
         // assignee, so Rahim must not be able to start work on it himself.
         Livewire::actingAs($rahim)
             ->test('tasks.show', ['task' => $task])
-            ->set('status_value', 'in_progress')
-            ->call('saveStatus')
+            ->call('saveStatus', 'in_progress')
             ->assertForbidden();
 
         $this->assertSame(TaskStatus::Todo, $task->fresh()->status);
@@ -122,8 +120,7 @@ class TaskWorkflowTest extends TestCase
 
         Livewire::actingAs($karim)
             ->test('tasks.show', ['task' => $task])
-            ->set('status_value', 'qa_testing')
-            ->call('saveStatus')
+            ->call('saveStatus', 'qa_testing')
             ->assertDispatched('notify');
 
         $this->assertSame(TaskStatus::InProgress, $task->fresh()->status);
@@ -140,8 +137,7 @@ class TaskWorkflowTest extends TestCase
 
         Livewire::actingAs($karim)
             ->test('tasks.show', ['task' => $task])
-            ->set('status_value', 'qa_testing')
-            ->call('saveStatus')
+            ->call('saveStatus', 'qa_testing')
             ->assertSet('showSubmitQaModal', true)
             ->set('actual_hours', '3.5')
             ->call('submitForQa');
@@ -166,8 +162,7 @@ class TaskWorkflowTest extends TestCase
 
         Livewire::actingAs($qa)
             ->test('tasks.show', ['task' => $task])
-            ->set('status_value', 'rejected')
-            ->call('saveStatus');
+            ->call('saveStatus', 'rejected');
 
         $this->assertSame(TaskStatus::Rejected, $task->fresh()->status);
     }
@@ -183,8 +178,7 @@ class TaskWorkflowTest extends TestCase
 
         Livewire::actingAs($qa)
             ->test('tasks.show', ['task' => $task])
-            ->set('status_value', 'ready_to_deploy')
-            ->call('saveStatus');
+            ->call('saveStatus', 'ready_to_deploy');
 
         $this->assertSame(TaskStatus::ReadyToDeploy, $task->fresh()->status);
     }
@@ -201,8 +195,7 @@ class TaskWorkflowTest extends TestCase
         // Karim is the assignee, not the QA/Reviewer, so he cannot approve/reject.
         Livewire::actingAs($karim)
             ->test('tasks.show', ['task' => $task])
-            ->set('status_value', 'ready_to_deploy')
-            ->call('saveStatus')
+            ->call('saveStatus', 'ready_to_deploy')
             ->assertForbidden();
 
         $this->assertSame(TaskStatus::QaTesting, $task->fresh()->status);
@@ -221,8 +214,7 @@ class TaskWorkflowTest extends TestCase
 
         Livewire::actingAs($karim)
             ->test('tasks.show', ['task' => $task])
-            ->set('status_value', 'qa_testing')
-            ->call('saveStatus')
+            ->call('saveStatus', 'qa_testing')
             ->set('actual_hours', '5')
             ->call('submitForQa');
 
@@ -244,8 +236,7 @@ class TaskWorkflowTest extends TestCase
 
         Livewire::actingAs($qa)
             ->test('tasks.show', ['task' => $task])
-            ->set('status_value', 'ready_to_deploy')
-            ->call('saveStatus');
+            ->call('saveStatus', 'ready_to_deploy');
 
         $this->assertSame(TaskStatus::ReadyToDeploy, $task->fresh()->status);
     }
@@ -261,8 +252,7 @@ class TaskWorkflowTest extends TestCase
 
         Livewire::actingAs($qa)
             ->test('tasks.show', ['task' => $task])
-            ->set('status_value', 'rejected')
-            ->call('saveStatus');
+            ->call('saveStatus', 'rejected');
 
         $this->assertSame(TaskStatus::Rejected, $task->fresh()->status);
     }
@@ -280,8 +270,7 @@ class TaskWorkflowTest extends TestCase
         // assignee must go through QA testing again.
         Livewire::actingAs($karim)
             ->test('tasks.show', ['task' => $task])
-            ->set('status_value', 'ready_to_deploy')
-            ->call('saveStatus')
+            ->call('saveStatus', 'ready_to_deploy')
             ->assertForbidden();
 
         $this->assertSame(TaskStatus::Rejected, $task->fresh()->status);
@@ -334,8 +323,7 @@ class TaskWorkflowTest extends TestCase
 
         Livewire::actingAs($rahim)
             ->test('tasks.show', ['task' => $task])
-            ->set('status_value', 'done')
-            ->call('saveStatus');
+            ->call('saveStatus', 'done');
 
         $this->assertSame(TaskStatus::Done, $task->fresh()->status);
     }
@@ -351,8 +339,7 @@ class TaskWorkflowTest extends TestCase
         // Karim is the assignee, not the Reporter, so he cannot close it out.
         Livewire::actingAs($karim)
             ->test('tasks.show', ['task' => $task])
-            ->set('status_value', 'done')
-            ->call('saveStatus')
+            ->call('saveStatus', 'done')
             ->assertForbidden();
 
         $this->assertSame(TaskStatus::ReadyToDeploy, $task->fresh()->status);
@@ -369,8 +356,7 @@ class TaskWorkflowTest extends TestCase
 
         Livewire::actingAs($karim)
             ->test('tasks.show', ['task' => $task])
-            ->set('assignee_value', (string) $hasan->id)
-            ->call('saveAssignee')
+            ->call('saveAssignee', (string) $hasan->id)
             ->assertForbidden();
     }
 

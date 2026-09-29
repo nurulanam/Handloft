@@ -2,7 +2,9 @@
 
 use App\Enums\ProjectStatus;
 use App\Models\Project;
+use App\Models\User;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -12,10 +14,6 @@ new #[Layout('layouts.app')] #[Title('Project')] class extends Component
 {
     public Project $project;
 
-    public bool $editingStatus = false;
-
-    public string $status_value = '';
-
     public function mount(Project $project): void
     {
         Gate::authorize('view', $project);
@@ -23,25 +21,29 @@ new #[Layout('layouts.app')] #[Title('Project')] class extends Component
         $this->project = $project;
     }
 
-    public function startEditStatus(): void
+    public function saveCoordinator(?int $userId): void
     {
         Gate::authorize('update', $this->project);
 
-        $this->status_value = $this->project->status->value;
-        $this->editingStatus = true;
+        $data = Validator::make(['coordinator_value' => $userId], [
+            'coordinator_value' => ['nullable', 'exists:users,id'],
+        ])->validate();
+
+        $this->project->update(['coordinator_id' => $data['coordinator_value'] ?: null]);
+
+        $this->project->refresh();
     }
 
-    public function saveStatus(): void
+    public function saveStatus(string $value): void
     {
         Gate::authorize('update', $this->project);
 
-        $data = $this->validate([
+        $data = Validator::make(['status_value' => $value], [
             'status_value' => ['required', Rule::in(array_column(ProjectStatus::cases(), 'value'))],
-        ]);
+        ])->validate();
 
         $this->project->update(['status' => $data['status_value']]);
 
-        $this->editingStatus = false;
         $this->project->refresh();
     }
 
@@ -49,6 +51,7 @@ new #[Layout('layouts.app')] #[Title('Project')] class extends Component
     {
         return [
             'canEdit' => Gate::allows('update', $this->project),
+            'users' => User::query()->orderBy('name')->get(),
         ];
     }
 };
@@ -60,24 +63,43 @@ new #[Layout('layouts.app')] #[Title('Project')] class extends Component
             <div>
                 <h1 class="text-2xl font-semibold text-zinc-900">{{ $project->name }}</h1>
                 <p class="mt-1 text-sm text-zinc-500">Created by {{ $project->creator->name }} on {{ $project->created_at->format('d M Y') }}</p>
+
+                <div class="mt-2 flex items-center gap-2 text-sm">
+                    <span class="text-zinc-500">Coordinator:</span>
+
+                    <div class="relative" x-data="dropdownMenu()">
+                        @if ($project->coordinator)
+                            <button type="button" @click="open = ! open" @disabled(! $canEdit) class="flex items-center gap-1.5 {{ $canEdit ? 'hover:opacity-75' : '' }}">
+                                <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($project->coordinator->name) }}</span>
+                                <span class="text-zinc-900">{{ $project->coordinator->name }}</span>
+                            </button>
+                        @else
+                            <button type="button" @click="open = ! open" @disabled(! $canEdit) class="text-zinc-400 {{ $canEdit ? 'hover:text-brand' : '' }}">
+                                {{ $canEdit ? 'Assign coordinator' : 'Unassigned' }}
+                            </button>
+                        @endif
+
+                        @if ($canEdit)
+                            <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute left-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                                <button type="button" wire:click="saveCoordinator(null)" @click="open = false" class="block w-full px-3 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-50">None</button>
+                                @foreach ($users as $option)
+                                    <button type="button" wire:click="saveCoordinator({{ $option->id }})" @click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50">
+                                        <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($option->name) }}</span>
+                                        {{ $option->name }}
+                                    </button>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                </div>
             </div>
 
-            @if ($editingStatus)
-                <div class="flex items-center gap-2">
-                    <select wire:model="status_value" class="rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                        @foreach (ProjectStatus::cases() as $option)
-                            <option value="{{ $option->value }}">{{ $option->label() }}</option>
-                        @endforeach
-                    </select>
-                    <button type="button" wire:click="saveStatus" class="text-xs font-medium text-brand hover:underline">Save</button>
-                    <button type="button" wire:click="$set('editingStatus', false)" class="text-xs text-zinc-500 hover:text-zinc-700">Cancel</button>
-                </div>
-            @else
+            <div class="relative shrink-0" x-data="dropdownMenu()">
                 <button
                     type="button"
-                    wire:click="startEditStatus"
+                    @click="open = ! open"
                     @disabled(! $canEdit)
-                    class="inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium {{ $project->status->pillClasses() }}"
+                    class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium {{ $project->status->pillClasses() }}"
                 >
                     {{ $project->status->label() }}
                     @if ($canEdit)
@@ -86,7 +108,17 @@ new #[Layout('layouts.app')] #[Title('Project')] class extends Component
                         </svg>
                     @endif
                 </button>
-            @endif
+
+                @if ($canEdit)
+                    <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 w-40 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                        @foreach (ProjectStatus::cases() as $option)
+                            <button type="button" wire:click="saveStatus('{{ $option->value }}')" @click="open = false" class="block w-full px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50">
+                                {{ $option->label() }}
+                            </button>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
         </div>
 
         @if ($project->description)

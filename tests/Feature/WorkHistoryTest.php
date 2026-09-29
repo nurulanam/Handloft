@@ -102,6 +102,34 @@ class WorkHistoryTest extends TestCase
         );
     }
 
+    public function test_custom_date_range_filters_the_history_list_not_just_the_summary(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+
+        $workflow = app(TaskWorkflowService::class);
+
+        $insideRangeTask = $workflow->createTask(['title' => 'Inside Range'], $rahim, $karim);
+        $insideRangeHistory = $workflow->submitForQa($insideRangeTask, $karim, 2.0);
+        $insideRangeHistory->update(['completed_date' => '2026-01-10']);
+
+        $outsideRangeTask = $workflow->createTask(['title' => 'Outside Range'], $rahim, $karim);
+        $outsideRangeHistory = $workflow->submitForQa($outsideRangeTask, $karim, 4.0);
+        $outsideRangeHistory->update(['completed_date' => '2026-05-01']);
+
+        $component = Livewire::actingAs($karim)
+            ->test('work-history.index')
+            ->set('range', 'custom')
+            ->set('from', '2026-01-01')
+            ->set('to', '2026-01-31');
+
+        $histories = $component->viewData('histories');
+
+        $this->assertCount(1, $histories);
+        $this->assertSame($insideRangeHistory->id, $histories->first()->id);
+        $component->assertViewHas('summaryHours', 2.0);
+    }
+
     public function test_team_member_cannot_view_another_users_work_history_via_route_parameter(): void
     {
         $rahim = $this->teamMember('Rahim');

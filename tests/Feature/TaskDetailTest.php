@@ -80,9 +80,7 @@ class TaskDetailTest extends TestCase
         // updateMeta should still be allowed.
         Livewire::actingAs($admin)
             ->test('tasks.show', ['task' => $task])
-            ->call('startEditField', 'priority')
-            ->set('priority_value', 'low')
-            ->call('savePriority');
+            ->call('savePriority', 'low');
 
         $task->refresh();
 
@@ -140,9 +138,7 @@ class TaskDetailTest extends TestCase
 
         Livewire::actingAs($rahim)
             ->test('tasks.show', ['task' => $task])
-            ->call('startEditField', 'parent')
-            ->set('parent_value', (string) $task->id)
-            ->call('saveParent')
+            ->call('saveParent', $task->id)
             ->assertHasErrors('parent_value');
 
         $task->refresh();
@@ -161,9 +157,7 @@ class TaskDetailTest extends TestCase
 
         Livewire::actingAs($rahim)
             ->test('tasks.show', ['task' => $child])
-            ->call('startEditField', 'parent')
-            ->set('parent_value', (string) $parent->id)
-            ->call('saveParent');
+            ->call('saveParent', $parent->id);
 
         $child->refresh();
 
@@ -181,9 +175,7 @@ class TaskDetailTest extends TestCase
 
         Livewire::actingAs($rahim)
             ->test('tasks.show', ['task' => $task])
-            ->call('startEditField', 'priority')
-            ->set('priority_value', 'urgent')
-            ->call('savePriority');
+            ->call('savePriority', 'urgent');
 
         $task->refresh();
 

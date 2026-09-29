@@ -206,28 +206,25 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
 
                     <div x-show="open" x-collapse class="divide-y divide-zinc-100 px-4 pb-2">
                         {{-- Assignee --}}
-                        <div
-                            class="flex items-center justify-between gap-3 py-2.5"
-                            x-data="inlineSelect(@js($assigned_to), @js(optional($users->firstWhere('id', $assigned_to))->name ?? 'Select assignee'))"
-                        >
+                        <div class="flex items-center justify-between gap-3 py-2.5">
                             <span class="text-sm text-zinc-500">Assignee</span>
 
-                            <div x-show="!editing">
-                                <button type="button" @click="editing = true" class="flex items-center gap-2 hover:opacity-75">
+                            <div class="relative" x-data="dropdownMenu(@js($assigned_to), @js(optional($users->firstWhere('id', $assigned_to))->name ?? 'Select assignee'))">
+                                <button type="button" @click="open = ! open" class="flex items-center gap-2 hover:opacity-75">
                                     <template x-if="value">
                                         <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand text-[10px] font-semibold text-white" x-text="initialsOf(label)"></span>
                                     </template>
                                     <span class="text-sm" :class="value ? 'text-zinc-900' : 'text-zinc-400'" x-text="label"></span>
                                 </button>
-                            </div>
 
-                            <div x-show="editing" x-cloak class="max-w-[65%] flex-1" @click.outside="editing = false">
-                                <select wire:model.live="assigned_to" @change="sync($event)" class="block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                                    <option value="">Select assignee</option>
+                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
                                     @foreach ($users as $option)
-                                        <option value="{{ $option->id }}">{{ $option->name }}</option>
+                                        <button type="button" wire:click="$set('assigned_to', {{ $option->id }})" @click="choose('{{ $option->id }}', @js($option->name))" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50">
+                                            <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-brand text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($option->name) }}</span>
+                                            {{ $option->name }}
+                                        </button>
                                     @endforeach
-                                </select>
+                                </div>
                             </div>
                         </div>
                         @error('assigned_to') <p class="pb-2 text-xs text-red-600">{{ $message }}</p> @enderror
@@ -242,122 +239,118 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
                         </div>
 
                         {{-- QA / Reviewer --}}
-                        <div
-                            class="flex items-center justify-between gap-3 py-2.5"
-                            x-data="inlineSelect(@js($qa_id), @js(optional($users->firstWhere('id', $qa_id))->name ?? 'Add reviewer'))"
-                        >
+                        <div class="flex items-center justify-between gap-3 py-2.5">
                             <span class="text-sm text-zinc-500">QA / Reviewer</span>
 
-                            <div x-show="!editing">
-                                <button type="button" @click="editing = true" class="flex items-center gap-2 hover:opacity-75">
+                            <div class="relative" x-data="dropdownMenu(@js($qa_id), @js(optional($users->firstWhere('id', $qa_id))->name ?? 'Add reviewer'))">
+                                <button type="button" @click="open = ! open" class="flex items-center gap-2 hover:opacity-75">
                                     <template x-if="value">
                                         <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-[10px] font-semibold text-white" x-text="initialsOf(label)"></span>
                                     </template>
                                     <span class="text-sm" :class="value ? 'text-zinc-900' : 'text-zinc-400'" x-text="label"></span>
                                 </button>
-                            </div>
 
-                            <div x-show="editing" x-cloak class="max-w-[65%] flex-1" @click.outside="editing = false">
-                                <select wire:model.live="qa_id" @change="sync($event)" class="block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                                    <option value="">None</option>
+                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                                    <button type="button" wire:click="$set('qa_id', '')" @click="choose('', 'Add reviewer')" class="block w-full px-3 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-50">None</button>
                                     @foreach ($users as $option)
-                                        <option value="{{ $option->id }}">{{ $option->name }}</option>
+                                        <button type="button" wire:click="$set('qa_id', {{ $option->id }})" @click="choose('{{ $option->id }}', @js($option->name))" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50">
+                                            <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($option->name) }}</span>
+                                            {{ $option->name }}
+                                        </button>
                                     @endforeach
-                                </select>
+                                </div>
                             </div>
                         </div>
 
                         {{-- Priority --}}
-                        <div
-                            class="flex items-center justify-between gap-3 py-2.5"
-                            x-data="inlineSelect(@js($priority), @js(\App\Enums\TaskPriority::from($priority)->label()))"
-                        >
+                        <div class="flex items-center justify-between gap-3 py-2.5">
                             <span class="text-sm text-zinc-500">Priority</span>
 
-                            <div x-show="!editing">
-                                <button type="button" @click="editing = true" class="flex items-center gap-1.5 text-sm text-zinc-900 hover:text-brand">
+                            <div class="relative" x-data="dropdownMenu(@js($priority), @js(\App\Enums\TaskPriority::from($priority)->label()))">
+                                <button type="button" @click="open = ! open" class="flex items-center gap-1.5 text-sm text-zinc-900 hover:text-brand">
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5" :class="priorityColor(value)">
                                         <path d="M2 10a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 10z" />
                                     </svg>
                                     <span x-text="label"></span>
                                 </button>
-                            </div>
 
-                            <div x-show="editing" x-cloak class="max-w-[65%] flex-1" @click.outside="editing = false">
-                                <select wire:model.live="priority" @change="sync($event)" class="block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 w-40 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
                                     @foreach (TaskPriority::cases() as $option)
-                                        <option value="{{ $option->value }}">{{ $option->label() }}</option>
+                                        <button type="button" wire:click="$set('priority', '{{ $option->value }}')" @click="choose('{{ $option->value }}', @js($option->label()))" class="flex w-full items-center gap-1.5 px-3 py-2 text-left text-sm hover:bg-zinc-50">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5 {{ $option->colorClass() }}">
+                                                <path d="M2 10a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 10z" />
+                                            </svg>
+                                            {{ $option->label() }}
+                                        </button>
                                     @endforeach
-                                </select>
+                                </div>
                             </div>
                         </div>
 
                         {{-- Due date --}}
-                        <div class="flex items-center justify-between gap-3 py-2.5" x-data="{ editing: false }">
+                        <div class="flex items-center justify-between gap-3 py-2.5">
                             <span class="text-sm text-zinc-500">Due date</span>
 
-                            <button type="button" x-show="!editing" @click="editing = true" class="text-sm {{ $deadline ? 'text-zinc-900' : 'text-zinc-400' }} hover:text-brand">
-                                {{ $deadline ? \Illuminate\Support\Carbon::parse($deadline)->format('d M Y') : 'Add due date' }}
-                            </button>
+                            <div class="relative" x-data="{ open: false }">
+                                <button type="button" @click="open = ! open" class="text-sm {{ $deadline ? 'text-zinc-900' : 'text-zinc-400' }} hover:text-brand">
+                                    {{ $deadline ? \Illuminate\Support\Carbon::parse($deadline)->format('d M Y') : 'Add due date' }}
+                                </button>
 
-                            <div x-show="editing" x-cloak class="max-w-[65%] flex-1" @click.outside="editing = false">
-                                <input wire:model.live="deadline" type="date" class="block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 rounded-lg border border-zinc-200 bg-white p-2 shadow-lg">
+                                    <input wire:model.live="deadline" type="date" class="block rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                </div>
                             </div>
                         </div>
                         @error('deadline') <p class="pb-2 text-xs text-red-600">{{ $message }}</p> @enderror
 
                         {{-- Start date --}}
-                        <div class="flex items-center justify-between gap-3 py-2.5" x-data="{ editing: false }">
+                        <div class="flex items-center justify-between gap-3 py-2.5">
                             <span class="text-sm text-zinc-500">Start date</span>
 
-                            <button type="button" x-show="!editing" @click="editing = true" class="text-sm {{ $start_date ? 'text-zinc-900' : 'text-zinc-400' }} hover:text-brand">
-                                {{ $start_date ? \Illuminate\Support\Carbon::parse($start_date)->format('d M Y') : 'Add start date' }}
-                            </button>
+                            <div class="relative" x-data="{ open: false }">
+                                <button type="button" @click="open = ! open" class="text-sm {{ $start_date ? 'text-zinc-900' : 'text-zinc-400' }} hover:text-brand">
+                                    {{ $start_date ? \Illuminate\Support\Carbon::parse($start_date)->format('d M Y') : 'Add start date' }}
+                                </button>
 
-                            <div x-show="editing" x-cloak class="max-w-[65%] flex-1" @click.outside="editing = false">
-                                <input wire:model.live="start_date" type="date" class="block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 rounded-lg border border-zinc-200 bg-white p-2 shadow-lg">
+                                    <input wire:model.live="start_date" type="date" class="block rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                </div>
                             </div>
                         </div>
 
                         {{-- Category --}}
-                        <div
-                            class="flex items-center justify-between gap-3 py-2.5"
-                            x-data="inlineSelect(@js($task_category_id), @js(optional($categories->firstWhere('id', $task_category_id))->name ?? 'None'))"
-                        >
+                        <div class="flex items-center justify-between gap-3 py-2.5">
                             <span class="text-sm text-zinc-500">Category</span>
 
-                            <div x-show="!editing">
-                                <button type="button" @click="editing = true" class="text-sm hover:text-brand" :class="value ? 'text-zinc-900' : 'text-zinc-400'" x-text="label"></button>
-                            </div>
+                            <div class="relative" x-data="dropdownMenu(@js($task_category_id), @js(optional($categories->firstWhere('id', $task_category_id))->name ?? 'None'))">
+                                <button type="button" @click="open = ! open" class="text-sm hover:text-brand" :class="value ? 'text-zinc-900' : 'text-zinc-400'" x-text="label"></button>
 
-                            <div x-show="editing" x-cloak class="max-w-[65%] flex-1" @click.outside="editing = false">
-                                <select wire:model.live="task_category_id" @change="sync($event)" class="block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                                    <option value="">None</option>
+                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                                    <button type="button" wire:click="$set('task_category_id', '')" @click="choose('', 'None')" class="block w-full px-3 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-50">None</button>
                                     @foreach ($categories as $category)
-                                        <option value="{{ $category->id }}">{{ $category->name }}</option>
+                                        <button type="button" wire:click="$set('task_category_id', {{ $category->id }})" @click="choose('{{ $category->id }}', @js($category->name))" class="block w-full px-3 py-2 text-left text-sm hover:bg-zinc-50">
+                                            {{ $category->name }}
+                                        </button>
                                     @endforeach
-                                </select>
+                                </div>
                             </div>
                         </div>
 
                         {{-- Project --}}
-                        <div
-                            class="flex items-center justify-between gap-3 py-2.5"
-                            x-data="inlineSelect(@js($project_id), @js(optional($projects->firstWhere('id', $project_id))->name ?? 'None'))"
-                        >
+                        <div class="flex items-center justify-between gap-3 py-2.5">
                             <span class="text-sm text-zinc-500">Project</span>
 
-                            <div x-show="!editing">
-                                <button type="button" @click="editing = true" class="text-sm hover:text-brand" :class="value ? 'text-zinc-900' : 'text-zinc-400'" x-text="label"></button>
-                            </div>
+                            <div class="relative" x-data="dropdownMenu(@js($project_id), @js(optional($projects->firstWhere('id', $project_id))->name ?? 'None'))">
+                                <button type="button" @click="open = ! open" class="text-sm hover:text-brand" :class="value ? 'text-zinc-900' : 'text-zinc-400'" x-text="label"></button>
 
-                            <div x-show="editing" x-cloak class="max-w-[65%] flex-1" @click.outside="editing = false">
-                                <select wire:model.live="project_id" @change="sync($event)" class="block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                                    <option value="">None</option>
+                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 w-48 max-h-60 overflow-y-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                                    <button type="button" wire:click="$set('project_id', '')" @click="choose('', 'None')" class="block w-full px-3 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-50">None</button>
                                     @foreach ($projects as $option)
-                                        <option value="{{ $option->id }}">{{ $option->name }}</option>
+                                        <button type="button" wire:click="$set('project_id', {{ $option->id }})" @click="choose('{{ $option->id }}', @js($option->name))" class="block w-full px-3 py-2 text-left text-sm hover:bg-zinc-50">
+                                            {{ $option->name }}
+                                        </button>
                                     @endforeach
-                                </select>
+                                </div>
                             </div>
                         </div>
                     </div>

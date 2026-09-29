@@ -5,9 +5,12 @@ use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 new #[Layout('layouts.app')] #[Title('Starred')] class extends Component
 {
+    use WithPagination;
+
     public function mount(): void
     {
         Gate::authorize('viewAny', Task::class);
@@ -20,6 +23,7 @@ new #[Layout('layouts.app')] #[Title('Starred')] class extends Component
         Gate::authorize('view', $task);
 
         auth()->user()->starredTasks()->toggle($task->id);
+        $this->resetPage();
     }
 
     public function with(): array
@@ -28,7 +32,7 @@ new #[Layout('layouts.app')] #[Title('Starred')] class extends Component
             'tasks' => auth()->user()->starredTasks()
                 ->with(['category', 'project', 'currentAssignment.assignedTo', 'creator'])
                 ->orderByPivot('created_at', 'desc')
-                ->get(),
+                ->paginate(20),
         ];
     }
 };
@@ -66,4 +70,6 @@ new #[Layout('layouts.app')] #[Title('Starred')] class extends Component
             @endforelse
         </div>
     </div>
+
+    {{ $tasks->links() }}
 </div>

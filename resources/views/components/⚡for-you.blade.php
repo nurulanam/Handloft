@@ -30,15 +30,23 @@ new #[Layout('layouts.app')] #[Title('For You')] class extends Component
         // Everything currently waiting on this specific person, at whatever
         // stage it's in — the assignee's active work, a reviewer's QA queue,
         // and a reporter's final sign-offs — excluding anything already Done.
-        $tasks = Task::query()
-            ->with(['category', 'project', 'currentAssignment.assignedTo', 'creator', 'starredBy' => fn ($q) => $q->where('users.id', $userId)])
+        $baseQuery = Task::query()
             ->where('status', '!=', TaskStatus::Done)
             ->where(function ($q) use ($userId) {
                 $q->whereHas('currentAssignment', fn ($q2) => $q2->where('assigned_to', $userId))
                     ->orWhere(fn ($q2) => $q2->where('qa_id', $userId)->where('status', TaskStatus::QaTesting))
                     ->orWhere(fn ($q2) => $q2->where('created_by', $userId)->where('status', TaskStatus::ReadyToDeploy));
-            })
+            });
+
+        // This is a personal queue, so it should naturally stay small — but
+        // cap it defensively rather than ever loading an unbounded result set.
+        $queueLimit = 150;
+        $queueTotal = (clone $baseQuery)->count();
+
+        $tasks = $baseQuery
+            ->with(['category', 'project', 'currentAssignment.assignedTo', 'creator', 'starredBy' => fn ($q) => $q->where('users.id', $userId)])
             ->orderByRaw('deadline IS NULL, deadline asc')
+            ->limit($queueLimit)
             ->get();
 
         $sections = collect([TaskStatus::Todo, TaskStatus::InProgress, TaskStatus::QaTesting, TaskStatus::Rejected, TaskStatus::ReadyToDeploy])
@@ -49,6 +57,9 @@ new #[Layout('layouts.app')] #[Title('For You')] class extends Component
 
         return [
             'sections' => $sections,
+            'queueTruncated' => $queueTotal > $queueLimit,
+            'queueTotal' => $queueTotal,
+            'queueLimit' => $queueLimit,
         ];
     }
 };
@@ -59,6 +70,13 @@ new #[Layout('layouts.app')] #[Title('For You')] class extends Component
         <h1 class="text-2xl font-semibold text-zinc-900">For You</h1>
         <p class="text-sm text-zinc-500">Everything waiting on you right now, across every task you're connected to.</p>
     </div>
+
+    @if ($queueTruncated)
+        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+            You have {{ $queueTotal }} active tasks — showing the {{ $queueLimit }} soonest.
+            <a href="{{ route('tasks.index', ['tab' => 'assigned-to-me', 'view' => 'list']) }}" wire:navigate class="font-medium underline hover:text-amber-900">View the full list</a>.
+        </div>
+    @endif
 
     <div class="space-y-5">
         @foreach ($sections as $section)

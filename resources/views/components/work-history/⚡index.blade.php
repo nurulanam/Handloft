@@ -44,6 +44,21 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
         $this->compareUserIds = [auth()->id()];
     }
 
+    public function updatedRange(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedFrom(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedTo(): void
+    {
+        $this->resetPage();
+    }
+
     public function periodBounds(): array
     {
         return match ($this->range) {
@@ -126,8 +141,11 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
 
         $singleUserId = $userIds[0];
 
-        $query = WorkHistory::query()->with(['task', 'assignedBy'])->where('user_id', $singleUserId)->latest('completed_date');
-        $summary = (clone $query)->whereBetween('completed_date', [$start->toDateString(), $end->toDateString()])->sum('actual_hours');
+        $query = WorkHistory::query()->with(['task', 'assignedBy'])
+            ->where('user_id', $singleUserId)
+            ->whereBetween('completed_date', [$start->toDateString(), $end->toDateString()])
+            ->latest('completed_date');
+        $summary = (clone $query)->sum('actual_hours');
 
         return $shared + [
             'mode' => 'single',

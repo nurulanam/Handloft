@@ -225,7 +225,9 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
         }
 
         if ($this->view === 'board') {
-            $tasks = (clone $query)->limit(200)->get();
+            $boardLimit = 200;
+            $matchingCount = (clone $query)->count();
+            $tasks = (clone $query)->limit($boardLimit)->get();
 
             return [
                 'tasks' => null,
@@ -233,6 +235,9 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                 'board' => collect(TaskStatus::cases())->mapWithKeys(
                     fn (TaskStatus $status) => [$status->value => $tasks->where('status', $status)->values()]
                 ),
+                'boardTruncated' => $matchingCount > $boardLimit,
+                'boardShown' => $tasks->count(),
+                'boardTotal' => $matchingCount,
             ];
         }
 
@@ -316,6 +321,14 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
     @endunless
 
     @if ($view === 'board')
+        @if ($boardTruncated)
+            <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+                Showing the {{ $boardShown }} most recent of {{ $boardTotal }} matching tasks on the board.
+                <button type="button" wire:click="$set('view', 'list')" class="font-medium underline hover:text-amber-900">Switch to List view</button>
+                to see and page through all of them.
+            </div>
+        @endif
+
         <div
             x-data="{
                 draggingId: null,

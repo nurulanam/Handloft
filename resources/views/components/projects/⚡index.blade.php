@@ -1,14 +1,18 @@
 <?php
 
 use App\Enums\ProjectStatus;
+use App\Enums\TaskStatus;
 use App\Models\Project;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 new #[Layout('layouts.app')] #[Title('Projects')] class extends Component
 {
+    use WithPagination;
+
     public function mount(): void
     {
         Gate::authorize('viewAny', Project::class);
@@ -17,7 +21,18 @@ new #[Layout('layouts.app')] #[Title('Projects')] class extends Component
     public function with(): array
     {
         return [
-            'projects' => Project::query()->with('creator')->latest()->get(),
+            // Both counts are computed in this one query via withCount rather
+            // than per-project queries (Project::taskCount()/completedCount()
+            // fall back to those only when not eager-loaded), so this page
+            // stays a single query no matter how many projects there are.
+            'projects' => Project::query()
+                ->with(['creator', 'coordinator'])
+                ->withCount([
+                    'topLevelTasks as task_count',
+                    'topLevelTasks as completed_count' => fn ($q) => $q->where('status', TaskStatus::Done),
+                ])
+                ->latest()
+                ->paginate(12),
             'canCreate' => Gate::allows('create', Project::class),
         ];
     }
@@ -60,7 +75,7 @@ new #[Layout('layouts.app')] #[Title('Projects')] class extends Component
                 </div>
 
                 <div class="mt-3 flex items-center justify-between text-xs text-zinc-400">
-                    <span>By {{ $project->creator->name }}</span>
+                    <span>{{ $project->coordinator?->name ? 'Coordinator: '.$project->coordinator->name : 'By '.$project->creator->name }}</span>
                     @if ($project->deadline)
                         <span>Due {{ $project->deadline->format('d M Y') }}</span>
                     @endif
@@ -72,4 +87,6 @@ new #[Layout('layouts.app')] #[Title('Projects')] class extends Component
             </div>
         @endforelse
     </div>
+
+    {{ $projects->links() }}
 </div>

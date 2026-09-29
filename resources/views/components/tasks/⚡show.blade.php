@@ -10,6 +10,7 @@ use App\Services\TaskWorkflowService;
 use App\Support\Html;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -32,21 +33,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
 
     public ?string $editingField = null;
 
-    public string $status_value = '';
-
-    public string $assignee_value = '';
-
-    public string $reporter_value = '';
-
-    public string $priority_value = '';
-
     public string $due_date_value = '';
-
-    public string $qa_value = '';
-
-    public string $parent_value = '';
-
-    public string $project_value = '';
 
     public string $newComment = '';
 
@@ -124,25 +111,18 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         $this->description = (string) $this->task->description;
     }
 
+    /**
+     * Due date is the only field left using this click-to-reveal-an-input
+     * pattern — every other field (status, assignee, reporter, QA, priority,
+     * parent, project) is now a self-contained dropdown menu that saves
+     * immediately on selection, so it no longer needs this shared "editing"
+     * state at all.
+     */
     public function startEditField(string $field): void
     {
-        $this->authorizeField($field);
+        Gate::authorize('updateMeta', $this->task);
 
-        match ($field) {
-            // Default to the first legal next status — a <select> renders its
-            // first <option> as selected regardless of the bound value, so this
-            // keeps the (deferred) wire:model state in sync with what's shown.
-            'status' => $this->status_value = optional($this->nextStatuses()->first())->value ?? '',
-            'assignee' => $this->assignee_value = (string) $this->task->currentAssignee()?->id,
-            'reporter' => $this->reporter_value = (string) $this->task->created_by,
-            'priority' => $this->priority_value = $this->task->priority->value,
-            'due_date' => $this->due_date_value = $this->task->deadline?->toDateString() ?? '',
-            'qa' => $this->qa_value = (string) $this->task->qa_id,
-            'parent' => $this->parent_value = (string) $this->task->parent_task_id,
-            'project' => $this->project_value = (string) $this->task->project_id,
-            default => null,
-        };
-
+        $this->due_date_value = $this->task->deadline?->toDateString() ?? '';
         $this->editingField = $field;
     }
 
@@ -150,17 +130,6 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
     {
         $this->editingField = null;
         $this->resetErrorBag();
-    }
-
-    private function authorizeField(string $field): void
-    {
-        $allowed = match ($field) {
-            'status' => $this->nextStatuses()->isNotEmpty(),
-            'assignee', 'reporter' => Gate::allows('reassign', $this->task),
-            default => Gate::allows('updateMeta', $this->task),
-        };
-
-        abort_unless($allowed, 403);
     }
 
     /**
@@ -173,11 +142,11 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
             ->values();
     }
 
-    public function saveStatus(TaskWorkflowService $workflow): void
+    public function saveStatus(string $value, TaskWorkflowService $workflow): void
     {
-        $data = $this->validate([
+        $data = Validator::make(['status_value' => $value], [
             'status_value' => ['required', Rule::in(array_column(TaskStatus::cases(), 'value'))],
-        ]);
+        ])->validate();
 
         $newStatus = TaskStatus::from($data['status_value']);
 
@@ -192,7 +161,6 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
 
             $this->actual_hours = (string) ($this->task->workHistory?->actual_hours ?? '');
             $this->submission_note = '';
-            $this->editingField = null;
             $this->showSubmitQaModal = true;
 
             return;
@@ -205,47 +173,47 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
             $this->logMetaChange("Status changed to {$newStatus->label()}");
         }
 
-        $this->editingField = null;
         $this->task->refresh();
     }
 
-    public function saveAssignee(TaskWorkflowService $workflow): void
+    public function saveAssignee(int $userId, TaskWorkflowService $workflow): void
     {
         Gate::authorize('reassign', $this->task);
 
-        $data = $this->validate(['assignee_value' => ['required', 'exists:users,id']]);
+        $data = Validator::make(['assignee_value' => $userId], [
+            'assignee_value' => ['required', 'exists:users,id'],
+        ])->validate();
 
         $workflow->reassignTask($this->task, User::findOrFail($data['assignee_value']), auth()->user());
 
-        $this->editingField = null;
         $this->task->refresh();
     }
 
-    public function saveReporter(): void
+    public function saveReporter(int $userId): void
     {
         Gate::authorize('reassign', $this->task);
 
-        $data = $this->validate(['reporter_value' => ['required', 'exists:users,id']]);
+        $data = Validator::make(['reporter_value' => $userId], [
+            'reporter_value' => ['required', 'exists:users,id'],
+        ])->validate();
 
         $this->task->update(['created_by' => $data['reporter_value']]);
         $this->logMetaChange('Reporter updated');
 
-        $this->editingField = null;
         $this->task->refresh();
     }
 
-    public function savePriority(): void
+    public function savePriority(string $value): void
     {
         Gate::authorize('updateMeta', $this->task);
 
-        $data = $this->validate([
+        $data = Validator::make(['priority_value' => $value], [
             'priority_value' => ['required', Rule::in(array_column(TaskPriority::cases(), 'value'))],
-        ]);
+        ])->validate();
 
         $this->task->update(['priority' => $data['priority_value']]);
         $this->logMetaChange('Priority updated to '.TaskPriority::from($data['priority_value'])->label());
 
-        $this->editingField = null;
         $this->task->refresh();
     }
 
@@ -262,37 +230,41 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         $this->task->refresh();
     }
 
-    public function saveQa(): void
+    public function saveQa(?int $userId): void
     {
         Gate::authorize('updateMeta', $this->task);
 
-        $data = $this->validate(['qa_value' => ['nullable', 'exists:users,id']]);
+        $data = Validator::make(['qa_value' => $userId], [
+            'qa_value' => ['nullable', 'exists:users,id'],
+        ])->validate();
 
         $this->task->update(['qa_id' => $data['qa_value'] ?: null]);
         $this->logMetaChange('QA/Reviewer updated');
 
-        $this->editingField = null;
         $this->task->refresh();
     }
 
-    public function saveProject(): void
+    public function saveProject(?int $projectId): void
     {
         Gate::authorize('updateMeta', $this->task);
 
-        $data = $this->validate(['project_value' => ['nullable', 'exists:projects,id']]);
+        $data = Validator::make(['project_value' => $projectId], [
+            'project_value' => ['nullable', 'exists:projects,id'],
+        ])->validate();
 
         $this->task->update(['project_id' => $data['project_value'] ?: null]);
         $this->logMetaChange('Project updated');
 
-        $this->editingField = null;
         $this->task->refresh();
     }
 
-    public function saveParent(): void
+    public function saveParent(?int $parentTaskId): void
     {
         Gate::authorize('updateMeta', $this->task);
 
-        $data = $this->validate(['parent_value' => ['nullable', 'exists:tasks,id']]);
+        $data = Validator::make(['parent_value' => $parentTaskId], [
+            'parent_value' => ['nullable', 'exists:tasks,id'],
+        ])->validate();
 
         $parentId = $data['parent_value'] ?: null;
 
@@ -321,7 +293,6 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         $this->task->update(['parent_task_id' => $parentId]);
         $this->logMetaChange('Parent task updated');
 
-        $this->editingField = null;
         $this->task->refresh();
     }
 
@@ -693,33 +664,30 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
 
         {{-- Sidebar --}}
         <div class="space-y-4 lg:sticky lg:top-20 lg:self-start">
-            {{-- Status dropdown --}}
-            <div>
-                @if ($editingField === 'status')
-                    <div class="flex items-center gap-2">
-                        <select wire:model="status_value" class="rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                            @foreach ($availableStatuses as $option)
-                                <option value="{{ $option->value }}">{{ $option->label() }}</option>
-                            @endforeach
-                        </select>
-                        <button type="button" wire:click="saveStatus" class="text-xs font-medium text-brand hover:underline">Save</button>
-                        <button type="button" wire:click="cancelEditField" class="text-xs text-zinc-500 hover:text-zinc-700">Cancel</button>
+            {{-- Status dropdown menu --}}
+            <div class="relative inline-block" x-data="dropdownMenu()">
+                <button
+                    type="button"
+                    @click="open = ! open"
+                    @disabled(! $canEditStatus)
+                    class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium {{ $task->status->pillClasses() }}"
+                >
+                    {{ $task->status->label() }}
+                    @if ($canEditStatus)
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5 opacity-60">
+                            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                        </svg>
+                    @endif
+                </button>
+
+                @if ($canEditStatus)
+                    <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute left-0 z-20 mt-1 w-44 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                        @foreach ($availableStatuses as $option)
+                            <button type="button" wire:click="saveStatus('{{ $option->value }}')" @click="open = false" class="block w-full px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50">
+                                {{ $option->label() }}
+                            </button>
+                        @endforeach
                     </div>
-                    @error('status_value') <p class="mt-2 max-w-xs rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{{ $message }}</p> @enderror
-                @else
-                    <button
-                        type="button"
-                        wire:click="startEditField('status')"
-                        @disabled(! $canEditStatus)
-                        class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium {{ $task->status->pillClasses() }}"
-                    >
-                        {{ $task->status->label() }}
-                        @if ($canEditStatus)
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5 opacity-60">
-                                <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
-                            </svg>
-                        @endif
-                    </button>
                 @endif
             </div>
 
@@ -736,21 +704,8 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                     {{-- Assignee --}}
                     <div class="flex items-center justify-between gap-3 py-2.5">
                         <span class="text-sm text-zinc-500">Assignee</span>
-                        @if ($editingField === 'assignee')
-                            <div class="max-w-[65%] flex-1">
-                                <select wire:model="assignee_value" class="block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                                    @foreach ($users as $option)
-                                        <option value="{{ $option->id }}">{{ $option->name }}</option>
-                                    @endforeach
-                                </select>
-                                @error('assignee_value') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-                                <div class="mt-1 flex justify-end gap-2">
-                                    <button type="button" wire:click="cancelEditField" class="text-xs text-zinc-500 hover:text-zinc-700">Cancel</button>
-                                    <button type="button" wire:click="saveAssignee" class="text-xs font-medium text-brand hover:underline">Save</button>
-                                </div>
-                            </div>
-                        @else
-                            <button type="button" wire:click="startEditField('assignee')" @disabled(! $canReassign) class="flex items-center gap-2 {{ $canReassign ? 'hover:opacity-75' : '' }}">
+                        <div class="relative" x-data="dropdownMenu()">
+                            <button type="button" @click="open = ! open" @disabled(! $canReassign) class="flex items-center gap-2 {{ $canReassign ? 'hover:opacity-75' : '' }}">
                                 @if ($currentAssignee)
                                     <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand text-[10px] font-semibold text-white">{{ \App\Support\Avatar::initials($currentAssignee->name) }}</span>
                                     <span class="text-sm text-zinc-900">{{ $currentAssignee->name }}</span>
@@ -758,113 +713,116 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                                     <span class="text-sm text-zinc-400">{{ $canReassign ? 'Add assignee' : 'Unassigned' }}</span>
                                 @endif
                             </button>
-                        @endif
+
+                            @if ($canReassign)
+                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                                    @foreach ($users as $option)
+                                        <button type="button" wire:click="saveAssignee({{ $option->id }})" @click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50">
+                                            <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-brand text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($option->name) }}</span>
+                                            {{ $option->name }}
+                                        </button>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </div>
                     </div>
 
                     {{-- Reporter --}}
                     <div class="flex items-center justify-between gap-3 py-2.5">
                         <span class="text-sm text-zinc-500">Reporter</span>
-                        @if ($editingField === 'reporter')
-                            <div class="max-w-[65%] flex-1">
-                                <select wire:model="reporter_value" class="block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                                    @foreach ($users as $option)
-                                        <option value="{{ $option->id }}">{{ $option->name }}</option>
-                                    @endforeach
-                                </select>
-                                @error('reporter_value') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-                                <div class="mt-1 flex justify-end gap-2">
-                                    <button type="button" wire:click="cancelEditField" class="text-xs text-zinc-500 hover:text-zinc-700">Cancel</button>
-                                    <button type="button" wire:click="saveReporter" class="text-xs font-medium text-brand hover:underline">Save</button>
-                                </div>
-                            </div>
-                        @else
-                            <button type="button" wire:click="startEditField('reporter')" @disabled(! $canReassign) class="flex items-center gap-2 {{ $canReassign ? 'hover:opacity-75' : '' }}">
+                        <div class="relative" x-data="dropdownMenu()">
+                            <button type="button" @click="open = ! open" @disabled(! $canReassign) class="flex items-center gap-2 {{ $canReassign ? 'hover:opacity-75' : '' }}">
                                 <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-[10px] font-semibold text-white">{{ \App\Support\Avatar::initials($task->creator->name) }}</span>
                                 <span class="text-sm text-zinc-900">{{ $task->creator->name }}</span>
                             </button>
-                        @endif
+
+                            @if ($canReassign)
+                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                                    @foreach ($users as $option)
+                                        <button type="button" wire:click="saveReporter({{ $option->id }})" @click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50">
+                                            <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($option->name) }}</span>
+                                            {{ $option->name }}
+                                        </button>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </div>
                     </div>
 
                     {{-- QA / Reviewer --}}
                     <div class="flex items-center justify-between gap-3 py-2.5">
                         <span class="text-sm text-zinc-500">QA / Reviewer</span>
-                        @if ($editingField === 'qa')
-                            <div class="flex-1 max-w-[65%]">
-                                <select wire:model="qa_value" class="block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                                    <option value="">Unassigned</option>
+                        <div class="relative" x-data="dropdownMenu()">
+                            @if ($task->qa)
+                                <button type="button" @click="open = ! open" @disabled(! $canEditMeta) class="flex items-center gap-2 {{ $canEditMeta ? 'hover:opacity-75' : '' }}">
+                                    <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-[10px] font-semibold text-white">{{ \App\Support\Avatar::initials($task->qa->name) }}</span>
+                                    <span class="text-sm text-zinc-900">{{ $task->qa->name }}</span>
+                                </button>
+                            @else
+                                <button type="button" @click="open = ! open" @disabled(! $canEditMeta) class="text-sm text-zinc-400 {{ $canEditMeta ? 'hover:text-brand' : '' }}">
+                                    {{ $canEditMeta ? 'Add reviewer' : 'None' }}
+                                </button>
+                            @endif
+
+                            @if ($canEditMeta)
+                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                                    <button type="button" wire:click="saveQa(null)" @click="open = false" class="block w-full px-3 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-50">Unassigned</button>
                                     @foreach ($users as $option)
-                                        <option value="{{ $option->id }}">{{ $option->name }}</option>
+                                        <button type="button" wire:click="saveQa({{ $option->id }})" @click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50">
+                                            <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($option->name) }}</span>
+                                            {{ $option->name }}
+                                        </button>
                                     @endforeach
-                                </select>
-                                <div class="mt-1 flex justify-end gap-2">
-                                    <button type="button" wire:click="cancelEditField" class="text-xs text-zinc-500 hover:text-zinc-700">Cancel</button>
-                                    <button type="button" wire:click="saveQa" class="text-xs font-medium text-brand hover:underline">Save</button>
                                 </div>
-                            </div>
-                        @elseif ($task->qa)
-                            <button type="button" wire:click="startEditField('qa')" @disabled(! $canEditMeta) class="flex items-center gap-2 {{ $canEditMeta ? 'hover:opacity-75' : '' }}">
-                                <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-[10px] font-semibold text-white">{{ \App\Support\Avatar::initials($task->qa->name) }}</span>
-                                <span class="text-sm text-zinc-900">{{ $task->qa->name }}</span>
-                                @if ($canEditMeta)
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5 text-zinc-400">
-                                        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
-                                    </svg>
-                                @endif
-                            </button>
-                        @else
-                            <button type="button" wire:click="startEditField('qa')" @disabled(! $canEditMeta) class="text-sm text-zinc-400 {{ $canEditMeta ? 'hover:text-brand' : '' }}">
-                                {{ $canEditMeta ? 'Add reviewer' : 'None' }}
-                            </button>
-                        @endif
+                            @endif
+                        </div>
                     </div>
 
                     {{-- Priority --}}
                     <div class="flex items-center justify-between gap-3 py-2.5">
                         <span class="text-sm text-zinc-500">Priority</span>
-                        @if ($editingField === 'priority')
-                            <div class="flex-1 max-w-[65%]">
-                                <select wire:model="priority_value" class="block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                                    @foreach (TaskPriority::cases() as $option)
-                                        <option value="{{ $option->value }}">{{ $option->label() }}</option>
-                                    @endforeach
-                                </select>
-                                <div class="mt-1 flex justify-end gap-2">
-                                    <button type="button" wire:click="cancelEditField" class="text-xs text-zinc-500 hover:text-zinc-700">Cancel</button>
-                                    <button type="button" wire:click="savePriority" class="text-xs font-medium text-brand hover:underline">Save</button>
-                                </div>
-                            </div>
-                        @else
-                            <button type="button" wire:click="startEditField('priority')" @disabled(! $canEditMeta) class="flex items-center gap-1.5 text-sm text-zinc-900 {{ $canEditMeta ? 'hover:text-brand' : '' }}">
+                        <div class="relative" x-data="dropdownMenu()">
+                            <button type="button" @click="open = ! open" @disabled(! $canEditMeta) class="flex items-center gap-1.5 text-sm text-zinc-900 {{ $canEditMeta ? 'hover:text-brand' : '' }}">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5 {{ $task->priority->colorClass() }}">
                                     <path d="M2 10a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 10z" />
                                 </svg>
                                 {{ $task->priority->label() }}
-                                @if ($canEditMeta)
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5 text-zinc-400">
-                                        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
-                                    </svg>
-                                @endif
                             </button>
-                        @endif
+
+                            @if ($canEditMeta)
+                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 w-40 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                                    @foreach (TaskPriority::cases() as $option)
+                                        <button type="button" wire:click="savePriority('{{ $option->value }}')" @click="open = false" class="flex w-full items-center gap-1.5 px-3 py-2 text-left text-sm hover:bg-zinc-50">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5 {{ $option->colorClass() }}">
+                                                <path d="M2 10a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 10z" />
+                                            </svg>
+                                            {{ $option->label() }}
+                                        </button>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </div>
                     </div>
 
                     {{-- Due Date --}}
                     <div class="flex items-center justify-between gap-3 py-2.5">
                         <span class="text-sm text-zinc-500">Due date</span>
-                        @if ($editingField === 'due_date')
-                            <div class="flex-1 max-w-[65%]">
-                                <input wire:model="due_date_value" type="date" class="block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                                @error('due_date_value') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-                                <div class="mt-1 flex justify-end gap-2">
-                                    <button type="button" wire:click="cancelEditField" class="text-xs text-zinc-500 hover:text-zinc-700">Cancel</button>
-                                    <button type="button" wire:click="saveDueDate" class="text-xs font-medium text-brand hover:underline">Save</button>
-                                </div>
-                            </div>
-                        @else
+                        <div class="relative">
                             <button type="button" wire:click="startEditField('due_date')" @disabled(! $canEditMeta) class="text-sm {{ $task->deadline ? 'text-zinc-900' : 'text-zinc-400' }} {{ $canEditMeta ? 'hover:text-brand' : '' }}">
                                 {{ $task->deadline?->format('d M Y') ?? ($canEditMeta ? 'Add due date' : 'None') }}
                             </button>
-                        @endif
+
+                            @if ($editingField === 'due_date')
+                                <div class="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-zinc-200 bg-white p-3 shadow-lg">
+                                    <input wire:model="due_date_value" type="date" class="block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                    @error('due_date_value') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                                    <div class="mt-2 flex justify-end gap-2">
+                                        <button type="button" wire:click="cancelEditField" class="text-xs text-zinc-500 hover:text-zinc-700">Cancel</button>
+                                        <button type="button" wire:click="saveDueDate" class="text-xs font-medium text-brand hover:underline">Save</button>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
                     </div>
 
                     {{-- Category --}}
@@ -876,58 +834,57 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                     {{-- Project --}}
                     <div class="flex items-center justify-between gap-3 py-2.5">
                         <span class="text-sm text-zinc-500">Project</span>
-                        @if ($editingField === 'project')
-                            <div class="flex-1 max-w-[65%]">
-                                <select wire:model="project_value" class="block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                                    <option value="">None</option>
+                        <div class="relative" x-data="dropdownMenu()">
+                            @if ($task->project)
+                                <button type="button" @click="open = ! open" @disabled(! $canEditMeta) class="inline-flex items-center gap-1 rounded border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-xs font-medium text-zinc-700 {{ $canEditMeta ? 'hover:border-brand/40' : '' }}">
+                                    {{ $task->project->name }}
+                                </button>
+                            @else
+                                <button type="button" @click="open = ! open" @disabled(! $canEditMeta) class="text-sm text-zinc-400 {{ $canEditMeta ? 'hover:text-brand' : '' }}">
+                                    {{ $canEditMeta ? 'Add project' : 'None' }}
+                                </button>
+                            @endif
+
+                            @if ($canEditMeta)
+                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                                    <button type="button" wire:click="saveProject(null)" @click="open = false" class="block w-full px-3 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-50">None</button>
                                     @foreach ($projects as $option)
-                                        <option value="{{ $option->id }}">{{ $option->name }}</option>
+                                        <button type="button" wire:click="saveProject({{ $option->id }})" @click="open = false" class="block w-full px-3 py-2 text-left text-sm hover:bg-zinc-50">
+                                            {{ $option->name }}
+                                        </button>
                                     @endforeach
-                                </select>
-                                @error('project_value') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-                                <div class="mt-1 flex justify-end gap-2">
-                                    <button type="button" wire:click="cancelEditField" class="text-xs text-zinc-500 hover:text-zinc-700">Cancel</button>
-                                    <button type="button" wire:click="saveProject" class="text-xs font-medium text-brand hover:underline">Save</button>
                                 </div>
-                            </div>
-                        @elseif ($task->project)
-                            <button type="button" wire:click="startEditField('project')" @disabled(! $canEditMeta) class="inline-flex items-center gap-1 rounded border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-xs font-medium text-zinc-700 {{ $canEditMeta ? 'hover:border-brand/40' : '' }}">
-                                {{ $task->project->name }}
-                            </button>
-                        @else
-                            <button type="button" wire:click="startEditField('project')" @disabled(! $canEditMeta) class="text-sm text-zinc-400 {{ $canEditMeta ? 'hover:text-brand' : '' }}">
-                                {{ $canEditMeta ? 'Add project' : 'None' }}
-                            </button>
-                        @endif
+                            @endif
+                        </div>
                     </div>
 
                     {{-- Parent --}}
                     <div class="flex items-center justify-between gap-3 py-2.5">
                         <span class="text-sm text-zinc-500">Parent</span>
-                        @if ($editingField === 'parent')
-                            <div class="flex-1 max-w-[65%]">
-                                <select wire:model="parent_value" class="block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                                    <option value="">None</option>
+                        <div class="relative" x-data="dropdownMenu()">
+                            @if ($task->parent)
+                                <button type="button" @click="open = ! open" @disabled(! $canEditMeta) class="inline-flex items-center gap-1 rounded border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-xs font-medium text-zinc-700 {{ $canEditMeta ? 'hover:border-brand/40' : '' }}">
+                                    <span class="size-1.5 rounded-full bg-brand"></span>
+                                    {{ $task->parent->task_key }} {{ $task->parent->title }}
+                                </button>
+                            @else
+                                <button type="button" @click="open = ! open" @disabled(! $canEditMeta) class="text-sm text-zinc-400 {{ $canEditMeta ? 'hover:text-brand' : '' }}">
+                                    {{ $canEditMeta ? 'Add parent' : 'None' }}
+                                </button>
+                            @endif
+
+                            @if ($canEditMeta)
+                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 max-h-60 w-56 overflow-y-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                                    <button type="button" wire:click="saveParent(null)" @click="open = false" class="block w-full px-3 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-50">None</button>
                                     @foreach ($availableParents as $option)
-                                        <option value="{{ $option->id }}">{{ $option->task_key }} {{ $option->title }}</option>
+                                        <button type="button" wire:click="saveParent({{ $option->id }})" @click="open = false" class="block w-full truncate px-3 py-2 text-left text-sm hover:bg-zinc-50">
+                                            {{ $option->task_key }} {{ $option->title }}
+                                        </button>
                                     @endforeach
-                                </select>
-                                @error('parent_value') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-                                <div class="mt-1 flex justify-end gap-2">
-                                    <button type="button" wire:click="cancelEditField" class="text-xs text-zinc-500 hover:text-zinc-700">Cancel</button>
-                                    <button type="button" wire:click="saveParent" class="text-xs font-medium text-brand hover:underline">Save</button>
                                 </div>
-                            </div>
-                        @elseif ($task->parent)
-                            <button type="button" wire:click="{{ $canEditMeta ? "startEditField('parent')" : '' }}" class="inline-flex items-center gap-1 rounded border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-xs font-medium text-zinc-700 {{ $canEditMeta ? 'hover:border-brand/40' : '' }}">
-                                <span class="size-1.5 rounded-full bg-brand"></span>
-                                {{ $task->parent->task_key }} {{ $task->parent->title }}
-                            </button>
-                        @else
-                            <button type="button" wire:click="startEditField('parent')" @disabled(! $canEditMeta) class="text-sm text-zinc-400 {{ $canEditMeta ? 'hover:text-brand' : '' }}">
-                                {{ $canEditMeta ? 'Add parent' : 'None' }}
-                            </button>
-                        @endif
+                            @endif
+                        </div>
+                        @error('parent_value') <p class="mt-1 max-w-xs text-right text-xs text-red-600">{{ $message }}</p> @enderror
                     </div>
                 </div>
             </div>

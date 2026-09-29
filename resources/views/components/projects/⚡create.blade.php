@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Project;
+use App\Models\User;
 use App\Support\Html;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
@@ -12,6 +13,8 @@ new #[Layout('layouts.app')] #[Title('Create Project')] class extends Component
     public string $name = '';
 
     public string $description = '';
+
+    public string $coordinator_id = '';
 
     public string $start_date = '';
 
@@ -36,6 +39,7 @@ new #[Layout('layouts.app')] #[Title('Create Project')] class extends Component
         $data = $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
+            'coordinator_id' => ['nullable', 'exists:users,id'],
             'start_date' => ['nullable', 'date'],
             'deadline' => ['nullable', 'date', 'after_or_equal:start_date'],
         ]);
@@ -43,12 +47,20 @@ new #[Layout('layouts.app')] #[Title('Create Project')] class extends Component
         $project = Project::create([
             'name' => $data['name'],
             'description' => Html::sanitize($data['description']),
+            'coordinator_id' => $data['coordinator_id'] ?: null,
             'start_date' => $data['start_date'] ?: null,
             'deadline' => $data['deadline'] ?: null,
             'created_by' => auth()->id(),
         ]);
 
         $this->redirect(route('projects.show', $project), navigate: true);
+    }
+
+    public function with(): array
+    {
+        return [
+            'users' => User::query()->orderBy('name')->get(),
+        ];
     }
 };
 ?>
@@ -107,29 +119,57 @@ new #[Layout('layouts.app')] #[Title('Create Project')] class extends Component
                             </span>
                         </div>
 
+                        {{-- Project Coordinator --}}
+                        <div class="flex items-center justify-between gap-3 py-2.5">
+                            <span class="text-sm text-zinc-500">Coordinator</span>
+
+                            <div class="relative" x-data="dropdownMenu(@js($coordinator_id), @js(optional($users->firstWhere('id', $coordinator_id))->name ?? 'Assign coordinator'))">
+                                <button type="button" @click="open = ! open" class="flex items-center gap-2 hover:opacity-75">
+                                    <template x-if="value">
+                                        <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-[10px] font-semibold text-white" x-text="initialsOf(label)"></span>
+                                    </template>
+                                    <span class="text-sm" :class="value ? 'text-zinc-900' : 'text-zinc-400'" x-text="label"></span>
+                                </button>
+
+                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                                    <button type="button" wire:click="$set('coordinator_id', '')" @click="choose('', 'Assign coordinator')" class="block w-full px-3 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-50">None</button>
+                                    @foreach ($users as $option)
+                                        <button type="button" wire:click="$set('coordinator_id', {{ $option->id }})" @click="choose('{{ $option->id }}', @js($option->name))" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50">
+                                            <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($option->name) }}</span>
+                                            {{ $option->name }}
+                                        </button>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
+
                         {{-- Start date --}}
-                        <div class="flex items-center justify-between gap-3 py-2.5" x-data="{ editing: false }">
+                        <div class="flex items-center justify-between gap-3 py-2.5">
                             <span class="text-sm text-zinc-500">Start date</span>
 
-                            <button type="button" x-show="!editing" @click="editing = true" class="text-sm {{ $start_date ? 'text-zinc-900' : 'text-zinc-400' }} hover:text-brand">
-                                {{ $start_date ? \Illuminate\Support\Carbon::parse($start_date)->format('d M Y') : 'Add start date' }}
-                            </button>
+                            <div class="relative" x-data="{ open: false }">
+                                <button type="button" @click="open = ! open" class="text-sm {{ $start_date ? 'text-zinc-900' : 'text-zinc-400' }} hover:text-brand">
+                                    {{ $start_date ? \Illuminate\Support\Carbon::parse($start_date)->format('d M Y') : 'Add start date' }}
+                                </button>
 
-                            <div x-show="editing" x-cloak class="max-w-[65%] flex-1" @click.outside="editing = false">
-                                <input wire:model.live="start_date" type="date" class="block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 rounded-lg border border-zinc-200 bg-white p-2 shadow-lg">
+                                    <input wire:model.live="start_date" type="date" class="block rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                </div>
                             </div>
                         </div>
 
                         {{-- Deadline --}}
-                        <div class="flex items-center justify-between gap-3 py-2.5" x-data="{ editing: false }">
+                        <div class="flex items-center justify-between gap-3 py-2.5">
                             <span class="text-sm text-zinc-500">Deadline</span>
 
-                            <button type="button" x-show="!editing" @click="editing = true" class="text-sm {{ $deadline ? 'text-zinc-900' : 'text-zinc-400' }} hover:text-brand">
-                                {{ $deadline ? \Illuminate\Support\Carbon::parse($deadline)->format('d M Y') : 'Add deadline' }}
-                            </button>
+                            <div class="relative" x-data="{ open: false }">
+                                <button type="button" @click="open = ! open" class="text-sm {{ $deadline ? 'text-zinc-900' : 'text-zinc-400' }} hover:text-brand">
+                                    {{ $deadline ? \Illuminate\Support\Carbon::parse($deadline)->format('d M Y') : 'Add deadline' }}
+                                </button>
 
-                            <div x-show="editing" x-cloak class="max-w-[65%] flex-1" @click.outside="editing = false">
-                                <input wire:model.live="deadline" type="date" class="block w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 rounded-lg border border-zinc-200 bg-white p-2 shadow-lg">
+                                    <input wire:model.live="deadline" type="date" class="block rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                </div>
                             </div>
                         </div>
                         @error('deadline') <p class="pb-2 text-xs text-red-600">{{ $message }}</p> @enderror
