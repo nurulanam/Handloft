@@ -171,6 +171,25 @@ class TaskWorkflowService
         $timeLog->delete();
     }
 
+    /**
+     * Correct a daily time-log entry's hours, auditing who changed it and why
+     * (e.g. a Manager fixing an obviously wrong entry from Work History).
+     */
+    public function editTimeLog(TaskTimeLog $timeLog, float $newHours, User $editor, ?string $reason = null): void
+    {
+        activity()
+            ->causedBy($editor)
+            ->performedOn($timeLog)
+            ->withProperties([
+                'old_hours' => (string) $timeLog->hours,
+                'new_hours' => (string) $newHours,
+                'reason' => $reason,
+            ])
+            ->log('Time log hours edited');
+
+        $timeLog->update(['hours' => $newHours]);
+    }
+
     private function recordActivity(Task $task, TaskActivityType $type, User $causer, string $description, \DateTimeInterface $occurredAt): void
     {
         $task->activities()->create([

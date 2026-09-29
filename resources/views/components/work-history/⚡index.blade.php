@@ -1,10 +1,10 @@
 <?php
 
+use App\Models\Task;
+use App\Models\TaskTimeLog;
 use App\Models\User;
-use App\Models\WorkHistory;
 use App\Services\TaskWorkflowService;
 use App\Support\Avatar;
-use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -20,7 +20,7 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
 
     public string $to = '';
 
-    public ?int $editingId = null;
+    public ?int $editingLogId = null;
 
     public string $edit_hours = '';
 
@@ -72,34 +72,49 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
         };
     }
 
-    public function startEdit(int $id): void
+    private function authorizeTimeLogEdit(TaskTimeLog $timeLog): void
     {
-        $history = WorkHistory::findOrFail($id);
-        Gate::authorize('update', $history);
+        abort_unless($timeLog->user_id === auth()->id() || auth()->user()->can('edit-completed-hours'), 403);
+    }
 
-        $this->editingId = $id;
-        $this->edit_hours = (string) $history->actual_hours;
+    public function startEdit(int $timeLogId): void
+    {
+        $timeLog = TaskTimeLog::findOrFail($timeLogId);
+        $this->authorizeTimeLogEdit($timeLog);
+
+        $this->editingLogId = $timeLogId;
+        $this->edit_hours = (string) $timeLog->hours;
         $this->edit_reason = '';
     }
 
     public function saveEdit(TaskWorkflowService $workflow): void
     {
-        $history = WorkHistory::findOrFail($this->editingId);
-        Gate::authorize('update', $history);
+        $timeLog = TaskTimeLog::findOrFail($this->editingLogId);
+        $this->authorizeTimeLogEdit($timeLog);
 
         $data = $this->validate([
             'edit_hours' => ['required', 'numeric', 'min:0.1', 'max:24'],
             'edit_reason' => ['required', 'string', 'max:255'],
         ]);
 
-        $workflow->editCompletedHours($history, (float) $data['edit_hours'], auth()->user(), $data['edit_reason']);
+        $workflow->editTimeLog($timeLog, (float) $data['edit_hours'], auth()->user(), $data['edit_reason']);
 
-        $this->editingId = null;
+        $this->editingLogId = null;
+    }
+
+    public function deleteLog(int $timeLogId, TaskWorkflowService $workflow): void
+    {
+        $timeLog = TaskTimeLog::findOrFail($timeLogId);
+        $this->authorizeTimeLogEdit($timeLog);
+
+        $workflow->deleteTimeLog($timeLog, auth()->user());
     }
 
     public function with(): array
     {
         [$start, $end] = $this->periodBounds();
+        $startDate = $start->toDateString();
+        $endDate = $end->toDateString();
 
         $canViewAll = auth()->user()->can('view-all-work-history');
         $userIds = $canViewAll && $this->compareUserIds !== [] ? $this->compareUserIds : [auth()->id()];
@@ -113,20 +128,21 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
             $users = User::query()->whereIn('id', $userIds)->get()->keyBy('id');
 
             $comparison = collect($userIds)
-                ->map(function (int $id) use ($users, $start, $end) {
+                ->map(function (int $id) use ($users, $startDate, $endDate) {
                     $user = $users->get($id);
 
                     if (! $user) {
                         return null;
                     }
 
-                    $periodQuery = WorkHistory::query()->where('user_id', $id)
-                        ->whereBetween('completed_date', [$start->toDateString(), $end->toDateString()]);
+                    $periodQuery = TaskTimeLog::query()->where('user_id', $id)
+                        ->whereDate('logged_date', '>=', $startDate)
+                        ->whereDate('logged_date', '<=', $endDate);
 
                     return [
                         'user' => $user,
-                        'hours' => (float) (clone $periodQuery)->sum('actual_hours'),
-                        'count' => (clone $periodQuery)->count(),
+                        'hours' => (float) (clone $periodQuery)->sum('hours'),
+                        'count' => (clone $periodQuery)->distinct('task_id')->count('task_id'),
                     ];
                 })
                 ->filter()
@@ -141,16 +157,47 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
 
         $singleUserId = $userIds[0];
 
-        $query = WorkHistory::query()->with(['task', 'assignedBy'])
-            ->where('user_id', $singleUserId)
-            ->whereBetween('completed_date', [$start->toDateString(), $end->toDateString()])
-            ->latest('completed_date');
-        $summary = (clone $query)->sum('actual_hours');
+        // Every task this person logged any time on within the period — as
+        // assignee, Reporter, or QA/Reviewer alike, since anyone connected to
+        // a task can log their own time on it. This is the accurate, granular
+        // source of "work history" now, rather than the one-off snapshot
+        // captured whenever a task happened to be submitted for QA.
+        $taskIds = TaskTimeLog::query()->where('user_id', $singleUserId)
+            ->whereDate('logged_date', '>=', $startDate)
+            ->whereDate('logged_date', '<=', $endDate)
+            ->distinct()
+            ->pluck('task_id');
+
+        $tasks = Task::query()
+            ->whereIn('id', $taskIds)
+            ->with(['timeLogs' => fn ($q) => $q->where('user_id', $singleUserId)
+                ->whereDate('logged_date', '>=', $startDate)
+                ->whereDate('logged_date', '<=', $endDate)
+                ->orderByDesc('logged_date')])
+            ->withSum(['timeLogs as period_hours' => fn ($q) => $q->where('user_id', $singleUserId)
+                ->whereDate('logged_date', '>=', $startDate)
+                ->whereDate('logged_date', '<=', $endDate)], 'hours')
+            ->addSelect(['latest_log_date' => TaskTimeLog::query()
+                ->select('logged_date')
+                ->whereColumn('task_id', 'tasks.id')
+                ->where('user_id', $singleUserId)
+                ->whereDate('logged_date', '>=', $startDate)
+                ->whereDate('logged_date', '<=', $endDate)
+                ->orderByDesc('logged_date')
+                ->limit(1),
+            ])
+            ->orderByDesc('latest_log_date')
+            ->paginate(15);
+
+        $summary = (float) TaskTimeLog::query()->where('user_id', $singleUserId)
+            ->whereDate('logged_date', '>=', $startDate)
+            ->whereDate('logged_date', '<=', $endDate)
+            ->sum('hours');
 
         return $shared + [
             'mode' => 'single',
             'viewingUser' => User::find($singleUserId),
-            'histories' => $query->paginate(15),
+            'tasks' => $tasks,
             'summaryHours' => $summary,
             'canEdit' => auth()->user()->can('edit-completed-hours'),
         ];
@@ -162,7 +209,7 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
     <div class="flex items-center justify-between">
         <div>
             <h1 class="text-2xl font-semibold text-zinc-900">Work History</h1>
-            <p class="text-sm text-zinc-500">Automatically recorded from completed tasks.</p>
+            <p class="text-sm text-zinc-500">Everyone's daily time logs — as assignee, Reporter, or QA/Reviewer.</p>
         </div>
     </div>
 
@@ -221,7 +268,7 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
                         <span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white">{{ Avatar::initials($row['user']->name) }}</span>
                         <div class="min-w-0">
                             <p class="truncate text-sm font-medium text-zinc-900">{{ $row['user']->name }}</p>
-                            <p class="text-xs text-zinc-500">{{ $row['count'] }} task{{ $row['count'] === 1 ? '' : 's' }} completed</p>
+                            <p class="text-xs text-zinc-500">{{ $row['count'] }} task{{ $row['count'] === 1 ? '' : 's' }} logged</p>
                         </div>
                     </div>
 
@@ -241,55 +288,82 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
             <table class="min-w-full divide-y divide-zinc-200">
                 <thead class="bg-zinc-50">
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Date</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Last Logged</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Task</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Assigned By</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Status</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Hours</th>
-                        @if ($canEdit)
-                            <th class="px-4 py-3"></th>
-                        @endif
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-zinc-100">
-                    @forelse ($histories as $history)
+                @forelse ($tasks as $task)
+                    <tbody x-data="{ open: false }" class="divide-y divide-zinc-100">
                         <tr>
-                            <td class="px-4 py-3 text-sm text-zinc-500">{{ $history->completed_date->format('d M Y') }}</td>
+                            <td class="px-4 py-3 text-sm text-zinc-500">{{ \Illuminate\Support\Carbon::parse($task->latest_log_date)->format('d M Y') }}</td>
                             <td class="px-4 py-3 text-sm font-medium text-zinc-900">
-                                <span class="mr-1 inline-block rounded-full bg-violet-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-violet-700">{{ $history->task->task_key }}</span>
-                                {{ $history->task->title }}
+                                <a href="{{ route('tasks.show', $task) }}" wire:navigate class="hover:text-brand">
+                                    <span class="mr-1 inline-block rounded-full bg-violet-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-violet-700">{{ $task->task_key }}</span>
+                                    {{ $task->title }}
+                                </a>
                             </td>
-                            <td class="px-4 py-3 text-sm text-zinc-500">{{ $history->assignedBy->name }}</td>
+                            <td class="px-4 py-3 text-sm">
+                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $task->status->pillClasses() }}">{{ $task->status->label() }}</span>
+                            </td>
                             <td class="px-4 py-3 text-sm text-zinc-500">
-                                @if ($editingId === $history->id)
-                                    <div class="flex items-center gap-2">
-                                        <input wire:model="edit_hours" type="number" step="0.1" class="w-20 rounded-lg border border-zinc-300 px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                                        <input wire:model="edit_reason" type="text" placeholder="Reason" class="w-40 rounded-lg border border-zinc-300 px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                                        <button type="button" wire:click="saveEdit" class="text-sm font-medium text-brand hover:underline">Save</button>
-                                        <button type="button" wire:click="$set('editingId', null)" class="text-sm text-zinc-500 hover:underline">Cancel</button>
-                                    </div>
-                                    @error('edit_hours') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
-                                    @error('edit_reason') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
-                                @else
-                                    {{ number_format($history->actual_hours, 2) }}h
-                                @endif
+                                <button type="button" @click="open = ! open" class="flex items-center gap-1 hover:text-brand">
+                                    {{ number_format((float) $task->period_hours, 2) }}h
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5 text-zinc-400 transition-transform" :class="open ? 'rotate-180' : ''">
+                                        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
                             </td>
-                            @if ($canEdit)
-                                <td class="px-4 py-3 text-right text-sm">
-                                    @if ($editingId !== $history->id)
-                                        <button type="button" wire:click="startEdit({{ $history->id }})" class="text-zinc-600 hover:text-brand hover:underline">Edit</button>
-                                    @endif
-                                </td>
-                            @endif
                         </tr>
-                    @empty
+                        <tr x-show="open" x-cloak>
+                            <td colspan="4" class="bg-zinc-50 px-4 py-3">
+                                <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">Daily time log</p>
+
+                                <div class="space-y-1">
+                                    @foreach ($task->timeLogs as $log)
+                                        <div class="flex items-center justify-between gap-3 py-1 text-xs text-zinc-600">
+                                            @if ($editingLogId === $log->id)
+                                                <div class="flex flex-1 flex-wrap items-center gap-2">
+                                                    <span class="shrink-0">{{ $log->logged_date->format('d M Y') }}</span>
+                                                    <input wire:model="edit_hours" type="number" step="0.1" class="w-20 rounded-lg border border-zinc-300 px-2 py-1 text-xs focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                                    <input wire:model="edit_reason" type="text" placeholder="Reason" class="w-40 rounded-lg border border-zinc-300 px-2 py-1 text-xs focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                                    <button type="button" wire:click="saveEdit" class="font-medium text-brand hover:underline">Save</button>
+                                                    <button type="button" wire:click="$set('editingLogId', null)" class="text-zinc-500 hover:underline">Cancel</button>
+                                                </div>
+                                                @error('edit_hours') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
+                                                @error('edit_reason') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
+                                            @else
+                                                <span class="truncate">
+                                                    {{ $log->logged_date->format('d M Y') }}
+                                                    @if ($log->note)
+                                                        <span class="text-zinc-400">— {{ $log->note }}</span>
+                                                    @endif
+                                                </span>
+                                                <span class="flex shrink-0 items-center gap-2">
+                                                    <span class="font-medium text-zinc-900">{{ number_format($log->hours, 2) }}h</span>
+                                                    @if ($canEdit || $log->user_id === auth()->id())
+                                                        <button type="button" wire:click="startEdit({{ $log->id }})" class="text-zinc-400 hover:text-brand">Edit</button>
+                                                        <button type="button" wire:click="deleteLog({{ $log->id }})" wire:confirm="Remove this time entry?" class="text-zinc-400 hover:text-red-600">Remove</button>
+                                                    @endif
+                                                </span>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                @empty
+                    <tbody>
                         <tr>
-                            <td colspan="5" class="px-4 py-8 text-center text-sm text-zinc-500">No work history for this period.</td>
+                            <td colspan="4" class="px-4 py-8 text-center text-sm text-zinc-500">No work history for this period.</td>
                         </tr>
-                    @endforelse
-                </tbody>
+                    </tbody>
+                @endforelse
             </table>
         </div>
 
-        {{ $histories->links() }}
+        {{ $tasks->links() }}
     @endif
 </div>
