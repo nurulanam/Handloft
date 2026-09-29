@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\AppSetting;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
@@ -55,6 +56,17 @@ new #[Layout('layouts.guest')] #[Title('Log in')] class extends Component
 
         if (request()->hasSession()) {
             request()->session()->regenerate();
+        }
+
+        // Flash a one-time signal the dashboard's layout picks up on its very
+        // next page load, to show the branded loading overlay over the real
+        // dashboard content instead of on this login page (see
+        // layouts/app.blade.php) — only if the setting is currently enabled.
+        $settings = AppSetting::current();
+
+        if ($settings->show_loading_screen) {
+            session()->flash('just_logged_in', true);
+            session()->flash('loading_screen_seconds', $settings->loading_screen_seconds);
         }
 
         $this->redirect(route('dashboard'), navigate: true);

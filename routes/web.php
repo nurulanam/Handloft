@@ -39,4 +39,6 @@ Route::middleware('auth')->group(function () {
 
     Route::livewire('/work-history', 'work-history.index')->name('work-history.index');
     Route::livewire('/work-history/{user}', 'work-history.index')->name('work-history.show');
+
+    Route::livewire('/settings', 'settings')->name('settings');
 });

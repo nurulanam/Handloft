@@ -34,6 +34,32 @@
             },
         }"
     >
+        @if (session('just_logged_in'))
+            @php $__loadingScreen = \App\Models\AppSetting::current(); @endphp
+            {{-- A frosted-glass overlay shown once, right after login, over the
+                 real dashboard underneath (rather than on the login page before
+                 navigating) so it's actually visible faintly through the blur.
+                 Fades itself out after the configured duration. Transparency
+                 and blur are configurable from Settings, so they're applied as
+                 inline styles rather than fixed Tailwind classes. --}}
+            <div
+                x-data="{ visible: true }"
+                x-init="setTimeout(() => visible = false, {{ (int) session('loading_screen_seconds', 3) * 1000 }})"
+                x-show="visible"
+                x-transition:leave="transition ease-in-out duration-700"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                class="fixed inset-0 z-60 flex flex-col items-center justify-center gap-6"
+                style="background-color: rgba(255, 255, 255, {{ $__loadingScreen->loading_screen_opacity / 100 }}); backdrop-filter: blur({{ $__loadingScreen->loading_screen_blur }}px); -webkit-backdrop-filter: blur({{ $__loadingScreen->loading_screen_blur }}px);"
+            >
+                <div class="size-16 animate-spin rounded-full border-4 border-brand/20 border-t-brand-lime"></div>
+                <div class="flex items-center gap-2 text-xl font-semibold text-zinc-900">
+                    <span class="h-2.5 w-2.5 rounded-full bg-brand-lime"></span>
+                    {{ config('app.name') }}
+                </div>
+            </div>
+        @endif
+
         <div class="flex min-h-screen">
             {{-- Sidebar --}}
             <aside
@@ -84,7 +110,7 @@
                             ['label' => 'Calendar', 'icon' => $icons['calendar'], 'disabled' => true],
                             ['label' => 'Reports', 'icon' => $icons['chart'], 'disabled' => true],
                             ['label' => 'Notifications', 'icon' => $icons['bell'], 'disabled' => true],
-                            ['label' => 'Settings', 'icon' => $icons['cog'], 'disabled' => true],
+                            ['label' => 'Settings', 'route' => 'settings', 'icon' => $icons['cog'], 'hidden' => auth()->user()->cannot('manage-settings')],
                         ];
                     @endphp
 
