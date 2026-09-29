@@ -22,6 +22,8 @@ Route::post('/logout', function () {
 
 Route::middleware('auth')->group(function () {
     Route::livewire('/dashboard', 'dashboard')->name('dashboard');
+    Route::livewire('/for-you', 'for-you')->name('for-you');
+    Route::livewire('/starred', 'starred')->name('starred');
 
     Route::livewire('/users', 'users.index')->name('users.index');
     Route::livewire('/users/create', 'users.form')->name('users.create');

@@ -163,6 +163,15 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
         $this->redirect(route('tasks.show', $task), navigate: true);
     }
 
+    public function toggleStar(int $taskId): void
+    {
+        $task = Task::findOrFail($taskId);
+
+        Gate::authorize('view', $task);
+
+        auth()->user()->starredTasks()->toggle($task->id);
+    }
+
     /**
      * A left-border accent identifying the viewer's relationship to a task on
      * a shared board, so "your" cards stand out without a distracting full
@@ -184,7 +193,9 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
     {
         $userId = auth()->id();
 
-        $query = Task::query()->with(['category', 'currentAssignment.assignedTo', 'creator'])->latest();
+        $query = Task::query()
+            ->with(['category', 'currentAssignment.assignedTo', 'creator', 'starredBy' => fn ($q) => $q->where('users.id', $userId)])
+            ->latest();
 
         $query->when($this->projectId, fn ($q) => $q->where('project_id', $this->projectId));
 
@@ -362,11 +373,19 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                                 :class="draggingId === {{ $task->id }} && moved ? 'opacity-40' : ''"
                                 class="cursor-grab select-none rounded-lg border border-zinc-200 bg-white p-3 hover:border-brand/40 active:cursor-grabbing {{ $this->connectionAccentClass($task, auth()->user()) }}"
                             >
-                                <div class="mb-1 flex flex-wrap items-center gap-1">
-                                    <span class="inline-block rounded-full bg-violet-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-violet-700">{{ $task->task_key }}</span>
-                                    @if ($task->parent_task_id)
-                                        <span class="inline-block rounded-full bg-zinc-200 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-zinc-600">SUB-{{ $task->parent_task_id }}</span>
-                                    @endif
+                                <div class="mb-1 flex items-center justify-between gap-1">
+                                    <div class="flex flex-wrap items-center gap-1">
+                                        <span class="inline-block rounded-full bg-violet-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-violet-700">{{ $task->task_key }}</span>
+                                        @if ($task->parent_task_id)
+                                            <span class="inline-block rounded-full bg-zinc-200 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-zinc-600">SUB-{{ $task->parent_task_id }}</span>
+                                        @endif
+                                    </div>
+
+                                    <button type="button" x-on:mousedown.stop wire:click="toggleStar({{ $task->id }})" class="shrink-0 {{ $task->starredBy->isNotEmpty() ? 'text-amber-400' : 'text-zinc-300 hover:text-amber-400' }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5">
+                                            <path d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z" />
+                                        </svg>
+                                    </button>
                                 </div>
                                 <p class="text-sm font-medium text-zinc-900">{{ $task->title }}</p>
                                 <p class="mt-1 text-xs text-zinc-500">{{ $task->currentAssignment?->assignedTo?->name ?? 'Unassigned' }}</p>
@@ -429,6 +448,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
             <table class="min-w-full divide-y divide-zinc-200">
                 <thead class="bg-zinc-50">
                     <tr>
+                        <th class="w-8 px-4 py-3"></th>
                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Key</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Title</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Assigned To</th>
@@ -439,7 +459,14 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                 </thead>
                 <tbody class="divide-y divide-zinc-100">
                     @forelse ($tasks as $task)
-                        <tr class="cursor-pointer hover:bg-zinc-50" onclick="window.location='{{ route('tasks.show', $task) }}'">
+                        <tr class="cursor-pointer hover:bg-zinc-50 {{ $this->connectionAccentClass($task, auth()->user()) }}" onclick="window.location='{{ route('tasks.show', $task) }}'">
+                            <td class="px-4 py-3">
+                                <button type="button" onclick="event.stopPropagation()" wire:click="toggleStar({{ $task->id }})" class="{{ $task->starredBy->isNotEmpty() ? 'text-amber-400' : 'text-zinc-300 hover:text-amber-400' }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4">
+                                        <path d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z" />
+                                    </svg>
+                                </button>
+                            </td>
                             <td class="px-4 py-3">
                                 <span class="inline-block rounded-full bg-violet-100 px-2 py-0.5 font-mono text-xs font-semibold text-violet-700">{{ $task->task_key }}</span>
                             </td>
@@ -456,7 +483,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-4 py-8 text-center text-sm text-zinc-500">No tasks here yet.</td>
+                            <td colspan="7" class="px-4 py-8 text-center text-sm text-zinc-500">No tasks here yet.</td>
                         </tr>
                     @endforelse
                 </tbody>

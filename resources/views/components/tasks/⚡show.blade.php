@@ -70,6 +70,11 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         $this->description = (string) $task->description;
     }
 
+    public function toggleStar(): void
+    {
+        auth()->user()->starredTasks()->toggle($this->task->id);
+    }
+
     /**
      * Clear a field's validation error as soon as the user changes it,
      * instead of leaving a stale error message on screen until re-submit.
@@ -454,6 +459,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
             'canEditStatus' => $nextStatuses->isNotEmpty(),
             'canEditMeta' => Gate::allows('updateMeta', $this->task),
             'canComment' => Gate::allows('comment', $this->task),
+            'isStarred' => auth()->user()->starredTasks()->where('tasks.id', $this->task->id)->exists(),
         ];
     }
 };
@@ -463,6 +469,13 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
     <div>
         <div class="flex items-center gap-2">
             <span class="rounded-full bg-violet-100 px-2.5 py-1 font-mono text-xs font-semibold text-violet-700">{{ $task->task_key }}</span>
+
+            <button type="button" wire:click="toggleStar" class="{{ $isStarred ? 'text-amber-400' : 'text-zinc-300 hover:text-amber-400' }}" title="{{ $isStarred ? 'Unstar' : 'Star' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5">
+                    <path d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z" />
+                </svg>
+            </button>
+
             @if ($task->project)
                 <a href="{{ route('projects.show', $task->project) }}" wire:navigate class="text-xs font-medium text-zinc-500 hover:text-brand">
                     {{ $task->project->name }} /
