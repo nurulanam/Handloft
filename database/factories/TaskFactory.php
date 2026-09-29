@@ -25,7 +25,7 @@ class TaskFactory extends Factory
             'description' => fake()->paragraph(),
             'created_by' => User::factory(),
             'priority' => fake()->randomElement(TaskPriority::cases()),
-            'status' => TaskStatus::Pending,
+            'status' => TaskStatus::Todo,
             'start_date' => now()->toDateString(),
             'deadline' => now()->addWeek()->toDateString(),
             'notes' => null,

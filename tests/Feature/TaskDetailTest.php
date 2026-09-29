@@ -33,14 +33,6 @@ class TaskDetailTest extends TestCase
         return $user;
     }
 
-    private function manager(string $name): User
-    {
-        $user = User::factory()->create(['name' => $name, 'status' => 'active']);
-        $user->assignRole(Role::Manager->value);
-
-        return $user;
-    }
-
     public function test_authorized_user_can_update_description_and_html_is_sanitized(): void
     {
         $rahim = $this->teamMember('Rahim');
@@ -197,62 +189,5 @@ class TaskDetailTest extends TestCase
 
         $this->assertSame('urgent', $task->priority->value);
         $this->assertTrue($task->activities()->where('type', 'meta_updated')->exists());
-    }
-
-    public function test_team_member_cannot_cancel_a_task_even_their_own(): void
-    {
-        $rahim = $this->teamMember('Rahim');
-        $karim = $this->teamMember('Karim');
-
-        $workflow = app(TaskWorkflowService::class);
-        $task = $workflow->createTask(['title' => 'Website Audit'], $rahim, $karim);
-
-        Livewire::actingAs($karim)
-            ->test('tasks.show', ['task' => $task])
-            ->set('status_value', 'cancelled')
-            ->call('saveStatus')
-            ->assertForbidden();
-
-        $task->refresh();
-
-        $this->assertNotEquals('cancelled', $task->status->value);
-    }
-
-    public function test_manager_can_cancel_a_task(): void
-    {
-        $rahim = $this->teamMember('Rahim');
-        $karim = $this->teamMember('Karim');
-        $manager = $this->manager('Manager Mike');
-
-        $workflow = app(TaskWorkflowService::class);
-        $task = $workflow->createTask(['title' => 'Website Audit'], $rahim, $karim);
-
-        Livewire::actingAs($manager)
-            ->test('tasks.show', ['task' => $task])
-            ->set('status_value', 'cancelled')
-            ->call('saveStatus');
-
-        $task->refresh();
-
-        $this->assertSame('cancelled', $task->status->value);
-    }
-
-    public function test_super_admin_can_cancel_a_task(): void
-    {
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
-        $rahim = $this->teamMember('Rahim');
-        $karim = $this->teamMember('Karim');
-
-        $workflow = app(TaskWorkflowService::class);
-        $task = $workflow->createTask(['title' => 'Website Audit'], $rahim, $karim);
-
-        Livewire::actingAs($admin)
-            ->test('tasks.show', ['task' => $task])
-            ->set('status_value', 'cancelled')
-            ->call('saveStatus');
-
-        $task->refresh();
-
-        $this->assertSame('cancelled', $task->status->value);
     }
 }

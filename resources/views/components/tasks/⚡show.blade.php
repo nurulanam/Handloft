@@ -22,11 +22,11 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
 
     public Task $task;
 
-    public bool $showCompleteModal = false;
+    public bool $showSubmitQaModal = false;
 
     public string $actual_hours = '';
 
-    public string $completion_note = '';
+    public string $submission_note = '';
 
     public string $description = '';
 
@@ -79,19 +79,27 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         $this->resetErrorBag($name);
     }
 
-    public function complete(TaskWorkflowService $workflow): void
+    public function submitForQa(TaskWorkflowService $workflow): void
     {
-        Gate::authorize('complete', $this->task);
+        Gate::authorize('transitionStatus', [$this->task, TaskStatus::QaTesting]);
 
         $data = $this->validate([
             'actual_hours' => ['required', 'numeric', 'min:0.1', 'max:24'],
-            'completion_note' => ['nullable', 'string'],
+            'submission_note' => ['nullable', 'string'],
         ]);
 
-        $workflow->completeTask($this->task, auth()->user(), (float) $data['actual_hours'], $data['completion_note'] ?: null);
+        $workflow->submitForQa($this->task, auth()->user(), (float) $data['actual_hours'], $data['submission_note'] ?: null);
 
-        $this->showCompleteModal = false;
+        $this->showSubmitQaModal = false;
         $this->task->refresh();
+    }
+
+    public function cancelSubmitForQa(): void
+    {
+        $this->showSubmitQaModal = false;
+        $this->actual_hours = '';
+        $this->submission_note = '';
+        $this->resetErrorBag();
     }
 
     public function saveDescription(): void
@@ -116,7 +124,10 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         $this->authorizeField($field);
 
         match ($field) {
-            'status' => $this->status_value = $this->task->status->value,
+            // Default to the first legal next status — a <select> renders its
+            // first <option> as selected regardless of the bound value, so this
+            // keeps the (deferred) wire:model state in sync with what's shown.
+            'status' => $this->status_value = optional($this->nextStatuses()->first())->value ?? '',
             'assignee' => $this->assignee_value = (string) $this->task->currentAssignee()?->id,
             'reporter' => $this->reporter_value = (string) $this->task->created_by,
             'priority' => $this->priority_value = $this->task->priority->value,
@@ -139,12 +150,22 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
     private function authorizeField(string $field): void
     {
         $allowed = match ($field) {
-            'status' => Gate::allows('complete', $this->task) || Gate::allows('cancel', $this->task) || Gate::allows('updateMeta', $this->task),
+            'status' => $this->nextStatuses()->isNotEmpty(),
             'assignee', 'reporter' => Gate::allows('reassign', $this->task),
             default => Gate::allows('updateMeta', $this->task),
         };
 
         abort_unless($allowed, 403);
+    }
+
+    /**
+     * The statuses the current user is allowed to move this task to right now.
+     */
+    private function nextStatuses(): \Illuminate\Support\Collection
+    {
+        return collect($this->task->status->nextStatuses())
+            ->filter(fn (TaskStatus $status) => Gate::allows('transitionStatus', [$this->task, $status]))
+            ->values();
     }
 
     public function saveStatus(TaskWorkflowService $workflow): void
@@ -153,24 +174,28 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
             'status_value' => ['required', Rule::in(array_column(TaskStatus::cases(), 'value'))],
         ]);
 
-        if ($data['status_value'] === TaskStatus::Completed->value) {
-            Gate::authorize('complete', $this->task);
+        $newStatus = TaskStatus::from($data['status_value']);
 
+        Gate::authorize('transitionStatus', [$this->task, $newStatus]);
+
+        if ($newStatus === TaskStatus::QaTesting) {
+            if (! $this->task->qa_id) {
+                $this->dispatch('notify', message: 'Assign a QA / Reviewer to this task before submitting it for QA testing.', type: 'error');
+
+                return;
+            }
+
+            $this->actual_hours = (string) ($this->task->workHistory?->actual_hours ?? '');
+            $this->submission_note = '';
             $this->editingField = null;
-            $this->showCompleteModal = true;
+            $this->showSubmitQaModal = true;
 
             return;
         }
 
-        if ($data['status_value'] === TaskStatus::Cancelled->value) {
-            Gate::authorize('cancel', $this->task);
+        if ($newStatus === TaskStatus::Done) {
+            $workflow->markDone($this->task, auth()->user());
         } else {
-            Gate::authorize('updateMeta', $this->task);
-        }
-
-        $newStatus = TaskStatus::from($data['status_value']);
-
-        if ($this->task->status !== $newStatus) {
             $this->task->update(['status' => $newStatus]);
             $this->logMetaChange("Status changed to {$newStatus->label()}");
         }
@@ -415,8 +440,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                 'source' => 'Comment',
             ]);
 
-        $canComplete = Gate::allows('complete', $this->task);
-        $canCancel = Gate::allows('cancel', $this->task);
+        $nextStatuses = $this->nextStatuses();
 
         return [
             'timeline' => $this->task->activities()->with('causer')->get(),
@@ -424,13 +448,10 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
             'users' => User::query()->orderBy('name')->get(),
             'projects' => Project::query()->orderBy('name')->get(),
             'availableParents' => Task::query()->where('id', '!=', $this->task->id)->orderBy('title')->get(),
-            'availableStatuses' => collect(TaskStatus::cases())->filter(
-                fn ($s) => ($s !== TaskStatus::Completed || $canComplete) && ($s !== TaskStatus::Cancelled || $canCancel)
-            ),
+            'availableStatuses' => $nextStatuses,
             'allAttachments' => $taskAttachments->concat($commentAttachments)->sortByDesc('created_at')->values(),
             'canReassign' => Gate::allows('reassign', $this->task),
-            'canComplete' => $canComplete,
-            'canEditStatus' => $canComplete || $canCancel || Gate::allows('updateMeta', $this->task),
+            'canEditStatus' => $nextStatuses->isNotEmpty(),
             'canEditMeta' => Gate::allows('updateMeta', $this->task),
             'canComment' => Gate::allows('comment', $this->task),
         ];
@@ -671,6 +692,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                         <button type="button" wire:click="saveStatus" class="text-xs font-medium text-brand hover:underline">Save</button>
                         <button type="button" wire:click="cancelEditField" class="text-xs text-zinc-500 hover:text-zinc-700">Cancel</button>
                     </div>
+                    @error('status_value') <p class="mt-2 max-w-xs rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{{ $message }}</p> @enderror
                 @else
                     <button
                         type="button"
@@ -941,11 +963,11 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         </div>
     </div>
 
-    {{-- Complete Task modal --}}
-    @if ($showCompleteModal)
+    {{-- Submit for QA Testing modal --}}
+    @if ($showSubmitQaModal)
         <div class="fixed inset-0 z-40 flex items-center justify-center bg-zinc-900/50 px-4">
             <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
-                <h3 class="text-lg font-semibold text-zinc-900">Complete Task</h3>
+                <h3 class="text-lg font-semibold text-zinc-900">Submit for QA Testing</h3>
                 <p class="mt-1 text-sm text-zinc-500">{{ $task->title }}</p>
 
                 <div class="mt-4">
@@ -955,13 +977,13 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                 </div>
 
                 <div class="mt-4">
-                    <label class="block text-sm font-medium text-zinc-700">Completion Note (Optional)</label>
-                    <textarea wire:model="completion_note" rows="2" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40"></textarea>
+                    <label class="block text-sm font-medium text-zinc-700">Note (Optional)</label>
+                    <textarea wire:model="submission_note" rows="2" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40"></textarea>
                 </div>
 
                 <div class="mt-6 flex justify-end gap-3">
-                    <button type="button" wire:click="$set('showCompleteModal', false)" class="text-sm font-medium text-zinc-600 hover:text-zinc-900">Cancel</button>
-                    <button type="button" wire:click="complete" class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90">Complete Task</button>
+                    <button type="button" wire:click="cancelSubmitForQa" class="text-sm font-medium text-zinc-600 hover:text-zinc-900">Cancel</button>
+                    <button type="button" wire:click="submitForQa" class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90">Submit</button>
                 </div>
             </div>
         </div>

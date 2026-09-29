@@ -37,7 +37,7 @@ class WorkHistoryTest extends TestCase
 
         $workflow = app(TaskWorkflowService::class);
         $task = $workflow->createTask(['title' => 'Create Client List'], $rahim, $karim);
-        $history = $workflow->completeTask($task, $karim, 3.5);
+        $history = $workflow->submitForQa($task, $karim, 3.5);
 
         Livewire::actingAs($karim)
             ->test('work-history.index')
@@ -53,7 +53,7 @@ class WorkHistoryTest extends TestCase
 
         $workflow = app(TaskWorkflowService::class);
         $task = $workflow->createTask(['title' => 'Create Client List'], $rahim, $karim);
-        $history = $workflow->completeTask($task, $karim, 3.5);
+        $history = $workflow->submitForQa($task, $karim, 3.5);
 
         Livewire::actingAs($admin)
             ->test('work-history.index')
@@ -83,9 +83,9 @@ class WorkHistoryTest extends TestCase
 
         $workflow = app(TaskWorkflowService::class);
         $task1 = $workflow->createTask(['title' => 'Task for Rahim'], $rahim, $rahim);
-        $workflow->completeTask($task1, $rahim, 3.0);
+        $workflow->submitForQa($task1, $rahim, 3.0);
         $task2 = $workflow->createTask(['title' => 'Task for Karim'], $karim, $karim);
-        $workflow->completeTask($task2, $karim, 5.0);
+        $workflow->submitForQa($task2, $karim, 5.0);
 
         $component = Livewire::actingAs($admin)
             ->test('work-history.index')

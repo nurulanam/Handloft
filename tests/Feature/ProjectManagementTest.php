@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\Role;
+use App\Enums\TaskStatus;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
@@ -77,12 +78,16 @@ class ProjectManagementTest extends TestCase
     {
         $manager = $this->manager('Rahim');
         $karim = $this->teamMember('Karim');
+        $qa = $this->teamMember('Qadir');
         $project = Project::factory()->create(['created_by' => $manager->id]);
 
         $workflow = app(TaskWorkflowService::class);
-        $taskOne = $workflow->createTask(['title' => 'Task One', 'project_id' => $project->id], $manager, $karim);
+        $taskOne = $workflow->createTask(['title' => 'Task One', 'project_id' => $project->id, 'qa_id' => $qa->id], $manager, $karim);
         $workflow->createTask(['title' => 'Task Two', 'project_id' => $project->id], $manager, $karim);
-        $workflow->completeTask($taskOne, $karim, 2.0);
+
+        $workflow->submitForQa($taskOne, $karim, 2.0);
+        $taskOne->update(['status' => TaskStatus::ReadyToDeploy]);
+        $workflow->markDone($taskOne, $manager);
 
         $project->refresh();
 

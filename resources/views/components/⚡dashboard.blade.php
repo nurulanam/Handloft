@@ -13,13 +13,13 @@ new #[Layout('layouts.app')] #[Title('Dashboard')] class extends Component
     public function with(): array
     {
         $totalTasks = Task::count();
-        $pending = Task::where('status', TaskStatus::Pending)->count();
+        $pending = Task::where('status', TaskStatus::Todo)->count();
         $inProgress = Task::where('status', TaskStatus::InProgress)->count();
-        $overdue = Task::whereDate('deadline', '<', now())->whereNotIn('status', [TaskStatus::Completed, TaskStatus::Cancelled])->count();
+        $overdue = Task::whereDate('deadline', '<', now())->where('status', '!=', TaskStatus::Done)->count();
 
         $activeMembers = User::where('status', 'active')->count();
         $hoursMonth = (float) WorkHistory::whereBetween('completed_date', [now()->startOfMonth(), now()->endOfMonth()])->sum('actual_hours');
-        $completedThisWeek = Task::where('status', TaskStatus::Completed)
+        $completedThisWeek = Task::where('status', TaskStatus::Done)
             ->whereHas('workHistory', fn ($q) => $q->whereBetween('completed_date', [now()->startOfWeek(), now()->endOfWeek()]))
             ->count();
 

@@ -152,7 +152,30 @@ class Task extends Model
     {
         return $this->deadline !== null
             && $this->deadline->isPast()
-            && $this->status !== TaskStatus::Completed
-            && $this->status !== TaskStatus::Cancelled;
+            && $this->status !== TaskStatus::Done;
+    }
+
+    public function isAssignedTo(User $user): bool
+    {
+        return $this->currentAssignee()?->id === $user->id;
+    }
+
+    public function isReportedBy(User $user): bool
+    {
+        return $this->created_by === $user->id;
+    }
+
+    public function isReviewedBy(User $user): bool
+    {
+        return $this->qa_id !== null && $this->qa_id === $user->id;
+    }
+
+    /**
+     * Whether the user holds any role (assignee, reporter, or QA/reviewer) on
+     * this task — used to highlight "your" tasks on a board everyone can see.
+     */
+    public function isConnectedTo(User $user): bool
+    {
+        return $this->isAssignedTo($user) || $this->isReportedBy($user) || $this->isReviewedBy($user);
     }
 }

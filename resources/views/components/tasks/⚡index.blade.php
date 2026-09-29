@@ -3,6 +3,7 @@
 use App\Enums\TaskActivityType;
 use App\Enums\TaskStatus;
 use App\Models\Task;
+use App\Models\User;
 use App\Services\TaskWorkflowService;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Url;
@@ -16,16 +17,16 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
     use WithPagination;
 
     #[Url]
-    public string $tab = 'my-tasks';
+    public string $tab = 'all';
 
     #[Url]
     public string $view = 'board';
 
-    public ?int $completingTaskId = null;
+    public ?int $submittingTaskId = null;
 
     public string $actual_hours = '';
 
-    public string $completion_note = '';
+    public string $submission_note = '';
 
     public ?int $projectId = null;
 
@@ -47,17 +48,10 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
 
     public function tabs(): array
     {
-        $tabs = [
-            'my-tasks' => 'My Tasks',
+        return [
+            'all' => 'All Tasks',
             'assigned-to-me' => 'Assigned to Me',
-            'assigned-by-me' => 'Assigned by Me',
         ];
-
-        if (auth()->user()->can('view-all-tasks')) {
-            $tabs = ['all' => 'All Tasks'] + $tabs;
-        }
-
-        return $tabs;
     }
 
     public function moveTask(int $taskId, string $status): void
@@ -66,29 +60,42 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
 
         Gate::authorize('view', $task);
 
-        // Completion always requires actual hours, so open the Complete Task
-        // modal in place instead of setting status directly or navigating away.
-        if ($status === TaskStatus::Completed->value) {
-            if (Gate::allows('complete', $task)) {
-                $this->completingTaskId = $task->id;
-                $this->actual_hours = '';
-                $this->completion_note = '';
+        $newStatus = TaskStatus::tryFrom($status);
+
+        if (! $newStatus || $newStatus === $task->status) {
+            return;
+        }
+
+        if (Gate::denies('transitionStatus', [$task, $newStatus])) {
+            $message = in_array($newStatus, $task->status->nextStatuses(), true)
+                ? "Only {$this->requiredActorFor($task->status, $newStatus)} can move this task to {$newStatus->label()}."
+                : "A task can't move from {$task->status->label()} to {$newStatus->label()}.";
+
+            $this->dispatch('notify', message: $message, type: 'error');
+
+            return;
+        }
+
+        // Submitting for QA testing always requires a reviewer to already be
+        // assigned (someone has to approve/reject it) and logs the assignee's
+        // hours worked so far, so open a modal instead of updating directly.
+        if ($newStatus === TaskStatus::QaTesting) {
+            if (! $task->qa_id) {
+                $this->dispatch('notify', message: 'Assign a QA / Reviewer to this task before submitting it for QA testing.', type: 'error');
+
+                return;
             }
 
+            $this->submittingTaskId = $task->id;
+            $this->actual_hours = (string) ($task->workHistory?->actual_hours ?? '');
+            $this->submission_note = '';
+
             return;
         }
 
-        if (! in_array($status, [TaskStatus::Pending->value, TaskStatus::InProgress->value, TaskStatus::Cancelled->value], true)) {
-            return;
-        }
+        if ($newStatus === TaskStatus::Done) {
+            app(TaskWorkflowService::class)->markDone($task, auth()->user());
 
-        if ($status === TaskStatus::Cancelled->value && Gate::denies('cancel', $task)) {
-            return;
-        }
-
-        $newStatus = TaskStatus::from($status);
-
-        if ($task->status === $newStatus) {
             return;
         }
 
@@ -102,29 +109,48 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
         ]);
     }
 
-    public function completeTask(TaskWorkflowService $workflow): void
+    /**
+     * A human-readable description of who is allowed to make this specific
+     * move, for the board's "move not possible" alert. Mirrors the pairing in
+     * TaskPolicy::transitionStatus() — some source statuses (Rejected,
+     * ReadyToDeploy) have a different actor depending on the target.
+     */
+    private function requiredActorFor(TaskStatus $from, TaskStatus $to): string
     {
-        $task = Task::findOrFail($this->completingTaskId);
+        return match (true) {
+            $from === TaskStatus::Todo, $from === TaskStatus::InProgress => 'the assignee',
+            $from === TaskStatus::Rejected && $to === TaskStatus::QaTesting => 'the assignee',
+            $from === TaskStatus::Rejected && $to === TaskStatus::ReadyToDeploy => 'the QA / Reviewer',
+            $from === TaskStatus::QaTesting => 'the QA / Reviewer',
+            $from === TaskStatus::ReadyToDeploy && $to === TaskStatus::Rejected => 'the QA / Reviewer',
+            $from === TaskStatus::ReadyToDeploy && $to === TaskStatus::Done => 'the Reporter',
+            default => 'no one',
+        };
+    }
 
-        Gate::authorize('complete', $task);
+    public function submitForQa(TaskWorkflowService $workflow): void
+    {
+        $task = Task::findOrFail($this->submittingTaskId);
+
+        Gate::authorize('transitionStatus', [$task, TaskStatus::QaTesting]);
 
         $data = $this->validate([
             'actual_hours' => ['required', 'numeric', 'min:0.1', 'max:24'],
-            'completion_note' => ['nullable', 'string'],
+            'submission_note' => ['nullable', 'string'],
         ]);
 
-        $workflow->completeTask($task, auth()->user(), (float) $data['actual_hours'], $data['completion_note'] ?: null);
+        $workflow->submitForQa($task, auth()->user(), (float) $data['actual_hours'], $data['submission_note'] ?: null);
 
-        $this->completingTaskId = null;
+        $this->submittingTaskId = null;
         $this->actual_hours = '';
-        $this->completion_note = '';
+        $this->submission_note = '';
     }
 
-    public function cancelComplete(): void
+    public function cancelSubmitForQa(): void
     {
-        $this->completingTaskId = null;
+        $this->submittingTaskId = null;
         $this->actual_hours = '';
-        $this->completion_note = '';
+        $this->submission_note = '';
         $this->resetErrorBag();
     }
 
@@ -137,6 +163,23 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
         $this->redirect(route('tasks.show', $task), navigate: true);
     }
 
+    /**
+     * A left-border accent identifying the viewer's relationship to a task on
+     * a shared board, so "your" cards stand out without a distracting full
+     * background tint. A task can hold more than one role at once (e.g. you
+     * both reported and self-assigned it) — priority favors whichever role is
+     * most actionable for you right now.
+     */
+    private function connectionAccentClass(Task $task, User $user): string
+    {
+        return match (true) {
+            $task->isAssignedTo($user) => 'border-l-4 border-l-brand',
+            $task->isReviewedBy($user) => 'border-l-4 border-l-amber-400',
+            $task->isReportedBy($user) => 'border-l-4 border-l-zinc-400',
+            default => '',
+        };
+    }
+
     public function with(): array
     {
         $userId = auth()->id();
@@ -145,14 +188,28 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
 
         $query->when($this->projectId, fn ($q) => $q->where('project_id', $this->projectId));
 
-        // Inside a project, tasks are scoped by project alone — no "My Tasks" /
-        // "Assigned to Me" split, since the project itself is the relevant scope.
+        // Inside a project, tasks are scoped by project alone — no tab split,
+        // since the project itself is the relevant scope.
         if (! $this->projectId) {
             match ($this->tab) {
-                'all' => $query,
-                'assigned-to-me' => $query->whereHas('currentAssignment', fn ($q) => $q->where('assigned_to', $userId)),
-                'assigned-by-me' => $query->whereHas('currentAssignment', fn ($q) => $q->where('assigned_by', $userId)),
-                default => $query->where('created_by', $userId),
+                // "Assigned to Me" is really "my action queue": everything
+                // currently assigned to me, plus tasks waiting on ME
+                // specifically at their current stage — a task I'm QA-reviewing
+                // while it's in QA Testing, or one I reported once it's Ready
+                // to Deploy and needs my final sign-off.
+                'assigned-to-me' => $query->where(function ($q) use ($userId) {
+                    $q->whereHas('currentAssignment', fn ($q2) => $q2->where('assigned_to', $userId))
+                        ->orWhere(fn ($q2) => $q2->where('qa_id', $userId)->where('status', TaskStatus::QaTesting))
+                        ->orWhere(fn ($q2) => $q2->where('created_by', $userId)->where('status', TaskStatus::ReadyToDeploy));
+                }),
+                // "All Tasks" means everything the viewer is allowed to see:
+                // literally everything for a view-all-tasks holder, otherwise
+                // just the tasks they're connected to (matches TaskPolicy::view()).
+                default => auth()->user()->can('view-all-tasks') ? $query : $query->where(function ($q) use ($userId) {
+                    $q->where('created_by', $userId)
+                        ->orWhereHas('currentAssignment', fn ($q2) => $q2->where('assigned_to', $userId))
+                        ->orWhere('qa_id', $userId);
+                }),
             };
         }
 
@@ -188,14 +245,35 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
             <h2 class="text-lg font-semibold text-zinc-900">Tasks</h2>
         @endunless
 
-        <a href="{{ route('tasks.create', $projectId ? ['project' => $projectId] : []) }}" wire:navigate class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90">
-            Create Task
-        </a>
+        <div class="flex items-center gap-3">
+            @if ($projectId)
+                <div class="flex rounded-lg border border-zinc-200 p-0.5">
+                    <button
+                        type="button"
+                        wire:click="$set('view', 'list')"
+                        class="rounded-md px-3 py-1 text-xs font-medium {{ $view === 'list' ? 'bg-brand text-white' : 'text-zinc-500 hover:text-zinc-700' }}"
+                    >
+                        List
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="$set('view', 'board')"
+                        class="rounded-md px-3 py-1 text-xs font-medium {{ $view === 'board' ? 'bg-brand text-white' : 'text-zinc-500 hover:text-zinc-700' }}"
+                    >
+                        Board
+                    </button>
+                </div>
+            @endif
+
+            <a href="{{ route('tasks.create', $projectId ? ['project' => $projectId] : []) }}" wire:navigate class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90">
+                Create Task
+            </a>
+        </div>
     </div>
 
-    <div class="flex items-center justify-between border-b border-zinc-200">
-        <div class="flex gap-2">
-            @unless ($projectId)
+    @unless ($projectId)
+        <div class="flex items-center justify-between border-b border-zinc-200">
+            <div class="flex gap-2">
                 @foreach ($this->tabs() as $key => $label)
                     <button
                         type="button"
@@ -205,26 +283,26 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                         {{ $label }}
                     </button>
                 @endforeach
-            @endunless
-        </div>
+            </div>
 
-        <div class="mb-2 flex rounded-lg border border-zinc-200 p-0.5">
-            <button
-                type="button"
-                wire:click="$set('view', 'list')"
-                class="rounded-md px-3 py-1 text-xs font-medium {{ $view === 'list' ? 'bg-brand text-white' : 'text-zinc-500 hover:text-zinc-700' }}"
-            >
-                List
-            </button>
-            <button
-                type="button"
-                wire:click="$set('view', 'board')"
-                class="rounded-md px-3 py-1 text-xs font-medium {{ $view === 'board' ? 'bg-brand text-white' : 'text-zinc-500 hover:text-zinc-700' }}"
-            >
-                Board
-            </button>
+            <div class="mb-2 flex rounded-lg border border-zinc-200 p-0.5">
+                <button
+                    type="button"
+                    wire:click="$set('view', 'list')"
+                    class="rounded-md px-3 py-1 text-xs font-medium {{ $view === 'list' ? 'bg-brand text-white' : 'text-zinc-500 hover:text-zinc-700' }}"
+                >
+                    List
+                </button>
+                <button
+                    type="button"
+                    wire:click="$set('view', 'board')"
+                    class="rounded-md px-3 py-1 text-xs font-medium {{ $view === 'board' ? 'bg-brand text-white' : 'text-zinc-500 hover:text-zinc-700' }}"
+                >
+                    Board
+                </button>
+            </div>
         </div>
-    </div>
+    @endunless
 
     @if ($view === 'board')
         <div
@@ -263,7 +341,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
             x-on:mousemove.window="onMove($event)"
             x-on:mouseup.window="onUp()"
             x-on:mouseleave="overStatus = null"
-            class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+            class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
             :class="draggingId !== null && moved ? 'cursor-grabbing select-none' : ''"
         >
             @foreach ($statuses as $status)
@@ -282,11 +360,31 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                             <div
                                 x-on:mousedown.prevent="startDrag({{ $task->id }}, $event)"
                                 :class="draggingId === {{ $task->id }} && moved ? 'opacity-40' : ''"
-                                class="cursor-grab select-none rounded-lg border border-zinc-200 bg-white p-3 hover:border-brand/40 active:cursor-grabbing"
+                                class="cursor-grab select-none rounded-lg border border-zinc-200 bg-white p-3 hover:border-brand/40 active:cursor-grabbing {{ $this->connectionAccentClass($task, auth()->user()) }}"
                             >
-                                <span class="mb-1 inline-block rounded-full bg-violet-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-violet-700">{{ $task->task_key }}</span>
+                                <div class="mb-1 flex flex-wrap items-center gap-1">
+                                    <span class="inline-block rounded-full bg-violet-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-violet-700">{{ $task->task_key }}</span>
+                                    @if ($task->parent_task_id)
+                                        <span class="inline-block rounded-full bg-zinc-200 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-zinc-600">SUB-{{ $task->parent_task_id }}</span>
+                                    @endif
+                                </div>
                                 <p class="text-sm font-medium text-zinc-900">{{ $task->title }}</p>
                                 <p class="mt-1 text-xs text-zinc-500">{{ $task->currentAssignment?->assignedTo?->name ?? 'Unassigned' }}</p>
+
+                                @if ($task->isConnectedTo(auth()->user()))
+                                    <div class="mt-1.5 flex flex-wrap gap-1">
+                                        @if ($task->isReportedBy(auth()->user()))
+                                            <span class="rounded-full bg-zinc-800 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">Reporter</span>
+                                        @endif
+                                        @if ($task->isAssignedTo(auth()->user()))
+                                            <span class="rounded-full bg-zinc-800 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">Assignee</span>
+                                        @endif
+                                        @if ($task->isReviewedBy(auth()->user()))
+                                            <span class="rounded-full bg-zinc-800 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">QA</span>
+                                        @endif
+                                    </div>
+                                @endif
+
                                 <div class="mt-2 flex items-center justify-between">
                                     <span class="text-xs text-zinc-400">{{ $task->deadline?->format('d M') ?? '—' }}</span>
                                     @if ($task->isOverdue())
@@ -302,11 +400,11 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
             @endforeach
         </div>
 
-        {{-- Complete Task modal (opened by dropping a card on the Completed column) --}}
-        @if ($completingTaskId)
+        {{-- Submit for QA Testing modal (opened by dropping a card on the QA Testing column) --}}
+        @if ($submittingTaskId)
             <div class="fixed inset-0 z-40 flex items-center justify-center bg-zinc-900/50 px-4">
                 <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
-                    <h3 class="text-lg font-semibold text-zinc-900">Complete Task</h3>
+                    <h3 class="text-lg font-semibold text-zinc-900">Submit for QA Testing</h3>
 
                     <div class="mt-4">
                         <label class="block text-sm font-medium text-zinc-700">Actual Hours Worked</label>
@@ -315,13 +413,13 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                     </div>
 
                     <div class="mt-4">
-                        <label class="block text-sm font-medium text-zinc-700">Completion Note (Optional)</label>
-                        <textarea wire:model="completion_note" rows="2" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40"></textarea>
+                        <label class="block text-sm font-medium text-zinc-700">Note (Optional)</label>
+                        <textarea wire:model="submission_note" rows="2" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40"></textarea>
                     </div>
 
                     <div class="mt-6 flex justify-end gap-3">
-                        <button type="button" wire:click="cancelComplete" class="text-sm font-medium text-zinc-600 hover:text-zinc-900">Cancel</button>
-                        <button type="button" wire:click="completeTask" class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90">Complete Task</button>
+                        <button type="button" wire:click="cancelSubmitForQa" class="text-sm font-medium text-zinc-600 hover:text-zinc-900">Cancel</button>
+                        <button type="button" wire:click="submitForQa" class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90">Submit</button>
                     </div>
                 </div>
             </div>

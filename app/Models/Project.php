@@ -65,7 +65,7 @@ class Project extends Model
 
     protected function completedCount(): Attribute
     {
-        return Attribute::make(get: fn () => $this->topLevelTasks()->where('status', TaskStatus::Completed)->count());
+        return Attribute::make(get: fn () => $this->topLevelTasks()->where('status', TaskStatus::Done)->count());
     }
 
     protected function progressPercent(): Attribute
