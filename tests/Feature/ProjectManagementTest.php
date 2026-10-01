@@ -64,6 +64,25 @@ class ProjectManagementTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_the_create_project_nav_link_is_hidden_from_users_who_cant_create_one(): void
+    {
+        $teamMember = $this->teamMember('Karim');
+
+        $response = $this->actingAs($teamMember)->get(route('dashboard'));
+
+        $response->assertDontSee('Create Project');
+        $response->assertSee('All Projects');
+    }
+
+    public function test_the_create_project_nav_link_is_visible_to_a_manager(): void
+    {
+        $manager = $this->manager('Rahim');
+
+        $response = $this->actingAs($manager)->get(route('dashboard'));
+
+        $response->assertSee('Create Project');
+    }
+
     public function test_anyone_can_view_the_project_list_and_detail(): void
     {
         $teamMember = $this->teamMember('Karim');

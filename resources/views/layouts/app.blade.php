@@ -98,7 +98,7 @@
                             ['label' => 'Team', 'route' => 'users.index', 'icon' => $icons['users'], 'hidden' => auth()->user()->cannot('manage-users')],
                             ['label' => 'Projects', 'icon' => $icons['folder'], 'children' => [
                                 ['label' => 'All Projects', 'route' => 'projects.index'],
-                                ['label' => 'Create Project', 'route' => 'projects.create'],
+                                ['label' => 'Create Project', 'route' => 'projects.create', 'hidden' => auth()->user()->cannot('create', \App\Models\Project::class)],
                             ]],
                             ['label' => 'Tasks', 'icon' => $icons['clipboard'], 'children' => [
                                 ['label' => 'All Tasks', 'route' => 'tasks.index'],
@@ -119,7 +119,8 @@
 
                         @if (! empty($item['children']))
                             @php
-                                $childActive = collect($item['children'])->contains(
+                                $visibleChildren = collect($item['children'])->reject(fn ($child) => ! empty($child['hidden']))->values();
+                                $childActive = $visibleChildren->contains(
                                     fn ($child) => request()->routeIs($child['route'], \Illuminate\Support\Str::before($child['route'], '.').'.*')
                                 );
                             @endphp
@@ -130,7 +131,7 @@
                                 <button
                                     type="button"
                                     title="{{ $item['label'] }}"
-                                    @click="sidebarCollapsed ? Livewire.navigate('{{ route($item['children'][0]['route']) }}') : (open = ! open)"
+                                    @click="sidebarCollapsed ? Livewire.navigate('{{ route($visibleChildren->first()['route']) }}') : (open = ! open)"
                                     class="flex w-full items-center gap-2.5 overflow-hidden rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors duration-200 ease-in-out {{ $childActive ? 'bg-brand text-white' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' }}"
                                     :class="sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''"
                                 >
@@ -155,7 +156,7 @@
                                     :class="sidebarCollapsed ? 'lg:hidden' : ''"
                                 >
                                     <div x-ref="submenuPanel" class="ml-4 mt-1 space-y-0.5 border-l border-zinc-800 pl-4">
-                                        @foreach ($item['children'] as $child)
+                                        @foreach ($visibleChildren as $child)
                                             <a
                                                 href="{{ route($child['route']) }}"
                                                 wire:navigate

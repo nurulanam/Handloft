@@ -8,6 +8,7 @@ use App\Models\Task;
 use App\Models\TaskTimeLog;
 use App\Models\User;
 use App\Models\WorkHistory;
+use App\Support\Duration;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 
@@ -149,15 +150,24 @@ class TaskWorkflowService
             ->where('task_id', $task->id)
             ->where('user_id', $user->id)
             ->whereDate('logged_date', $date->toDateString())
-            ->first() ?? new TaskTimeLog([
-                'task_id' => $task->id,
-                'user_id' => $user->id,
-                'logged_date' => $date->toDateString(),
-            ]);
+            ->first();
+
+        $isNewEntry = $log === null;
+
+        $log ??= new TaskTimeLog([
+            'task_id' => $task->id,
+            'user_id' => $user->id,
+            'logged_date' => $date->toDateString(),
+        ]);
 
         $log->fill(['hours' => $hours, 'note' => $note])->save();
 
-        $this->recordActivity($task, TaskActivityType::MetaUpdated, $user, "{$user->name} logged {$hours}h on {$date->format('d M Y')}", now());
+        // Only the first time someone logs a given day earns a timeline
+        // entry — re-submitting the same day again is a correction, not a
+        // new event, so it shouldn't keep stacking "logged Xh on Y" lines.
+        if ($isNewEntry) {
+            $this->recordActivity($task, TaskActivityType::MetaUpdated, $user, "{$user->name} logged ".Duration::forHumans($hours)." on {$date->format('d M Y')}", now());
+        }
 
         return $log;
     }
@@ -188,6 +198,14 @@ class TaskWorkflowService
             ->log('Time log hours edited');
 
         $timeLog->update(['hours' => $newHours]);
+
+        $this->recordActivity(
+            $timeLog->task,
+            TaskActivityType::MetaUpdated,
+            $editor,
+            "{$editor->name} updated the time log for {$timeLog->logged_date->format('d M Y')} to ".Duration::forHumans($newHours),
+            now()
+        );
     }
 
     private function recordActivity(Task $task, TaskActivityType $type, User $causer, string $description, \DateTimeInterface $occurredAt): void

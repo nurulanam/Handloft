@@ -81,10 +81,27 @@ class WorkHistoryTest extends TestCase
             ->test('work-history.index')
             ->call('startEdit', $log->id)
             ->set('edit_hours', '4')
+            ->set('edit_minutes', '0')
             ->set('edit_reason', 'Forgot some time')
             ->call('saveEdit');
 
         $this->assertEquals(4.0, $log->fresh()->hours);
+    }
+
+    public function test_starting_an_edit_splits_the_stored_decimal_hours_into_hours_and_minutes(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+
+        $workflow = app(TaskWorkflowService::class);
+        $task = $workflow->createTask(['title' => 'Create Client List'], $rahim, $karim);
+        $log = $workflow->logTime($task, $karim, now(), 3.5);
+
+        Livewire::actingAs($karim)
+            ->test('work-history.index')
+            ->call('startEdit', $log->id)
+            ->assertSet('edit_hours', '3')
+            ->assertSet('edit_minutes', '30');
     }
 
     public function test_admin_edit_persists_and_is_audit_logged(): void
@@ -101,6 +118,7 @@ class WorkHistoryTest extends TestCase
             ->test('work-history.index')
             ->call('startEdit', $log->id)
             ->set('edit_hours', '4')
+            ->set('edit_minutes', '0')
             ->set('edit_reason', 'Incorrect time entry')
             ->call('saveEdit');
 
@@ -115,6 +133,32 @@ class WorkHistoryTest extends TestCase
         $this->assertSame('3.50', $activity->properties['old_hours']);
         $this->assertSame('4', $activity->properties['new_hours']);
         $this->assertSame('Incorrect time entry', $activity->properties['reason']);
+    }
+
+    public function test_editing_a_time_log_from_work_history_records_it_on_the_tasks_activity_timeline(): void
+    {
+        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+
+        $workflow = app(TaskWorkflowService::class);
+        $task = $workflow->createTask(['title' => 'Create Client List'], $rahim, $karim);
+        $log = $workflow->logTime($task, $karim, Carbon::parse('2026-09-27'), 3.5);
+        $countBeforeEdit = $task->activities()->count();
+
+        Livewire::actingAs($admin)
+            ->test('work-history.index')
+            ->call('startEdit', $log->id)
+            ->set('edit_hours', '4')
+            ->set('edit_minutes', '0')
+            ->set('edit_reason', 'Incorrect time entry')
+            ->call('saveEdit');
+
+        $this->assertSame($countBeforeEdit + 1, $task->activities()->count());
+
+        $taskActivity = $task->activities()->latest('id')->first();
+
+        $this->assertSame('Super Admin updated the time log for 27 Sep 2026 to 4h', $taskActivity->description);
     }
 
     public function test_admin_can_delete_someone_elses_time_log_entry(): void

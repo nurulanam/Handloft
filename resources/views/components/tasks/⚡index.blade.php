@@ -435,7 +435,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                     <h3 class="text-lg font-semibold text-zinc-900">Submit for QA Testing</h3>
 
                     <p class="mt-4 text-sm text-zinc-500">
-                        Time logged so far: <span class="font-semibold text-zinc-900">{{ rtrim(rtrim(number_format(\App\Models\Task::find($submittingTaskId)?->total_logged_hours ?? 0, 2), '0'), '.') ?: '0' }}h</span>
+                        Time logged so far: <span class="font-semibold text-zinc-900">{{ \App\Support\Duration::forHumans((float) (\App\Models\Task::find($submittingTaskId)?->total_logged_hours ?? 0)) }}</span>
                     </p>
 
                     <div class="mt-4">

@@ -55,13 +55,15 @@ class TaskTimeLogTest extends TestCase
             ->test('tasks.show', ['task' => $task])
             ->set('log_date', '2026-09-27')
             ->set('log_hours', '3')
+            ->set('log_minutes', '0')
             ->call('logTime')
             ->assertHasNoErrors();
 
         Livewire::actingAs($karim)
             ->test('tasks.show', ['task' => $task])
             ->set('log_date', '2026-09-28')
-            ->set('log_hours', '2.5')
+            ->set('log_hours', '2')
+            ->set('log_minutes', '30')
             ->call('logTime')
             ->assertHasNoErrors();
 
@@ -79,16 +81,43 @@ class TaskTimeLogTest extends TestCase
             ->test('tasks.show', ['task' => $task])
             ->set('log_date', '2026-09-27')
             ->set('log_hours', '3')
+            ->set('log_minutes', '0')
             ->call('logTime');
 
         Livewire::actingAs($karim)
             ->test('tasks.show', ['task' => $task])
             ->set('log_date', '2026-09-27')
             ->set('log_hours', '4')
+            ->set('log_minutes', '0')
             ->call('logTime');
 
         $this->assertSame(1, TaskTimeLog::where('task_id', $task->id)->count());
         $this->assertEquals(4, TaskTimeLog::where('task_id', $task->id)->first()->hours);
+    }
+
+    public function test_re_logging_the_same_day_does_not_add_a_duplicate_activity_timeline_entry(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+        $task = $this->createTask($rahim, $karim);
+
+        Livewire::actingAs($karim)
+            ->test('tasks.show', ['task' => $task])
+            ->set('log_date', '2026-09-27')
+            ->set('log_hours', '3')
+            ->set('log_minutes', '0')
+            ->call('logTime');
+
+        $countAfterFirstLog = $task->activities()->count();
+
+        Livewire::actingAs($karim)
+            ->test('tasks.show', ['task' => $task])
+            ->set('log_date', '2026-09-27')
+            ->set('log_hours', '4')
+            ->set('log_minutes', '0')
+            ->call('logTime');
+
+        $this->assertSame($countAfterFirstLog, $task->activities()->count());
     }
 
     public function test_hours_must_be_within_range(): void
@@ -103,6 +132,55 @@ class TaskTimeLogTest extends TestCase
             ->set('log_hours', '30')
             ->call('logTime')
             ->assertHasErrors(['log_hours' => 'max']);
+    }
+
+    public function test_minutes_must_be_within_range(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+        $task = $this->createTask($rahim, $karim);
+
+        Livewire::actingAs($karim)
+            ->test('tasks.show', ['task' => $task])
+            ->set('log_date', '2026-09-27')
+            ->set('log_hours', '1')
+            ->set('log_minutes', '70')
+            ->call('logTime')
+            ->assertHasErrors(['log_minutes' => 'max']);
+    }
+
+    public function test_zero_hours_and_minutes_is_rejected(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+        $task = $this->createTask($rahim, $karim);
+
+        Livewire::actingAs($karim)
+            ->test('tasks.show', ['task' => $task])
+            ->set('log_date', '2026-09-27')
+            ->set('log_hours', '0')
+            ->set('log_minutes', '0')
+            ->call('logTime')
+            ->assertHasErrors('log_hours');
+
+        $this->assertSame(0, TaskTimeLog::where('task_id', $task->id)->count());
+    }
+
+    public function test_hours_and_minutes_combine_into_the_correct_decimal_total(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+        $task = $this->createTask($rahim, $karim);
+
+        Livewire::actingAs($karim)
+            ->test('tasks.show', ['task' => $task])
+            ->set('log_date', '2026-09-27')
+            ->set('log_hours', '5')
+            ->set('log_minutes', '30')
+            ->call('logTime')
+            ->assertHasNoErrors();
+
+        $this->assertEquals(5.5, TaskTimeLog::where('task_id', $task->id)->first()->hours);
     }
 
     public function test_future_dates_are_rejected(): void
@@ -164,7 +242,8 @@ class TaskTimeLogTest extends TestCase
         Livewire::actingAs($hasan)
             ->test('tasks.show', ['task' => $task])
             ->set('log_date', '2026-09-27')
-            ->set('log_hours', '1.5')
+            ->set('log_hours', '1')
+            ->set('log_minutes', '30')
             ->call('logTime')
             ->assertHasNoErrors();
 
@@ -182,7 +261,8 @@ class TaskTimeLogTest extends TestCase
         Livewire::actingAs($hasan)
             ->test('tasks.show', ['task' => $task])
             ->set('log_date', '2026-09-27')
-            ->set('log_hours', '1.5')
+            ->set('log_hours', '1')
+            ->set('log_minutes', '30')
             ->call('logTime')
             ->assertForbidden();
 

@@ -5,6 +5,7 @@ use App\Models\TaskTimeLog;
 use App\Models\User;
 use App\Services\TaskWorkflowService;
 use App\Support\Avatar;
+use App\Support\Duration;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -22,7 +23,9 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
 
     public ?int $editingLogId = null;
 
-    public string $edit_hours = '';
+    public string $edit_hours = '0';
+
+    public string $edit_minutes = '0';
 
     public string $edit_reason = '';
 
@@ -82,8 +85,11 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
         $timeLog = TaskTimeLog::findOrFail($timeLogId);
         $this->authorizeTimeLogEdit($timeLog);
 
+        [$hours, $minutes] = Duration::toParts((float) $timeLog->hours);
+
         $this->editingLogId = $timeLogId;
-        $this->edit_hours = (string) $timeLog->hours;
+        $this->edit_hours = (string) $hours;
+        $this->edit_minutes = (string) $minutes;
         $this->edit_reason = '';
     }
 
@@ -93,11 +99,20 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
         $this->authorizeTimeLogEdit($timeLog);
 
         $data = $this->validate([
-            'edit_hours' => ['required', 'numeric', 'min:0.1', 'max:24'],
+            'edit_hours' => ['required', 'integer', 'min:0', 'max:24'],
+            'edit_minutes' => ['required', 'integer', 'min:0', 'max:59'],
             'edit_reason' => ['required', 'string', 'max:255'],
         ]);
 
-        $workflow->editTimeLog($timeLog, (float) $data['edit_hours'], auth()->user(), $data['edit_reason']);
+        $totalHours = Duration::fromParts((int) $data['edit_hours'], (int) $data['edit_minutes']);
+
+        if ($totalHours <= 0 || $totalHours > 24) {
+            $this->addError('edit_hours', 'Total logged time must be between a few minutes and 24 hours.');
+
+            return;
+        }
+
+        $workflow->editTimeLog($timeLog, $totalHours, auth()->user(), $data['edit_reason']);
 
         $this->editingLogId = null;
     }
@@ -254,7 +269,7 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
 
         @if ($mode === 'single')
             <div class="ml-auto rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700">
-                {{ $viewingUser->is(auth()->user()) ? 'Your total' : $viewingUser->name.'\'s total' }}: {{ number_format($summaryHours, 2) }}h
+                {{ $viewingUser->is(auth()->user()) ? 'Your total' : $viewingUser->name.'\'s total' }}: {{ Duration::forHumans($summaryHours) }}
             </div>
         @endif
     </div>
@@ -272,7 +287,7 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
                         </div>
                     </div>
 
-                    <p class="mt-3 text-2xl font-semibold text-zinc-900">{{ number_format($row['hours'], 2) }}<span class="text-sm font-normal text-zinc-400">h</span></p>
+                    <p class="mt-3 text-2xl font-semibold text-zinc-900">{{ Duration::forHumans($row['hours']) }}</p>
 
                     <div class="mt-2 h-1.5 w-full rounded-full bg-zinc-100">
                         <div class="h-1.5 rounded-full bg-brand" style="width: {{ min(100, $row['hours'] / $maxHours * 100) }}%"></div>
@@ -309,7 +324,7 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
                             </td>
                             <td class="px-4 py-3 text-sm text-zinc-500">
                                 <button type="button" @click="open = ! open" class="flex items-center gap-1 hover:text-brand">
-                                    {{ number_format((float) $task->period_hours, 2) }}h
+                                    {{ Duration::forHumans((float) $task->period_hours) }}
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5 text-zinc-400 transition-transform" :class="open ? 'rotate-180' : ''">
                                         <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
                                     </svg>
@@ -326,12 +341,16 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
                                             @if ($editingLogId === $log->id)
                                                 <div class="flex flex-1 flex-wrap items-center gap-2">
                                                     <span class="shrink-0">{{ $log->logged_date->format('d M Y') }}</span>
-                                                    <input wire:model="edit_hours" type="number" step="0.1" class="w-20 rounded-lg border border-zinc-300 px-2 py-1 text-xs focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                                    <input wire:model="edit_hours" type="number" min="0" max="24" placeholder="Hrs" class="w-14 rounded-lg border border-zinc-300 px-2 py-1 text-xs focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                                    <span class="text-zinc-400">h</span>
+                                                    <input wire:model="edit_minutes" type="number" min="0" max="59" placeholder="Min" class="w-14 rounded-lg border border-zinc-300 px-2 py-1 text-xs focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                                    <span class="text-zinc-400">m</span>
                                                     <input wire:model="edit_reason" type="text" placeholder="Reason" class="w-40 rounded-lg border border-zinc-300 px-2 py-1 text-xs focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
                                                     <button type="button" wire:click="saveEdit" class="font-medium text-brand hover:underline">Save</button>
                                                     <button type="button" wire:click="$set('editingLogId', null)" class="text-zinc-500 hover:underline">Cancel</button>
                                                 </div>
                                                 @error('edit_hours') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
+                                                @error('edit_minutes') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
                                                 @error('edit_reason') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
                                             @else
                                                 <span class="truncate">
@@ -341,7 +360,7 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
                                                     @endif
                                                 </span>
                                                 <span class="flex shrink-0 items-center gap-2">
-                                                    <span class="font-medium text-zinc-900">{{ number_format($log->hours, 2) }}h</span>
+                                                    <span class="font-medium text-zinc-900">{{ Duration::forHumans((float) $log->hours) }}</span>
                                                     @if ($canEdit || $log->user_id === auth()->id())
                                                         <button type="button" wire:click="startEdit({{ $log->id }})" class="text-zinc-400 hover:text-brand">Edit</button>
                                                         <button type="button" wire:click="deleteLog({{ $log->id }})" wire:confirm="Remove this time entry?" class="text-zinc-400 hover:text-red-600">Remove</button>

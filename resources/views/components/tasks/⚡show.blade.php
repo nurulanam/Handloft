@@ -7,6 +7,7 @@ use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\TaskWorkflowService;
+use App\Support\Duration;
 use App\Support\Html;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
@@ -51,7 +52,9 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
 
     public string $log_date = '';
 
-    public string $log_hours = '';
+    public string $log_hours = '0';
+
+    public string $log_minutes = '0';
 
     public string $log_note = '';
 
@@ -397,22 +400,38 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                 'before_or_equal:today',
                 ...($this->task->start_date ? ['after_or_equal:'.$this->task->start_date->toDateString()] : []),
             ],
-            'log_hours' => ['required', 'numeric', 'min:0.1', 'max:24'],
+            'log_hours' => ['required', 'integer', 'min:0', 'max:24'],
+            'log_minutes' => ['required', 'integer', 'min:0', 'max:59'],
             'log_note' => ['nullable', 'string'],
         ], [
             'log_date.after_or_equal' => 'Time can\'t be logged before the task\'s start date ('.optional($this->task->start_date)->format('d M Y').').',
         ]);
 
+        $totalHours = Duration::fromParts((int) $data['log_hours'], (int) $data['log_minutes']);
+
+        if ($totalHours <= 0) {
+            $this->addError('log_hours', 'Log at least some time.');
+
+            return;
+        }
+
+        if ($totalHours > 24) {
+            $this->addError('log_hours', "A single day can't have more than 24 hours logged.");
+
+            return;
+        }
+
         $workflow->logTime(
             $this->task,
             auth()->user(),
             \Illuminate\Support\Carbon::parse($data['log_date']),
-            (float) $data['log_hours'],
+            $totalHours,
             $data['log_note'] ?: null
         );
 
         $this->log_date = now()->toDateString();
-        $this->log_hours = '';
+        $this->log_hours = '0';
+        $this->log_minutes = '0';
         $this->log_note = '';
         $this->showLogTime = false;
         $this->task->refresh();
@@ -422,7 +441,8 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
     {
         $this->showLogTime = false;
         $this->log_date = now()->toDateString();
-        $this->log_hours = '';
+        $this->log_hours = '0';
+        $this->log_minutes = '0';
         $this->log_note = '';
         $this->resetErrorBag();
     }
@@ -1034,7 +1054,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
             <div class="rounded-lg border border-zinc-200 bg-white p-4">
                 <div class="flex items-center justify-between">
                     <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Time Logs</h3>
-                    <span class="text-sm font-semibold text-brand">{{ rtrim(rtrim(number_format((float) $totalLoggedHours, 2), '0'), '.') ?: '0' }}h</span>
+                    <span class="text-sm font-semibold text-brand">{{ Duration::forHumans((float) $totalLoggedHours) }}</span>
                 </div>
 
                 <div class="mt-2 space-y-2">
@@ -1052,7 +1072,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                             </div>
 
                             <div class="flex shrink-0 items-center gap-2">
-                                <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">{{ rtrim(rtrim(number_format((float) $log->hours, 2), '0'), '.') ?: '0' }}h</span>
+                                <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">{{ Duration::forHumans((float) $log->hours) }}</span>
 
                                 @if ($log->user_id === auth()->id() || $canEditMeta)
                                     <button type="button" wire:click="deleteTimeLog({{ $log->id }})" wire:confirm="Remove this time entry?" class="text-zinc-300 hover:text-red-600" title="Remove">
@@ -1071,12 +1091,17 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                 @if ($canLogTime)
                     @if ($showLogTime)
                         <div class="mt-3 space-y-2 rounded-md border border-zinc-200 p-2">
-                            <div class="flex gap-2">
-                                <input wire:model="log_date" type="date" min="{{ $task->start_date?->toDateString() }}" max="{{ now()->toDateString() }}" class="block w-1/2 rounded-md border border-zinc-300 px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                                <input wire:model="log_hours" type="number" step="0.25" min="0.1" max="24" placeholder="Hours" class="block w-1/2 rounded-md border border-zinc-300 px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                            </div>
+                            <input wire:model="log_date" type="date" min="{{ $task->start_date?->toDateString() }}" max="{{ now()->toDateString() }}" class="block w-full rounded-md border border-zinc-300 px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
                             @error('log_date') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
+
+                            <div class="flex items-center gap-2">
+                                <input wire:model="log_hours" type="number" min="0" max="24" placeholder="Hours" class="block w-1/2 rounded-md border border-zinc-300 px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                <span class="shrink-0 text-xs text-zinc-500">hrs</span>
+                                <input wire:model="log_minutes" type="number" min="0" max="59" placeholder="Minutes" class="block w-1/2 rounded-md border border-zinc-300 px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                <span class="shrink-0 text-xs text-zinc-500">min</span>
+                            </div>
                             @error('log_hours') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
+                            @error('log_minutes') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
 
                             <input wire:model="log_note" type="text" placeholder="Note (optional)" class="block w-full rounded-md border border-zinc-300 px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
 
@@ -1101,7 +1126,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                 <p class="mt-1 text-sm text-zinc-500">{{ $task->title }}</p>
 
                 <p class="mt-4 text-sm text-zinc-500">
-                    Time logged so far: <span class="font-semibold text-zinc-900">{{ rtrim(rtrim(number_format($task->total_logged_hours, 2), '0'), '.') ?: '0' }}h</span>
+                    Time logged so far: <span class="font-semibold text-zinc-900">{{ Duration::forHumans($task->total_logged_hours) }}</span>
                 </p>
 
                 <div class="mt-4">
