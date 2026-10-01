@@ -219,4 +219,21 @@ class TaskDetailTest extends TestCase
         $this->assertSame('urgent', $task->priority->value);
         $this->assertTrue($task->activities()->where('type', 'meta_updated')->exists());
     }
+
+    public function test_meta_change_activity_entries_name_who_made_the_change(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+
+        $workflow = app(TaskWorkflowService::class);
+        $task = $workflow->createTask(['title' => 'Website Audit'], $rahim, $karim);
+
+        Livewire::actingAs($karim)
+            ->test('tasks.show', ['task' => $task])
+            ->call('saveReporter', $rahim->id);
+
+        $activity = $task->activities()->where('type', 'meta_updated')->latest('occurred_at')->first();
+
+        $this->assertSame('Reporter updated by Karim', $activity->description);
+    }
 }

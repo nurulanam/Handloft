@@ -243,11 +243,14 @@ class TaskTimeLogTest extends TestCase
         $this->assertSame(0, TaskTimeLog::where('task_id', $task->id)->count());
     }
 
-    public function test_a_reassign_task_permission_holder_can_log_time_on_behalf_of_anyone_regardless_of_status(): void
+    public function test_even_an_admin_cannot_log_time_on_a_task_theyre_not_connected_to(): void
     {
         $rahim = $this->teamMember('Rahim');
         $karim = $this->teamMember('Karim');
         $task = $this->createTask($rahim, $karim);
+        // A SuperAdmin has every permission, including reassign-task, but
+        // there is no permission-based override for logging time — only
+        // being the assignee, Reporter, or QA/Reviewer grants that.
         $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
 
         Livewire::actingAs($admin)
@@ -255,9 +258,9 @@ class TaskTimeLogTest extends TestCase
             ->set('log_date', '2026-09-27')
             ->set('log_hours', '2')
             ->call('logTime')
-            ->assertHasNoErrors();
+            ->assertForbidden();
 
-        $this->assertSame(1, TaskTimeLog::where('task_id', $task->id)->count());
+        $this->assertSame(0, TaskTimeLog::where('task_id', $task->id)->count());
     }
 
     public function test_the_reporter_cannot_log_time_on_behalf_of_the_assignee_before_ready_to_deploy_even_as_creator(): void

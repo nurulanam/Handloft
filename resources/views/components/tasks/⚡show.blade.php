@@ -439,20 +439,16 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
     }
 
     /**
-     * Anyone connected to the task — the assignee doing the work, the QA/
-     * Reviewer testing it, or the Reporter who filed it — spends real time on
-     * it and can log their own hours, not just the assignee. A reassign-task
-     * holder (e.g. a Manager) may also log time on someone else's behalf,
-     * regardless of status.
+     * Only someone actually connected to the task — the assignee doing the
+     * work, the QA/Reviewer testing it, or the Reporter who filed it — may
+     * log time on it. There is no permission-based override: an uninvolved
+     * Manager/Admin can still view and manage the task's metadata, but has no
+     * reason to be logging hours on work they're not party to.
      *
      * The QA/Reviewer and Reporter's own time only makes sense once the task
      * has actually reached their stage of the workflow — a reviewer isn't
      * testing anything before QA Testing, and a reporter isn't signing off on
-     * anything before Ready to Deploy. This still applies even when the
-     * Reporter happens to be the task's creator, so it's checked separately
-     * from the assignee/permission-holder cases rather than via the more
-     * permissive `updateMeta` ability (which lets a creator edit metadata
-     * unconditionally).
+     * anything before Ready to Deploy.
      */
     private function authorizeTimeLogging(): void
     {
@@ -463,7 +459,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
     {
         $user = auth()->user();
 
-        if ($user->can('reassign-task') || $this->task->isAssignedTo($user)) {
+        if ($this->task->isAssignedTo($user)) {
             return true;
         }
 
@@ -483,7 +479,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         $this->task->activities()->create([
             'causer_id' => auth()->id(),
             'type' => TaskActivityType::MetaUpdated,
-            'description' => $description,
+            'description' => "{$description} by ".auth()->user()->name,
             'occurred_at' => now(),
         ]);
     }
