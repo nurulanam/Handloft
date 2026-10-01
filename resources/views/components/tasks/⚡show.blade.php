@@ -180,6 +180,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         } else {
             $this->task->update(['status' => $newStatus]);
             $this->logMetaChange("Status changed to {$newStatus->label()}");
+            $workflow->notifyStatusChange($this->task, $newStatus, auth()->user());
         }
 
         $this->task->refresh();

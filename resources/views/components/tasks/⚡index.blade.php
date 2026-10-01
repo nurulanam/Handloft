@@ -104,6 +104,8 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
             'description' => auth()->user()->name." moved this to {$newStatus->label()}",
             'occurred_at' => now(),
         ]);
+
+        app(TaskWorkflowService::class)->notifyStatusChange($task, $newStatus, auth()->user());
     }
 
     /**

@@ -8,6 +8,10 @@ use App\Models\Task;
 use App\Models\TaskTimeLog;
 use App\Models\User;
 use App\Models\WorkHistory;
+use App\Notifications\TaskAssigned;
+use App\Notifications\TaskReadyToDeploy;
+use App\Notifications\TaskRejected;
+use App\Notifications\TaskSubmittedForQa;
 use App\Support\Duration;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
@@ -43,7 +47,11 @@ class TaskWorkflowService
 
             $this->recordActivity($task, TaskActivityType::Assigned, $creator, "Assigned to {$assignee->name}", $now);
 
-            return $task->fresh();
+            $task = $task->fresh();
+
+            $this->notifyUnlessSelf($assignee, $creator, new TaskAssigned($task, $creator));
+
+            return $task;
         });
     }
 
@@ -66,6 +74,8 @@ class TaskWorkflowService
                 : "Assigned to {$to->name}";
 
             $this->recordActivity($task, TaskActivityType::Reassigned, $by, $description, now());
+
+            $this->notifyUnlessSelf($to, $by, new TaskAssigned($task, $by));
         });
     }
 
@@ -84,6 +94,10 @@ class TaskWorkflowService
             $task->update(['status' => TaskStatus::QaTesting]);
 
             $this->recordActivity($task, TaskActivityType::StatusChanged, $assignee, "Submitted for QA testing by {$assignee->name}", $now);
+
+            if ($task->qa) {
+                $this->notifyUnlessSelf($task->qa, $assignee, new TaskSubmittedForQa($task, $assignee));
+            }
 
             return WorkHistory::updateOrCreate(
                 ['task_id' => $task->id],
@@ -206,6 +220,33 @@ class TaskWorkflowService
             "{$editor->name} updated the time log for {$timeLog->logged_date->format('d M Y')} to ".Duration::forHumans($newHours),
             now()
         );
+    }
+
+    /**
+     * Notify whoever needs to know about a Rejected / Ready to Deploy move.
+     * Called from the Livewire components that perform these status changes
+     * directly (board drag, status dropdown) rather than through a shared
+     * "change status" service method, so each keeps its own existing
+     * activity-logging wording — this only adds the notification side effect.
+     */
+    public function notifyStatusChange(Task $task, TaskStatus $to, User $actor): void
+    {
+        match ($to) {
+            TaskStatus::Rejected => $this->notifyUnlessSelf($task->currentAssignee(), $actor, new TaskRejected($task, $actor)),
+            TaskStatus::ReadyToDeploy => $this->notifyUnlessSelf($task->creator, $actor, new TaskReadyToDeploy($task, $actor)),
+            default => null,
+        };
+    }
+
+    /**
+     * Skip notifying someone about their own action (e.g. a self-assigned
+     * task, or a QA/Reviewer who is also the task's Reporter).
+     */
+    private function notifyUnlessSelf(?User $recipient, User $actor, object $notification): void
+    {
+        if ($recipient && $recipient->isNot($actor)) {
+            $recipient->notify($notification);
+        }
     }
 
     private function recordActivity(Task $task, TaskActivityType $type, User $causer, string $description, \DateTimeInterface $occurredAt): void

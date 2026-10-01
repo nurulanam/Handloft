@@ -3,6 +3,7 @@
 use App\Enums\ProjectStatus;
 use App\Models\Project;
 use App\Models\User;
+use App\Notifications\ProjectCoordinatorAssigned;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -29,7 +30,17 @@ new #[Layout('layouts.app')] #[Title('Project')] class extends Component
             'coordinator_value' => ['nullable', 'exists:users,id'],
         ])->validate();
 
-        $this->project->update(['coordinator_id' => $data['coordinator_value'] ?: null]);
+        $newCoordinatorId = $data['coordinator_value'] ?: null;
+
+        if ($newCoordinatorId && $newCoordinatorId !== $this->project->coordinator_id) {
+            $newCoordinator = User::find($newCoordinatorId);
+
+            if ($newCoordinator && $newCoordinator->isNot(auth()->user())) {
+                $newCoordinator->notify(new ProjectCoordinatorAssigned($this->project, auth()->user()));
+            }
+        }
+
+        $this->project->update(['coordinator_id' => $newCoordinatorId]);
 
         $this->project->refresh();
     }

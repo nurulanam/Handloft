@@ -109,7 +109,7 @@
                             ['label' => 'Outreach', 'icon' => $icons['megaphone'], 'disabled' => true],
                             ['label' => 'Calendar', 'icon' => $icons['calendar'], 'disabled' => true],
                             ['label' => 'Reports', 'icon' => $icons['chart'], 'disabled' => true],
-                            ['label' => 'Notifications', 'icon' => $icons['bell'], 'disabled' => true],
+                            ['label' => 'Notifications', 'route' => 'notifications.index', 'icon' => $icons['bell']],
                             ['label' => 'Settings', 'route' => 'settings', 'icon' => $icons['cog'], 'hidden' => auth()->user()->cannot('manage-settings')],
                         ];
                     @endphp
@@ -233,9 +233,7 @@
                     </button>
 
                     <div class="flex flex-1 items-center justify-end gap-4">
-                        <button type="button" class="relative rounded-full p-2 text-zinc-500 hover:bg-zinc-100" title="Notifications (coming soon)">
-                            <span aria-hidden="true">&#128276;</span>
-                        </button>
+                        <livewire:notifications.bell />
 
                         <div class="flex items-center gap-3">
                             <div class="text-right">

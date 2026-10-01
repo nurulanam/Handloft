@@ -2,6 +2,7 @@
 
 use App\Models\Project;
 use App\Models\User;
+use App\Notifications\ProjectCoordinatorAssigned;
 use App\Support\Html;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
@@ -52,6 +53,10 @@ new #[Layout('layouts.app')] #[Title('Create Project')] class extends Component
             'deadline' => $data['deadline'] ?: null,
             'created_by' => auth()->id(),
         ]);
+
+        if ($project->coordinator && $project->coordinator->isNot(auth()->user())) {
+            $project->coordinator->notify(new ProjectCoordinatorAssigned($project, auth()->user()));
+        }
 
         $this->redirect(route('projects.show', $project), navigate: true);
     }
