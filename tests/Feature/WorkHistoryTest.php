@@ -156,7 +156,10 @@ class WorkHistoryTest extends TestCase
 
         $this->assertSame($countBeforeEdit + 1, $task->activities()->count());
 
-        $taskActivity = $task->activities()->latest('id')->first();
+        // reorder() clears the relation's default `orderBy('occurred_at')`
+        // first — stacking `latest('id')` on top of it left the sort
+        // ambiguous (ties on `occurred_at`) and flaky under the full suite.
+        $taskActivity = $task->activities()->reorder('id', 'desc')->first();
 
         $this->assertSame('Super Admin updated the time log for 27 Sep 2026 to 4h', $taskActivity->description);
     }

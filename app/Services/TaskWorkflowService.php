@@ -12,6 +12,7 @@ use App\Notifications\TaskAssigned;
 use App\Notifications\TaskReadyToDeploy;
 use App\Notifications\TaskRejected;
 use App\Notifications\TaskSubmittedForQa;
+use App\Support\DeferredNotification;
 use App\Support\Duration;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
@@ -245,7 +246,7 @@ class TaskWorkflowService
     private function notifyUnlessSelf(?User $recipient, User $actor, object $notification): void
     {
         if ($recipient && $recipient->isNot($actor)) {
-            $recipient->notify($notification);
+            DeferredNotification::send($recipient, $notification);
         }
     }
 

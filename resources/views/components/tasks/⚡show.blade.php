@@ -1137,7 +1137,10 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
 
                 <div class="mt-6 flex justify-end gap-3">
                     <button type="button" wire:click="cancelSubmitForQa" class="text-sm font-medium text-zinc-600 hover:text-zinc-900">Cancel</button>
-                    <button type="button" wire:click="submitForQa" class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90">Submit</button>
+                    <button type="button" wire:click="submitForQa" wire:loading.attr="disabled" wire:target="submitForQa" class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90 disabled:opacity-60">
+                        <span wire:loading.remove wire:target="submitForQa">Submit</span>
+                        <span wire:loading wire:target="submitForQa">Submitting…</span>
+                    </button>
                 </div>
             </div>
         </div>

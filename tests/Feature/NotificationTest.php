@@ -13,8 +13,10 @@ use App\Notifications\TaskReadyToDeploy;
 use App\Notifications\TaskRejected;
 use App\Notifications\TaskSubmittedForQa;
 use App\Services\TaskWorkflowService;
+use App\Support\DeferredNotification;
 use Database\Seeders\RoleAndAdminSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Notifications\Notification as NotificationBase;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -46,6 +48,29 @@ class NotificationTest extends TestCase
         return $user;
     }
 
+    /**
+     * Notifications are dispatched via dispatch(...)->afterResponse() rather
+     * than queued, so nothing actually runs until the HTTP kernel's
+     * terminate() callbacks fire — which a real request does automatically,
+     * but a Livewire component test or a direct service call does not.
+     * Triggering it manually here is the test-only equivalent of "the
+     * response finished flushing".
+     *
+     * A real request's Application instance is discarded after terminate()
+     * runs once, but a single test method reuses the same instance across
+     * several actions — and terminate() never clears its callback list, so
+     * a later flush would silently replay every earlier one too. Draining
+     * the list here keeps each flush scoped to what's pending right now.
+     */
+    private function flushDeferredNotifications(): void
+    {
+        $this->app->terminate();
+
+        (function () {
+            $this->terminatingCallbacks = [];
+        })->call($this->app);
+    }
+
     public function test_creating_a_task_notifies_the_assignee(): void
     {
         Notification::fake();
@@ -54,6 +79,7 @@ class NotificationTest extends TestCase
         $karim = $this->teamMember('Karim');
 
         app(TaskWorkflowService::class)->createTask(['title' => 'Create Client List'], $rahim, $karim);
+        $this->flushDeferredNotifications();
 
         Notification::assertSentTo($karim, TaskAssigned::class);
         Notification::assertNotSentTo($rahim, TaskAssigned::class);
@@ -66,6 +92,7 @@ class NotificationTest extends TestCase
         $rahim = $this->teamMember('Rahim');
 
         app(TaskWorkflowService::class)->createTask(['title' => 'Create Client List'], $rahim, $rahim);
+        $this->flushDeferredNotifications();
 
         Notification::assertNothingSent();
     }
@@ -83,6 +110,7 @@ class NotificationTest extends TestCase
         Notification::fake();
 
         $workflow->reassignTask($task, $hasan, $admin);
+        $this->flushDeferredNotifications();
 
         Notification::assertSentTo($hasan, TaskAssigned::class);
     }
@@ -99,6 +127,7 @@ class NotificationTest extends TestCase
         Notification::fake();
 
         $workflow->submitForQa($task, $karim, 3.0);
+        $this->flushDeferredNotifications();
 
         Notification::assertSentTo($qa, TaskSubmittedForQa::class);
     }
@@ -117,6 +146,7 @@ class NotificationTest extends TestCase
         Livewire::actingAs($qa)
             ->test('tasks.show', ['task' => $task])
             ->call('saveStatus', 'rejected');
+        $this->flushDeferredNotifications();
 
         Notification::assertSentTo($karim, TaskRejected::class);
     }
@@ -135,6 +165,7 @@ class NotificationTest extends TestCase
         Livewire::actingAs($qa)
             ->test('tasks.index')
             ->call('moveTask', $task->id, 'rejected');
+        $this->flushDeferredNotifications();
 
         Notification::assertSentTo($karim, TaskRejected::class);
     }
@@ -153,6 +184,7 @@ class NotificationTest extends TestCase
         Livewire::actingAs($qa)
             ->test('tasks.show', ['task' => $task])
             ->call('saveStatus', 'ready_to_deploy');
+        $this->flushDeferredNotifications();
 
         Notification::assertSentTo($rahim, TaskReadyToDeploy::class);
     }
@@ -164,12 +196,14 @@ class NotificationTest extends TestCase
 
         $workflow = app(TaskWorkflowService::class);
         $task = $workflow->createTask(['title' => 'Website Audit', 'status' => TaskStatus::QaTesting, 'qa_id' => $qa->id], $qa, $karim);
+        $this->flushDeferredNotifications();
 
         Notification::fake();
 
         Livewire::actingAs($qa)
             ->test('tasks.show', ['task' => $task])
             ->call('saveStatus', 'ready_to_deploy');
+        $this->flushDeferredNotifications();
 
         Notification::assertNothingSent();
     }
@@ -186,6 +220,7 @@ class NotificationTest extends TestCase
             ->set('name', 'Website Relaunch')
             ->set('coordinator_id', $coordinator->id)
             ->call('save');
+        $this->flushDeferredNotifications();
 
         Notification::assertSentTo($coordinator, ProjectCoordinatorAssigned::class);
     }
@@ -202,6 +237,7 @@ class NotificationTest extends TestCase
         Livewire::actingAs($manager)
             ->test('projects.show', ['project' => $project])
             ->call('saveCoordinator', $coordinator->id);
+        $this->flushDeferredNotifications();
 
         Notification::assertSentTo($coordinator, ProjectCoordinatorAssigned::class);
     }
@@ -217,6 +253,7 @@ class NotificationTest extends TestCase
         Livewire::actingAs($manager)
             ->test('projects.show', ['project' => $project])
             ->call('saveCoordinator', $manager->id);
+        $this->flushDeferredNotifications();
 
         Notification::assertNothingSent();
     }
@@ -227,6 +264,7 @@ class NotificationTest extends TestCase
         $karim = $this->teamMember('Karim');
 
         app(TaskWorkflowService::class)->createTask(['title' => 'Website Audit'], $rahim, $karim);
+        $this->flushDeferredNotifications();
 
         $component = Livewire::actingAs($karim)->test('notifications.bell');
         $component->assertViewHas('unreadCount', 1);
@@ -237,6 +275,20 @@ class NotificationTest extends TestCase
         $this->assertNotNull($karim->notifications()->find($notificationId)->read_at);
     }
 
+    public function test_a_failed_send_is_reported_instead_of_crashing_the_deferred_flush(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+
+        DeferredNotification::send($rahim, new ThrowingTestNotification);
+
+        // Flushing must not let the channel's exception escape — it's
+        // caught and reported, not left to crash PHP's termination phase
+        // (where nothing would otherwise be around to catch it).
+        $this->flushDeferredNotifications();
+
+        $this->assertTrue(true);
+    }
+
     public function test_notifications_index_lists_and_can_mark_all_as_read(): void
     {
         $rahim = $this->teamMember('Rahim');
@@ -245,6 +297,7 @@ class NotificationTest extends TestCase
         $workflow = app(TaskWorkflowService::class);
         $workflow->createTask(['title' => 'Task One'], $rahim, $karim);
         $workflow->createTask(['title' => 'Task Two'], $rahim, $karim);
+        $this->flushDeferredNotifications();
 
         Livewire::actingAs($karim)
             ->test('notifications.index')
@@ -253,5 +306,27 @@ class NotificationTest extends TestCase
             ->call('markAllAsRead');
 
         $this->assertSame(0, $karim->unreadNotifications()->count());
+    }
+}
+
+/**
+ * A minimal, deliberately-failing notification used only to prove
+ * DeferredNotification::send() catches and reports a channel failure
+ * instead of letting it crash PHP's termination phase. It must be a real,
+ * named class (not an inline anonymous one) — the dispatched closure
+ * captures it as a use() variable, and PHP cannot serialize anonymous
+ * classes, which Laravel's queued-closure dispatch requires even for
+ * afterResponse() delivery.
+ */
+class ThrowingTestNotification extends NotificationBase
+{
+    public function via(object $notifiable): array
+    {
+        return ['database'];
+    }
+
+    public function toArray(object $notifiable): array
+    {
+        throw new \RuntimeException('Simulated notification failure');
     }
 }

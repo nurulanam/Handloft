@@ -4,6 +4,7 @@ use App\Enums\ProjectStatus;
 use App\Models\Project;
 use App\Models\User;
 use App\Notifications\ProjectCoordinatorAssigned;
+use App\Support\DeferredNotification;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -36,7 +37,7 @@ new #[Layout('layouts.app')] #[Title('Project')] class extends Component
             $newCoordinator = User::find($newCoordinatorId);
 
             if ($newCoordinator && $newCoordinator->isNot(auth()->user())) {
-                $newCoordinator->notify(new ProjectCoordinatorAssigned($this->project, auth()->user()));
+                DeferredNotification::send($newCoordinator, new ProjectCoordinatorAssigned($this->project, auth()->user()));
             }
         }
 
