@@ -103,7 +103,7 @@
                                 ['label' => 'Create Task', 'route' => 'tasks.create'],
                             ]],
                             ['label' => 'Work History', 'route' => 'work-history.index', 'icon' => $icons['clock']],
-                            ['label' => 'Calendar', 'icon' => $icons['calendar'], 'disabled' => true],
+                            ['label' => 'Calendar', 'route' => 'calendar.index', 'icon' => $icons['calendar']],
                             ['label' => 'Reports', 'icon' => $icons['chart'], 'disabled' => true],
                             ['label' => 'Notifications', 'route' => 'notifications.index', 'icon' => $icons['bell']],
                             ['label' => 'Settings', 'route' => 'settings', 'icon' => $icons['cog'], 'hidden' => auth()->user()->cannot('manage-settings')],

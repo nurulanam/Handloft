@@ -22,7 +22,8 @@ The full requirements live in [`am2am desk requirements.md`](am2am%20desk%20requ
 - **Daily Time Logs** — hours + minutes logged per day per task by whoever's actually connected to it (assignee any time; QA/Reviewer once it reaches QA Testing; Reporter once it reaches Ready to Deploy), auto-summed per task
 - **Work History** — built from the real daily time logs (not a one-off snapshot), with a per-task breakdown, Today/This Week/This Month/Custom-range filters, and a side-by-side team comparison view
 - **Notifications** — an in-app bell + full notifications page, and email, covering: a new project coordinator assignment, a task being assigned/reassigned, a task submitted for QA testing, a task rejected, and a task marked ready to deploy. Sent after the HTTP response has already been returned to the browser (no queue worker required — see `DeferredNotification`)
-- **Settings** — a configurable post-login loading screen (duration, transparency, blur)
+- **Calendar** — Month/Week/Day views of task and project deadlines, scoped to what each viewer can see, with click-through to the record
+- **Settings** — a sidebar of app-wide preferences: a configurable post-login loading screen (duration, transparency, blur), and an SMTP server override (with a live "Send Test Email" check) that takes effect immediately, no redeploy needed
 - **Dashboard** — team/task/hours summary cards and a 14-day hours-logged chart
 
 ## Getting Started
@@ -76,6 +77,6 @@ vendor/bin/pint --dirty --format agent
 | 1 — Core | Users, tasks with assignment/reassignment history, task completion, automatic work history | ✅ Done |
 | Extra — Projects & Time Tracking | Projects with Coordinators, subtasks, daily time logging (hours + minutes), work history rebuilt from real daily logs | ✅ Done (ahead of the original phase plan) |
 | 3 — Reporting | Productivity reports, exports, charts | Not started |
-| 4 — Enhancement | Templates, calendar, **notifications**, search, attachments, full settings | Notifications ✅ done; rest not started |
+| 4 — Enhancement | Templates, **calendar**, **notifications**, search, attachments, full settings | Calendar ✅ done, Notifications ✅ done; rest not started |
 
 See [`PHASES.md`](PHASES.md) for the detailed scope of each phase.

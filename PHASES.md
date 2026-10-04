@@ -93,8 +93,8 @@ Maps to SRS §51 Phase 4 + §26–§27, §29–§30, §36–§40.
 
 - Message Template system (§29) with categories + status, admin-managed
 - Dynamic template variables `{Client Name}`, `{Company Name}`, `{Team Member Name}`, `{Website}` (§30)
-- Calendar (§36): task deadlines, assignments, follow-ups, client activities; daily/weekly/monthly views; click-through to record
-- Notifications (§37, §27): in-app + dashboard + optional email, for task assignment/reassignment/deadline/overdue, status change
+- Calendar (§36): task and project deadlines; Month/Week/Day views; click-through to record — ✅ done
+- Notifications (§37, §27): in-app + email, for task assignment/reassignment, QA submission/rejection, ready-to-deploy, and project coordinator assignment — ✅ done. Deadline/overdue reminders (would need a scheduled job) are not yet built.
 - Global search & filters (§38)
 - File attachments (§39) with admin-configurable max size/allowed types
 - Full audit log UI (§40) with filters, backed by the activity log wired in from Phase 0 onward
