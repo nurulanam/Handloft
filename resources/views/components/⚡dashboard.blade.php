@@ -167,28 +167,4 @@ new #[Layout('layouts.app')] #[Title('Dashboard')] class extends Component
         </div>
     </div>
 
-    {{-- Coming soon --}}
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div class="relative overflow-hidden rounded-lg border border-zinc-200 bg-white p-5">
-            <span class="absolute right-3 top-3 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">Phase 2</span>
-            <span class="flex size-10 items-center justify-center rounded-full bg-zinc-100 text-zinc-400">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5">
-                    <path fill-rule="evenodd" d="M10 2c-2.236 0-4.43.18-6.57.524C1.993 2.755 1 4.014 1 5.426v5.148c0 1.412.993 2.67 2.43 2.902.848.137 1.705.248 2.57.331v3.443a.75.75 0 001.28.53l3.58-3.579a.78.78 0 01.527-.224 41.202 41.202 0 005.183-.5c1.437-.232 2.43-1.49 2.43-2.903V5.426c0-1.412-.993-2.67-2.43-2.902A41.289 41.289 0 0010 2zm0 7a1 1 0 100-2 1 1 0 000 2zM8 8a1 1 0 11-2 0 1 1 0 012 0zm5 1a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
-                </svg>
-            </span>
-            <h2 class="mt-3 text-sm font-semibold text-zinc-900">Leads</h2>
-            <p class="mt-1 text-xs text-zinc-500">Total, new, hot, warm, cold, converted — the CRM pipeline lands in Phase 2.</p>
-        </div>
-
-        <div class="relative overflow-hidden rounded-lg border border-zinc-200 bg-white p-5">
-            <span class="absolute right-3 top-3 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">Phase 2</span>
-            <span class="flex size-10 items-center justify-center rounded-full bg-zinc-100 text-zinc-400">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5">
-                    <path d="M3.478 2.404a.75.75 0 00-.926.941l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.404z" />
-                </svg>
-            </span>
-            <h2 class="mt-3 text-sm font-semibold text-zinc-900">Outreach</h2>
-            <p class="mt-1 text-xs text-zinc-500">Messages sent, follow-ups, and client replies — arrives alongside Leads in Phase 2.</p>
-        </div>
-    </div>
 </div>

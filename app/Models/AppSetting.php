@@ -10,7 +10,19 @@ use Illuminate\Database\Eloquent\Model;
  * the Settings page, rather than a full key/value settings table — there are
  * only a couple of these and they don't need per-key flexibility.
  */
-#[Fillable(['show_loading_screen', 'loading_screen_seconds', 'loading_screen_opacity', 'loading_screen_blur'])]
+#[Fillable([
+    'show_loading_screen',
+    'loading_screen_seconds',
+    'loading_screen_opacity',
+    'loading_screen_blur',
+    'mail_host',
+    'mail_port',
+    'mail_username',
+    'mail_password',
+    'mail_encryption',
+    'mail_from_address',
+    'mail_from_name',
+])]
 class AppSetting extends Model
 {
     protected function casts(): array
@@ -20,6 +32,10 @@ class AppSetting extends Model
             'loading_screen_seconds' => 'integer',
             'loading_screen_opacity' => 'integer',
             'loading_screen_blur' => 'integer',
+            'mail_port' => 'integer',
+            // Laravel transparently encrypts/decrypts this on save/read, so
+            // the SMTP password is never stored or logged in plain text.
+            'mail_password' => 'encrypted',
         ];
     }
 
@@ -34,5 +50,14 @@ class AppSetting extends Model
             'loading_screen_opacity' => 10,
             'loading_screen_blur' => 64,
         ]);
+    }
+
+    /**
+     * Whether a custom SMTP server has been configured here, as opposed to
+     * falling back to whatever's in .env.
+     */
+    public function hasCustomMailSettings(): bool
+    {
+        return filled($this->mail_host);
     }
 }

@@ -28,9 +28,6 @@ class RoleAndAdminSeeder extends Seeder
         'view-own-work-history',
         'view-all-work-history',
         'edit-completed-hours',
-        'create-lead',
-        'assign-lead',
-        'manage-follow-ups',
         'manage-templates',
         'view-reports',
         'export-data',
@@ -57,9 +54,6 @@ class RoleAndAdminSeeder extends Seeder
             'manage-projects',
             'view-own-work-history',
             'view-all-work-history',
-            'create-lead',
-            'assign-lead',
-            'manage-follow-ups',
         ]);
 
         $teamMember = Role::findOrCreate(RoleEnum::TeamMember->value);
@@ -67,7 +61,6 @@ class RoleAndAdminSeeder extends Seeder
             'create-task',
             'assign-task',
             'view-own-work-history',
-            'create-lead',
         ]);
 
         $admin = User::firstOrCreate(

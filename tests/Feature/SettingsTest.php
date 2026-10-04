@@ -3,10 +3,12 @@
 namespace Tests\Feature;
 
 use App\Enums\Role;
+use App\Mail\SmtpTestMail;
 use App\Models\AppSetting;
 use App\Models\User;
 use Database\Seeders\RoleAndAdminSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -31,7 +33,7 @@ class SettingsTest extends TestCase
             ->set('loading_screen_seconds', 7)
             ->set('loading_screen_opacity', 25)
             ->set('loading_screen_blur', 32)
-            ->call('save');
+            ->call('saveLoadingScreen');
 
         $settings = AppSetting::current();
 
@@ -48,7 +50,7 @@ class SettingsTest extends TestCase
         Livewire::actingAs($admin)
             ->test('settings')
             ->set('loading_screen_seconds', 15)
-            ->call('save')
+            ->call('saveLoadingScreen')
             ->assertHasErrors(['loading_screen_seconds' => 'max']);
     }
 
@@ -60,7 +62,7 @@ class SettingsTest extends TestCase
             ->test('settings')
             ->set('loading_screen_opacity', 150)
             ->set('loading_screen_blur', -5)
-            ->call('save')
+            ->call('saveLoadingScreen')
             ->assertHasErrors(['loading_screen_opacity' => 'max', 'loading_screen_blur' => 'min']);
     }
 
@@ -111,5 +113,105 @@ class SettingsTest extends TestCase
             ->call('login');
 
         $this->assertFalse(session('just_logged_in', false));
+    }
+
+    public function test_super_admin_can_save_smtp_settings(): void
+    {
+        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+
+        Livewire::actingAs($admin)
+            ->test('settings')
+            ->set('tab', 'smtp')
+            ->set('mail_host', 'smtp.example.test')
+            ->set('mail_port', '587')
+            ->set('mail_username', 'mailer@example.test')
+            ->set('mail_password', 'secret-password')
+            ->set('mail_encryption', 'tls')
+            ->set('mail_from_address', 'hello@example.test')
+            ->set('mail_from_name', 'Example App')
+            ->call('saveSmtp')
+            ->assertHasNoErrors();
+
+        $settings = AppSetting::current();
+
+        $this->assertSame('smtp.example.test', $settings->mail_host);
+        $this->assertSame(587, $settings->mail_port);
+        $this->assertSame('mailer@example.test', $settings->mail_username);
+        $this->assertSame('secret-password', $settings->mail_password);
+        $this->assertSame('tls', $settings->mail_encryption);
+        $this->assertSame('hello@example.test', $settings->mail_from_address);
+        $this->assertSame('Example App', $settings->mail_from_name);
+    }
+
+    public function test_leaving_the_password_blank_keeps_the_previously_saved_one(): void
+    {
+        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+
+        AppSetting::current()->update([
+            'mail_host' => 'smtp.example.test',
+            'mail_port' => 587,
+            'mail_password' => 'original-password',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test('settings')
+            ->set('tab', 'smtp')
+            ->set('mail_host', 'smtp.example.test')
+            ->set('mail_port', '587')
+            ->set('mail_password', '')
+            ->call('saveSmtp');
+
+        $this->assertSame('original-password', AppSetting::current()->mail_password);
+    }
+
+    public function test_the_saved_password_is_never_sent_back_to_the_browser(): void
+    {
+        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+
+        AppSetting::current()->update([
+            'mail_host' => 'smtp.example.test',
+            'mail_password' => 'super-secret',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test('settings')
+            ->assertSet('mail_password', '')
+            ->assertDontSee('super-secret');
+    }
+
+    public function test_sending_a_test_email_uses_the_unsaved_form_values(): void
+    {
+        Mail::fake();
+
+        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+
+        Livewire::actingAs($admin)
+            ->test('settings')
+            ->set('tab', 'smtp')
+            ->set('mail_host', 'smtp.example.test')
+            ->set('mail_port', '587')
+            ->set('mail_from_address', 'hello@example.test')
+            ->set('test_email', 'someone@example.test')
+            ->call('testSmtp')
+            ->assertHasNoErrors();
+
+        Mail::assertSent(SmtpTestMail::class, fn ($mail) => $mail->hasTo('someone@example.test'));
+
+        // The test send must not have persisted anything.
+        $this->assertNull(AppSetting::current()->mail_host);
+    }
+
+    public function test_a_failed_test_send_reports_the_error_without_crashing(): void
+    {
+        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+
+        Livewire::actingAs($admin)
+            ->test('settings')
+            ->set('tab', 'smtp')
+            ->set('mail_host', 'smtp.invalid.test')
+            ->set('mail_port', '587')
+            ->set('test_email', 'someone@example.test')
+            ->call('testSmtp')
+            ->assertHasNoErrors();
     }
 }

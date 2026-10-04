@@ -1,6 +1,6 @@
 # AM2AM Desk
 
-Team Management, Task Tracking & Lead CRM — an internal Laravel + Livewire application for managing team members, projects and tasks with full assignment history, daily time logging, automatic work-history tracking, notifications, and (in later phases) a lead CRM with outreach and reporting.
+Team Management & Task Tracking — an internal Laravel + Livewire application for managing team members, projects and tasks with full assignment history, daily time logging, automatic work-history tracking, and notifications.
 
 The full requirements live in [`am2am desk requirements.md`](am2am%20desk%20requirements.md); the phased build plan is in [`PHASES.md`](PHASES.md).
 
@@ -75,8 +75,7 @@ vendor/bin/pint --dirty --format agent
 | 0 — Foundation | Auth scaffold, roles/permissions, audit log, dashboard shell | ✅ Done |
 | 1 — Core | Users, tasks with assignment/reassignment history, task completion, automatic work history | ✅ Done |
 | Extra — Projects & Time Tracking | Projects with Coordinators, subtasks, daily time logging (hours + minutes), work history rebuilt from real daily logs | ✅ Done (ahead of the original phase plan) |
-| 2 — CRM | Leads, outreach, follow-ups | Not started |
-| 3 — Reporting | Productivity/lead/outreach reports, exports, charts | Not started |
+| 3 — Reporting | Productivity reports, exports, charts | Not started |
 | 4 — Enhancement | Templates, calendar, **notifications**, search, attachments, full settings | Notifications ✅ done; rest not started |
 
 See [`PHASES.md`](PHASES.md) for the detailed scope of each phase.

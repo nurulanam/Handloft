@@ -71,46 +71,18 @@ Maps to SRS §51 Phase 1 + §3, §4 (partial), §5–§17.
 
 ---
 
-## Phase 2 — CRM: Leads & Outreach
-
-Maps to SRS §51 Phase 2 + §18–§28.
-
-**2a. Lead Management**
-
-- Tables: `leads`, `lead_assignments` (history), `lead_activities` (timeline)
-- Add Lead form: client/company info, contact, lead source, assigned to, status, temperature, notes
-- Duplicate detection (§23) on email/company/website/profile URL before save, with "similar lead exists" confirmation showing the match
-- Lead statuses & temperatures configurable in Settings (§20–§21)
-- Lead assignment + reassignment history (mirrors task assignment pattern from Phase 1)
-
-**2b. Outreach & Follow-ups**
-
-- Tables: `communications`, `follow_ups`
-- Communication entry form: lead, channel, template used, message content, date/time, response/result, next follow-up date, notes
-- Lead activity timeline aggregates status changes + communications (append-only, §28)
-- Follow-up list: Today / Overdue / Upcoming, tied into dashboard Outreach card (§4)
-
-**Done when**
-
-- Full workflow in SRS §48 works end-to-end (add lead → duplicate check → assign → outreach → follow-up → reply → status update → converted/lost)
-- Dashboard Leads + Outreach cards populate from real data
-
----
-
 ## Phase 3 — Reporting & Analytics
 
-Maps to SRS §51 Phase 3 + §31–§35, §43–§44.
+Maps to SRS §51 Phase 3 + §31–§33, §43–§44.
 
-- Team Productivity report (table + filters: date, member, department, task, lead status) — §32
+- Team Productivity report (table + filters: date, member, department, task) — §32
 - Individual Report per team member — §33
-- Lead Report (by source/member/temperature/status) — §34
-- Outreach Report (by member/channel, follow-ups, replies) — §35
 - Export to Excel/CSV and PDF (§43) — via maatwebsite/excel + dompdf/snappy
-- Dashboard charts (§44): working hours, task status, lead status, lead temperature, outreach volume — Chart.js via Livewire, all date-filterable
+- Dashboard charts (§44): working hours, task status — Chart.js via Livewire, all date-filterable
 
 **Done when**
 
-- Every report in §32–§35 renders with real data and correct filters
+- Every report in §32–§33 renders with real data and correct filters
 - Exports produce valid CSV/Excel/PDF matching the on-screen report
 
 ---
@@ -122,11 +94,11 @@ Maps to SRS §51 Phase 4 + §26–§27, §29–§30, §36–§40.
 - Message Template system (§29) with categories + status, admin-managed
 - Dynamic template variables `{Client Name}`, `{Company Name}`, `{Team Member Name}`, `{Website}` (§30)
 - Calendar (§36): task deadlines, assignments, follow-ups, client activities; daily/weekly/monthly views; click-through to record
-- Notifications (§37, §27): in-app + dashboard + optional email, for task assignment/reassignment/deadline/overdue, lead assignment, follow-up due/overdue, status change
+- Notifications (§37, §27): in-app + dashboard + optional email, for task assignment/reassignment/deadline/overdue, status change
 - Global search & filters (§38)
 - File attachments (§39) with admin-configurable max size/allowed types
 - Full audit log UI (§40) with filters, backed by the activity log wired in from Phase 0 onward
-- Admin Settings screens (§42): users/roles/permissions, CRM lookups, task lookups, templates, notification settings
+- Admin Settings screens (§42): users/roles/permissions, task lookups, templates, notification settings
 
 **Done when**
 
@@ -149,6 +121,6 @@ Applied continuously, not as a separate phase:
 
 ## Suggested Build Order Recap
 
-1. Foundation → 1. Core (Auth/Users/Tasks/Work History) → 2. CRM (Leads/Outreach) → 3. Reporting → 4. Enhancement
+1. Foundation → 1. Core (Auth/Users/Tasks/Work History) → 3. Reporting → 4. Enhancement
 
 We proceed one phase at a time: implement, review/demo, then move to the next.
