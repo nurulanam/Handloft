@@ -123,4 +123,28 @@ class TaskStarAndForYouTest extends TestCase
 
         $this->assertFalse($allIds->contains($done->id));
     }
+
+    public function test_a_section_only_shows_five_cards_until_load_more_is_clicked(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+
+        $workflow = app(TaskWorkflowService::class);
+        collect(range(1, 7))->each(
+            fn (int $i) => $workflow->createTask(['title' => "Todo task {$i}"], $rahim, $karim)
+        );
+
+        $component = Livewire::actingAs($karim)->test('for-you');
+
+        $todoSection = $component->viewData('sections')->firstWhere('status', TaskStatus::Todo);
+        $this->assertCount(7, $todoSection['tasks']);
+        $this->assertCount(5, $todoSection['visibleTasks']);
+        $this->assertTrue($todoSection['hasMore']);
+
+        $component->call('loadMore', TaskStatus::Todo->value);
+
+        $todoSection = $component->viewData('sections')->firstWhere('status', TaskStatus::Todo);
+        $this->assertCount(7, $todoSection['visibleTasks']);
+        $this->assertFalse($todoSection['hasMore']);
+    }
 }
