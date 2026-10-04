@@ -6,9 +6,13 @@ use App\Enums\Role;
 use App\Mail\SmtpTestMail;
 use App\Models\AppSetting;
 use App\Models\User;
+use App\Notifications\MailTemplatePreview;
 use Database\Seeders\RoleAndAdminSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Mail\Markdown;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -213,5 +217,81 @@ class SettingsTest extends TestCase
             ->set('test_email', 'someone@example.test')
             ->call('testSmtp')
             ->assertHasNoErrors();
+    }
+
+    public function test_super_admin_can_save_the_mail_template_colors(): void
+    {
+        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+
+        Livewire::actingAs($admin)
+            ->test('settings')
+            ->set('tab', 'mail-template')
+            ->set('mail_brand_color', '#ff6600')
+            ->set('mail_button_text_color', '#111111')
+            ->set('mail_footer_note', 'Questions? Reply to this email.')
+            ->call('saveMailTemplate')
+            ->assertHasNoErrors();
+
+        $settings = AppSetting::current();
+
+        $this->assertSame('#ff6600', $settings->mail_brand_color);
+        $this->assertSame('#111111', $settings->mail_button_text_color);
+        $this->assertSame('Questions? Reply to this email.', $settings->mail_footer_note);
+    }
+
+    public function test_mail_template_colors_must_be_valid_hex(): void
+    {
+        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+
+        Livewire::actingAs($admin)
+            ->test('settings')
+            ->set('tab', 'mail-template')
+            ->set('mail_brand_color', 'not-a-color')
+            ->call('saveMailTemplate')
+            ->assertHasErrors(['mail_brand_color' => 'regex']);
+    }
+
+    public function test_sending_a_template_preview_saves_the_colors_and_emails_the_sample(): void
+    {
+        Notification::fake();
+
+        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+
+        Livewire::actingAs($admin)
+            ->test('settings')
+            ->set('tab', 'mail-template')
+            ->set('mail_brand_color', '#ff6600')
+            ->set('mail_button_text_color', '#111111')
+            ->set('template_preview_email', 'preview@example.test')
+            ->call('sendTemplatePreview')
+            ->assertHasNoErrors();
+
+        $this->assertSame('#ff6600', AppSetting::current()->mail_brand_color);
+
+        Notification::assertSentOnDemand(
+            MailTemplatePreview::class,
+            fn ($notification, $channels, $notifiable) => $notifiable->routes['mail'] === 'preview@example.test'
+        );
+    }
+
+    public function test_the_shared_mail_template_inlines_the_configured_brand_color(): void
+    {
+        AppSetting::current()->update([
+            'mail_brand_color' => '#ff6600',
+            'mail_button_text_color' => '#111111',
+            'mail_footer_note' => 'Custom footer note here.',
+        ]);
+
+        $message = (new MailMessage)
+            ->subject('Test')
+            ->greeting('Hi there,')
+            ->line('This is a test line.')
+            ->action('View Thing', 'https://example.test');
+
+        $html = (string) app(Markdown::class)->render('notifications::email', $message->toArray());
+
+        $this->assertStringContainsString('background-color: #ff6600 !important', $html);
+        $this->assertStringContainsString('color: #111111 !important', $html);
+        $this->assertStringContainsString('Custom footer note here.', $html);
     }
 }

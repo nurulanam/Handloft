@@ -22,6 +22,9 @@ use Illuminate\Database\Eloquent\Model;
     'mail_encryption',
     'mail_from_address',
     'mail_from_name',
+    'mail_brand_color',
+    'mail_button_text_color',
+    'mail_footer_note',
 ])]
 class AppSetting extends Model
 {
@@ -59,5 +62,24 @@ class AppSetting extends Model
     public function hasCustomMailSettings(): bool
     {
         return filled($this->mail_host);
+    }
+
+    /**
+     * The brand color used for links/buttons/header in outgoing notification
+     * emails — falls back to the app's own brand green when unset.
+     */
+    public function mailBrandColor(): string
+    {
+        return $this->mail_brand_color ?: '#10512a';
+    }
+
+    /**
+     * The text color drawn on top of the brand color (e.g. the button
+     * label) — falls back to white, which reads on any reasonably dark
+     * brand color.
+     */
+    public function mailButtonTextColor(): string
+    {
+        return $this->mail_button_text_color ?: '#ffffff';
     }
 }

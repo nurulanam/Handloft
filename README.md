@@ -23,7 +23,7 @@ The full requirements live in [`am2am desk requirements.md`](am2am%20desk%20requ
 - **Work History** — built from the real daily time logs (not a one-off snapshot), with a per-task breakdown, Today/This Week/This Month/Custom-range filters, and a side-by-side team comparison view
 - **Notifications** — an in-app bell + full notifications page, and email, covering: a new project coordinator assignment, a task being assigned/reassigned, a task submitted for QA testing, a task rejected, and a task marked ready to deploy. Sent after the HTTP response has already been returned to the browser (no queue worker required — see `DeferredNotification`)
 - **Calendar** — Month/Week/Day views of task and project deadlines, scoped to what each viewer can see, with click-through to the record
-- **Settings** — a sidebar of app-wide preferences: a configurable post-login loading screen (duration, transparency, blur), and an SMTP server override (with a live "Send Test Email" check) that takes effect immediately, no redeploy needed
+- **Settings** — a sidebar of app-wide preferences: a configurable post-login loading screen (duration, transparency, blur), an SMTP server override (with a live "Send Test Email" check) that takes effect immediately, no redeploy needed, and an Email Template tab (brand color, button text color, footer note, with a live swatch preview and a "send a real preview" action) shared by every outgoing notification email
 - **Dashboard** — team/task/hours summary cards and a 14-day hours-logged chart
 
 ## Getting Started

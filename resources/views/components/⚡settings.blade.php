@@ -2,8 +2,10 @@
 
 use App\Mail\SmtpTestMail;
 use App\Models\AppSetting;
+use App\Notifications\MailTemplatePreview;
 use App\Support\MailSettings;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -39,6 +41,14 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
 
     public string $test_email = '';
 
+    public string $mail_brand_color = '#10512a';
+
+    public string $mail_button_text_color = '#ffffff';
+
+    public string $mail_footer_note = '';
+
+    public string $template_preview_email = '';
+
     public function mount(): void
     {
         abort_unless(auth()->user()->can('manage-settings'), 403);
@@ -60,6 +70,11 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
         $this->mail_from_name = (string) $settings->mail_from_name;
 
         $this->test_email = auth()->user()->email;
+
+        $this->mail_brand_color = $settings->mailBrandColor();
+        $this->mail_button_text_color = $settings->mailButtonTextColor();
+        $this->mail_footer_note = (string) $settings->mail_footer_note;
+        $this->template_preview_email = auth()->user()->email;
     }
 
     public function saveLoadingScreen(): void
@@ -152,6 +167,59 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
             $this->dispatch('notify', message: 'Could not send test email: '.$e->getMessage(), type: 'error');
         }
     }
+
+    public function saveMailTemplate(): void
+    {
+        abort_unless(auth()->user()->can('manage-settings'), 403);
+
+        $data = $this->validate([
+            'mail_brand_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'mail_button_text_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'mail_footer_note' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        AppSetting::current()->update([
+            'mail_brand_color' => $data['mail_brand_color'],
+            'mail_button_text_color' => $data['mail_button_text_color'],
+            'mail_footer_note' => $data['mail_footer_note'] ?: null,
+        ]);
+
+        $this->dispatch('notify', message: 'Email template saved.', type: 'success');
+    }
+
+    /**
+     * Saves the form's colors (the shared mail template reads them straight
+     * from the database at send time, not from this form) and then sends a
+     * real notification email built from that same template, so an admin
+     * can see exactly what recipients will see.
+     */
+    public function sendTemplatePreview(): void
+    {
+        abort_unless(auth()->user()->can('manage-settings'), 403);
+
+        $data = $this->validate([
+            'mail_brand_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'mail_button_text_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'mail_footer_note' => ['nullable', 'string', 'max:255'],
+            'template_preview_email' => ['required', 'email'],
+        ]);
+
+        AppSetting::current()->update([
+            'mail_brand_color' => $data['mail_brand_color'],
+            'mail_button_text_color' => $data['mail_button_text_color'],
+            'mail_footer_note' => $data['mail_footer_note'] ?: null,
+        ]);
+
+        try {
+            Notification::route('mail', $data['template_preview_email'])->notify(new MailTemplatePreview);
+
+            $this->dispatch('notify', message: "Preview email sent to {$data['template_preview_email']}.", type: 'success');
+        } catch (\Throwable $e) {
+            report($e);
+
+            $this->dispatch('notify', message: 'Could not send preview email: '.$e->getMessage(), type: 'error');
+        }
+    }
 };
 ?>
 
@@ -167,6 +235,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
             @foreach ([
                 'loading-screen' => 'Loading Screen',
                 'smtp' => 'Email / SMTP',
+                'mail-template' => 'Email Template',
             ] as $key => $label)
                 <button
                     type="button"
@@ -345,6 +414,89 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                             <button type="button" wire:click="testSmtp" wire:loading.attr="disabled" wire:target="testSmtp" class="shrink-0 rounded-lg border border-brand px-4 py-2 text-sm font-semibold text-brand hover:bg-brand/10 disabled:opacity-60">
                                 <span wire:loading.remove wire:target="testSmtp">Send Test Email</span>
                                 <span wire:loading wire:target="testSmtp">Sending…</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            @elseif ($tab === 'mail-template')
+                <div class="space-y-4">
+                    <form wire:submit="saveMailTemplate" class="space-y-4 rounded-lg border border-zinc-200 bg-white p-5">
+                        <h2 class="text-sm font-semibold uppercase tracking-wide text-zinc-500">Email Template</h2>
+                        <p class="-mt-2 text-xs text-zinc-500">Every notification email (task assignments, QA, project coordination, etc.) shares this one template — change its colors and footer note here instead of editing code.</p>
+
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div>
+                                <label for="mail_brand_color" class="block text-sm font-medium text-zinc-700">Brand Color</label>
+                                <p class="text-xs text-zinc-500">Used for the header link and the button background.</p>
+                                <div class="mt-1 flex items-center gap-2">
+                                    <input wire:model.live="mail_brand_color" type="color" class="h-9 w-12 shrink-0 cursor-pointer rounded border border-zinc-300 bg-white p-1">
+                                    <input wire:model.live="mail_brand_color" type="text" maxlength="7" class="block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                </div>
+                                @error('mail_brand_color') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                            </div>
+
+                            <div>
+                                <label for="mail_button_text_color" class="block text-sm font-medium text-zinc-700">Button Text Color</label>
+                                <p class="text-xs text-zinc-500">The label color drawn on top of the button background.</p>
+                                <div class="mt-1 flex items-center gap-2">
+                                    <input wire:model.live="mail_button_text_color" type="color" class="h-9 w-12 shrink-0 cursor-pointer rounded border border-zinc-300 bg-white p-1">
+                                    <input wire:model.live="mail_button_text_color" type="text" maxlength="7" class="block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                </div>
+                                @error('mail_button_text_color') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                            </div>
+
+                            <div class="sm:col-span-2">
+                                <label for="mail_footer_note" class="block text-sm font-medium text-zinc-700">Footer Note (optional)</label>
+                                <input wire:model.live="mail_footer_note" id="mail_footer_note" type="text" maxlength="255" placeholder="e.g. Questions? Reply to this email or reach us at support@example.com" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                <p class="mt-1 text-xs text-zinc-500">Shown above the copyright line at the bottom of every email.</p>
+                                @error('mail_footer_note') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                            </div>
+                        </div>
+
+                        {{-- Live swatch preview — a rough mock, not a full email render, so changes above show instantly without a round trip. --}}
+                        <div class="rounded-lg border border-zinc-200 bg-zinc-50 p-6">
+                            <div class="mx-auto max-w-sm rounded-lg border border-zinc-200 bg-white shadow-sm">
+                                <div class="px-6 py-5 text-center">
+                                    <span class="text-base font-bold" style="color: {{ $mail_brand_color }};">{{ config('app.name') }}</span>
+                                </div>
+                                <div class="border-t border-zinc-100 px-6 py-5 text-center">
+                                    <p class="text-sm text-zinc-700">Hi there, this is a sample notification.</p>
+                                    <div class="mt-4">
+                                        <span class="inline-block rounded px-5 py-2.5 text-sm font-semibold" style="background-color: {{ $mail_brand_color }}; color: {{ $mail_button_text_color }};">
+                                            Sample Button
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="border-t border-zinc-100 px-6 py-4 text-center text-xs text-zinc-400">
+                                    @if ($mail_footer_note)
+                                        {{ $mail_footer_note }}<br>
+                                    @endif
+                                    © {{ date('Y') }} {{ config('app.name') }}. All rights reserved.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end border-t border-zinc-100 pt-4">
+                            <button type="submit" class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90" wire:loading.attr="disabled" wire:target="saveMailTemplate">
+                                Save Template
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="rounded-lg border border-zinc-200 bg-white p-5">
+                        <h2 class="text-sm font-semibold uppercase tracking-wide text-zinc-500">Send a Real Preview</h2>
+                        <p class="mt-1 text-xs text-zinc-500">Saves the colors above, then sends a real sample notification email so you can see exactly how it renders in an actual inbox.</p>
+
+                        <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
+                            <div class="flex-1">
+                                <label for="template_preview_email" class="block text-sm font-medium text-zinc-700">Send preview to</label>
+                                <input wire:model="template_preview_email" id="template_preview_email" type="email" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                @error('template_preview_email') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                            </div>
+
+                            <button type="button" wire:click="sendTemplatePreview" wire:loading.attr="disabled" wire:target="sendTemplatePreview" class="shrink-0 rounded-lg border border-brand px-4 py-2 text-sm font-semibold text-brand hover:bg-brand/10 disabled:opacity-60">
+                                <span wire:loading.remove wire:target="sendTemplatePreview">Send Preview Email</span>
+                                <span wire:loading wire:target="sendTemplatePreview">Sending…</span>
                             </button>
                         </div>
                     </div>
