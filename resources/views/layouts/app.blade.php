@@ -21,6 +21,326 @@
                     -webkit-mask-image: radial-gradient(circle at 100% calc(100% - 42px), transparent 24px, black 24px);
                 }
             }
+
+            /* Post-login loading animation: a line of rounded squares that
+               leapfrog over each other left to right (squash-and-stretch +
+               flip), each picking up the brand gradient as it lands. Adapted
+               from https://sm-amzad-hossain.github.io/Jampe-Slider-Loading/,
+               recolored to the app's brand green → lime instead of blue. */
+            .jampe-loader {
+                --jampe-duration: 1.4s;
+                --jampe-container: 140px;
+                --jampe-box: 20px;
+                width: var(--jampe-container);
+                height: var(--jampe-box);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                position: relative;
+            }
+
+            .jampe-box {
+                width: var(--jampe-box);
+                height: var(--jampe-box);
+                position: relative;
+                display: block;
+                transform-origin: -50% center;
+                border-radius: 30%;
+            }
+
+            .jampe-box::after {
+                content: '';
+                width: 100%;
+                height: 100%;
+                position: absolute;
+                top: 0;
+                right: 0;
+                border-radius: 30%;
+            }
+
+            .jampe-box:nth-child(1) { animation: jampe-slide var(--jampe-duration) ease-in-out infinite alternate; }
+            .jampe-box:nth-child(1)::after { animation: jampe-color var(--jampe-duration) ease-in-out infinite alternate; }
+
+            .jampe-box:nth-child(2) { animation: jampe-flip-1 var(--jampe-duration) ease-in-out infinite alternate; }
+            .jampe-box:nth-child(2)::after { animation: jampe-squidge-1 var(--jampe-duration) ease-in-out infinite alternate; background-color: #1a6b35; }
+
+            .jampe-box:nth-child(3) { animation: jampe-flip-2 var(--jampe-duration) ease-in-out infinite alternate; }
+            .jampe-box:nth-child(3)::after { animation: jampe-squidge-2 var(--jampe-duration) ease-in-out infinite alternate; background-color: #4c9a3f; }
+
+            .jampe-box:nth-child(4) { animation: jampe-flip-3 var(--jampe-duration) ease-in-out infinite alternate; }
+            .jampe-box:nth-child(4)::after { animation: jampe-squidge-3 var(--jampe-duration) ease-in-out infinite alternate; background-color: #85c230; }
+
+            .jampe-box:nth-child(5) { animation: jampe-flip-4 var(--jampe-duration) ease-in-out infinite alternate; }
+            .jampe-box:nth-child(5)::after { animation: jampe-squidge-4 var(--jampe-duration) ease-in-out infinite alternate; background-color: #bfef1e; }
+
+            @keyframes jampe-slide {
+                0% { background-color: #10512a; transform: translateX(0); }
+                100% { background-color: #bfef1e; transform: translateX(calc(var(--jampe-container) - (var(--jampe-box) * 1.25))); }
+            }
+
+            @keyframes jampe-color {
+                0% { background-color: #10512a; }
+                100% { background-color: #bfef1e; }
+            }
+
+            @keyframes jampe-flip-1 { 0%, 15% { transform: rotate(0); } 35%, 100% { transform: rotate(-180deg); } }
+            @keyframes jampe-flip-2 { 0%, 30% { transform: rotate(0); } 50%, 100% { transform: rotate(-180deg); } }
+            @keyframes jampe-flip-3 { 0%, 45% { transform: rotate(0); } 65%, 100% { transform: rotate(-180deg); } }
+            @keyframes jampe-flip-4 { 0%, 60% { transform: rotate(0); } 80%, 100% { transform: rotate(-180deg); } }
+
+            @keyframes jampe-squidge-1 {
+                5% { transform-origin: center bottom; transform: scaleX(1) scaleY(1); }
+                15% { transform-origin: center bottom; transform: scaleX(1.3) scaleY(0.7); }
+                20%, 25% { transform-origin: center bottom; transform: scaleX(0.8) scaleY(1.4); }
+                40% { transform-origin: center top; transform: scaleX(1.3) scaleY(0.7); }
+                55%, 100% { transform-origin: center top; transform: scaleX(1) scaleY(1); }
+            }
+
+            @keyframes jampe-squidge-2 {
+                20% { transform-origin: center bottom; transform: scaleX(1) scaleY(1); }
+                30% { transform-origin: center bottom; transform: scaleX(1.3) scaleY(0.7); }
+                35%, 40% { transform-origin: center bottom; transform: scaleX(0.8) scaleY(1.4); }
+                55% { transform-origin: center top; transform: scaleX(1.3) scaleY(0.7); }
+                70%, 100% { transform-origin: center top; transform: scaleX(1) scaleY(1); }
+            }
+
+            @keyframes jampe-squidge-3 {
+                35% { transform-origin: center bottom; transform: scaleX(1) scaleY(1); }
+                45% { transform-origin: center bottom; transform: scaleX(1.3) scaleY(0.7); }
+                50%, 55% { transform-origin: center bottom; transform: scaleX(0.8) scaleY(1.4); }
+                70% { transform-origin: center top; transform: scaleX(1.3) scaleY(0.7); }
+                85%, 100% { transform-origin: center top; transform: scaleX(1) scaleY(1); }
+            }
+
+            @keyframes jampe-squidge-4 {
+                50% { transform-origin: center bottom; transform: scaleX(1) scaleY(1); }
+                60% { transform-origin: center bottom; transform: scaleX(1.3) scaleY(0.7); }
+                65%, 70% { transform-origin: center bottom; transform: scaleX(0.8) scaleY(1.4); }
+                85% { transform-origin: center top; transform: scaleX(1.3) scaleY(0.7); }
+                100% { transform-origin: center top; transform: scaleX(1) scaleY(1); }
+            }
+
+            /* Post-login loading animation: five equalizer-style bars
+               pulsing height on a staggered delay. Adapted from
+               https://sm-amzad-hossain.github.io/Loading-Animation/,
+               recolored to the app's brand green → lime instead of the
+               original red-to-green gradient. */
+            .bars-loader {
+                --bars-duration: 0.9s;
+                --bars-gap: 6px;
+                --bars-height: 50px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: var(--bars-height);
+                gap: var(--bars-gap);
+            }
+
+            .bars-loader span {
+                width: 6px;
+                height: 100%;
+                border-radius: 2px;
+                display: block;
+                animation: bars-scale var(--bars-duration) ease-in-out infinite;
+            }
+
+            .bars-loader span:nth-child(1) { background: #10512a; animation-delay: 0s; }
+            .bars-loader span:nth-child(2) { background: #1a6b35; animation-delay: -0.8s; }
+            .bars-loader span:nth-child(3) { background: #4c9a3f; animation-delay: -0.7s; }
+            .bars-loader span:nth-child(4) { background: #85c230; animation-delay: -0.6s; }
+            .bars-loader span:nth-child(5) { background: #bfef1e; animation-delay: -0.5s; }
+
+            @keyframes bars-scale {
+                0%, 40%, 100% { transform: scaleY(0.09); }
+                20% { transform: scaleY(1); }
+            }
+
+            /* Post-login loading animation: a cartoon hand with four fingers
+               and a thumb "typing", each lifting and curling in sequence.
+               Adapted from https://sm-amzad-hossain.github.io/Hand-Animation/,
+               recolored (brand green fingers, white knuckle/nail details)
+               instead of white fingers on a solid blue background, and
+               switched from page-absolute centering to sitting inline in
+               the overlay's own centered flex layout. */
+            .hand-loader {
+                position: relative;
+                width: 112px;
+                height: 70px;
+                transform: scale(0.85);
+            }
+
+            .hand-loader::before,
+            .hand-loader::after {
+                display: table;
+                content: '';
+            }
+
+            .hand-loader::after {
+                clear: both;
+            }
+
+            .hand-finger {
+                float: left;
+                margin: 0 2px 0 0;
+                width: 20px;
+                height: 100%;
+            }
+
+            .hand-finger-1 { animation: hand-finger-1-animation 2s infinite ease-out; }
+            .hand-finger-1 span { animation: hand-finger-1-animation-span 2s infinite ease-out; }
+            .hand-finger-1 i { animation: hand-finger-1-animation-i 2s infinite ease-out; }
+
+            .hand-finger-2 { animation: hand-finger-2-animation 2s infinite ease-out; }
+            .hand-finger-2 span { animation: hand-finger-2-animation-span 2s infinite ease-out; }
+            .hand-finger-2 i { animation: hand-finger-2-animation-i 2s infinite ease-out; }
+
+            .hand-finger-3 { animation: hand-finger-3-animation 2s infinite ease-out; }
+            .hand-finger-3 span { animation: hand-finger-3-animation-span 2s infinite ease-out; }
+            .hand-finger-3 i { animation: hand-finger-3-animation-i 2s infinite ease-out; }
+
+            .hand-finger-4 { animation: hand-finger-4-animation 2s infinite ease-out; }
+            .hand-finger-4 span { animation: hand-finger-4-animation-span 2s infinite ease-out; }
+            .hand-finger-4 i { animation: hand-finger-4-animation-i 2s infinite ease-out; }
+
+            .hand-finger-item {
+                position: relative;
+                width: 100%;
+                height: 100%;
+                border-radius: 6px 6px 8px 8px;
+                background: #10512a;
+            }
+
+            .hand-finger-item span {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: auto;
+                padding: 5px 5px 0 5px;
+            }
+
+            .hand-finger-item span::before,
+            .hand-finger-item span::after {
+                content: '';
+                position: relative;
+                display: block;
+                margin: 0 0 2px 0;
+                width: 100%;
+                height: 2px;
+                background: #ffffff;
+            }
+
+            .hand-finger-item i {
+                position: absolute;
+                left: 3px;
+                bottom: 3px;
+                width: 14px;
+                height: 14px;
+                border-radius: 10px 10px 7px 7px;
+                background: #bfef1e;
+            }
+
+            .hand-last-finger {
+                position: relative;
+                float: left;
+                width: 24px;
+                height: 100%;
+                overflow: hidden;
+            }
+
+            .hand-last-finger-item {
+                position: absolute;
+                right: 0;
+                top: 32px;
+                width: 110%;
+                height: 20px;
+                border-radius: 0 5px 14px 0;
+                background: #10512a;
+                animation: hand-finger-5-animation 2s infinite linear;
+            }
+
+            .hand-last-finger-item i {
+                position: absolute;
+                left: 0;
+                top: -8px;
+                width: 22px;
+                height: 8px;
+                background: #10512a;
+                overflow: hidden;
+            }
+
+            .hand-last-finger-item i::after {
+                content: '';
+                position: absolute;
+                left: 0;
+                bottom: 0;
+                width: 34px;
+                height: 20px;
+                border-radius: 0 0 15px 15px;
+                /* Matches the overlay's own backdrop (not the hand's brand
+                   color) so this reads as a notch carved out of the thumb,
+                   revealing what's behind it — the actual illusion this
+                   shape is for, same trick the original used against its
+                   page background. */
+                background: #ffffff;
+            }
+
+            @keyframes hand-finger-1-animation {
+                0%, 20%, 41%, 100% { padding: 12px 0 5px 0; }
+                29%, 35% { padding: 4px 0 24px 0; }
+            }
+            @keyframes hand-finger-1-animation-span {
+                0%, 20%, 41%, 100% { top: 0; }
+                29%, 35% { top: -7px; }
+            }
+            @keyframes hand-finger-1-animation-i {
+                0%, 20%, 41%, 100% { bottom: 3px; height: 14px; border-radius: 10px 10px 7px 7px; }
+                29%, 35% { bottom: 8px; height: 12px; border-radius: 7px 7px 4px 4px; }
+            }
+
+            @keyframes hand-finger-2-animation {
+                0%, 24%, 45%, 100% { padding: 6px 0 2px 0; }
+                33%, 39% { padding: 2px 0 16px 0; }
+            }
+            @keyframes hand-finger-2-animation-span {
+                0%, 24%, 45%, 100% { top: 0; }
+                33%, 39% { top: -7px; }
+            }
+            @keyframes hand-finger-2-animation-i {
+                0%, 24%, 45%, 100% { bottom: 3px; height: 14px; border-radius: 10px 10px 7px 7px; }
+                33%, 39% { bottom: 8px; height: 12px; border-radius: 7px 7px 4px 4px; }
+            }
+
+            @keyframes hand-finger-3-animation {
+                0%, 28%, 49%, 100% { padding: 0 0 0 0; }
+                37%, 43% { padding: 0 0 12px 0; }
+            }
+            @keyframes hand-finger-3-animation-span {
+                0%, 28%, 49%, 100% { top: 0; }
+                37%, 43% { top: -7px; }
+            }
+            @keyframes hand-finger-3-animation-i {
+                0%, 28%, 49%, 100% { bottom: 3px; height: 14px; border-radius: 10px 10px 7px 7px; }
+                37%, 43% { bottom: 8px; height: 12px; border-radius: 7px 7px 4px 4px; }
+            }
+
+            @keyframes hand-finger-4-animation {
+                0%, 32%, 53%, 100% { padding: 8px 0 3px 0; }
+                41%, 47% { padding: 4px 0 20px 0; }
+            }
+            @keyframes hand-finger-4-animation-span {
+                0%, 32%, 53%, 100% { top: 0; }
+                41%, 47% { top: -7px; }
+            }
+            @keyframes hand-finger-4-animation-i {
+                0%, 32%, 53%, 100% { bottom: 3px; height: 14px; border-radius: 10px 10px 7px 7px; }
+                41%, 47% { bottom: 8px; height: 12px; border-radius: 7px 7px 4px 4px; }
+            }
+
+            @keyframes hand-finger-5-animation {
+                0%, 34%, 60%, 100% { top: 32px; right: 0; border-radius: 0 5px 14px 0; transform: rotate(0deg); }
+                43%, 50% { top: 20px; right: 2px; border-radius: 0 8px 20px 0; transform: rotate(-12deg); }
+            }
         </style>
     </head>
     <body
@@ -52,7 +372,57 @@
                 class="fixed inset-0 z-60 flex flex-col items-center justify-center gap-6"
                 style="background-color: rgba(255, 255, 255, {{ $__loadingScreen->loading_screen_opacity / 100 }}); backdrop-filter: blur({{ $__loadingScreen->loading_screen_blur }}px); -webkit-backdrop-filter: blur({{ $__loadingScreen->loading_screen_blur }}px);"
             >
-                <div class="size-16 animate-spin rounded-full border-4 border-brand/20 border-t-brand-lime"></div>
+                @if ($__loadingScreen->loading_screen_style === 'spinner')
+                    <div class="size-16 animate-spin rounded-full border-4 border-brand/20 border-t-brand-lime"></div>
+                @elseif ($__loadingScreen->loading_screen_style === 'bars')
+                    <div class="bars-loader">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                @elseif ($__loadingScreen->loading_screen_style === 'hand')
+                    <div class="hand-loader">
+                        <div class="hand-finger hand-finger-1">
+                            <div class="hand-finger-item">
+                                <span></span>
+                                <i></i>
+                            </div>
+                        </div>
+                        <div class="hand-finger hand-finger-2">
+                            <div class="hand-finger-item">
+                                <span></span>
+                                <i></i>
+                            </div>
+                        </div>
+                        <div class="hand-finger hand-finger-3">
+                            <div class="hand-finger-item">
+                                <span></span>
+                                <i></i>
+                            </div>
+                        </div>
+                        <div class="hand-finger hand-finger-4">
+                            <div class="hand-finger-item">
+                                <span></span>
+                                <i></i>
+                            </div>
+                        </div>
+                        <div class="hand-last-finger">
+                            <div class="hand-last-finger-item">
+                                <i></i>
+                            </div>
+                        </div>
+                    </div>
+                @else
+                    <div class="jampe-loader">
+                        <div class="jampe-box"></div>
+                        <div class="jampe-box"></div>
+                        <div class="jampe-box"></div>
+                        <div class="jampe-box"></div>
+                        <div class="jampe-box"></div>
+                    </div>
+                @endif
                 <div class="flex items-center gap-2 text-xl font-semibold text-zinc-900">
                     <span class="h-2.5 w-2.5 rounded-full bg-brand-lime"></span>
                     {{ config('app.name') }}

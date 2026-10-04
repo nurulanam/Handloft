@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Model;
     'loading_screen_seconds',
     'loading_screen_opacity',
     'loading_screen_blur',
+    'loading_screen_style',
     'mail_host',
     'mail_port',
     'mail_username',
@@ -52,6 +53,7 @@ class AppSetting extends Model
             'loading_screen_seconds' => 3,
             'loading_screen_opacity' => 10,
             'loading_screen_blur' => 64,
+            'loading_screen_style' => 'jampe',
         ]);
     }
 

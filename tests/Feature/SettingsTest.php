@@ -70,6 +70,56 @@ class SettingsTest extends TestCase
             ->assertHasErrors(['loading_screen_opacity' => 'max', 'loading_screen_blur' => 'min']);
     }
 
+    public function test_super_admin_can_switch_the_loading_screen_animation_style(): void
+    {
+        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+
+        Livewire::actingAs($admin)
+            ->test('settings')
+            ->set('loading_screen_style', 'spinner')
+            ->call('saveLoadingScreen')
+            ->assertHasNoErrors();
+
+        $this->assertSame('spinner', AppSetting::current()->loading_screen_style);
+    }
+
+    public function test_super_admin_can_switch_to_the_equalizer_bars_animation(): void
+    {
+        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+
+        Livewire::actingAs($admin)
+            ->test('settings')
+            ->set('loading_screen_style', 'bars')
+            ->call('saveLoadingScreen')
+            ->assertHasNoErrors();
+
+        $this->assertSame('bars', AppSetting::current()->loading_screen_style);
+    }
+
+    public function test_super_admin_can_switch_to_the_typing_hand_animation(): void
+    {
+        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+
+        Livewire::actingAs($admin)
+            ->test('settings')
+            ->set('loading_screen_style', 'hand')
+            ->call('saveLoadingScreen')
+            ->assertHasNoErrors();
+
+        $this->assertSame('hand', AppSetting::current()->loading_screen_style);
+    }
+
+    public function test_the_loading_screen_style_must_be_a_known_option(): void
+    {
+        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+
+        Livewire::actingAs($admin)
+            ->test('settings')
+            ->set('loading_screen_style', 'not-a-real-style')
+            ->call('saveLoadingScreen')
+            ->assertHasErrors(['loading_screen_style']);
+    }
+
     public function test_default_settings_have_sensible_values(): void
     {
         $settings = AppSetting::current();
@@ -78,6 +128,7 @@ class SettingsTest extends TestCase
         $this->assertSame(3, $settings->loading_screen_seconds);
         $this->assertSame(10, $settings->loading_screen_opacity);
         $this->assertSame(64, $settings->loading_screen_blur);
+        $this->assertSame('jampe', $settings->loading_screen_style);
     }
 
     public function test_team_member_cannot_access_settings(): void

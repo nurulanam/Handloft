@@ -25,6 +25,8 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
 
     public int $loading_screen_blur = 64;
 
+    public string $loading_screen_style = 'jampe';
+
     public string $mail_host = '';
 
     public string $mail_port = '';
@@ -59,6 +61,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
         $this->loading_screen_seconds = $settings->loading_screen_seconds;
         $this->loading_screen_opacity = $settings->loading_screen_opacity;
         $this->loading_screen_blur = $settings->loading_screen_blur;
+        $this->loading_screen_style = $settings->loading_screen_style ?: 'jampe';
 
         $this->mail_host = (string) $settings->mail_host;
         $this->mail_port = (string) ($settings->mail_port ?? '');
@@ -86,6 +89,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
             'loading_screen_seconds' => ['required', 'integer', 'min:1', 'max:10'],
             'loading_screen_opacity' => ['required', 'integer', 'min:0', 'max:100'],
             'loading_screen_blur' => ['required', 'integer', 'min:0', 'max:100'],
+            'loading_screen_style' => ['required', Rule::in(['jampe', 'bars', 'hand', 'spinner'])],
         ]);
 
         AppSetting::current()->update($data);
@@ -320,6 +324,78 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                             class="mt-2 w-full accent-brand"
                         >
                         @error('loading_screen_blur') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div class="border-t border-zinc-100 py-3" :class="! $wire.show_loading_screen ? 'opacity-40' : ''" x-data>
+                        <p class="text-sm font-medium text-zinc-900">Animation</p>
+                        <p class="text-xs text-zinc-500">Which loading animation plays inside the overlay.</p>
+
+                        <div class="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                            @foreach (['jampe' => 'Jumping Boxes', 'bars' => 'Equalizer Bars', 'hand' => 'Typing Hand', 'spinner' => 'Classic Spinner'] as $key => $label)
+                                <button
+                                    type="button"
+                                    wire:click="$set('loading_screen_style', '{{ $key }}')"
+                                    :disabled="! $wire.show_loading_screen"
+                                    class="flex flex-col items-center gap-3 rounded-lg border p-4 {{ $loading_screen_style === $key ? 'border-brand ring-1 ring-brand' : 'border-zinc-200 hover:border-zinc-300' }}"
+                                >
+                                    <div class="flex h-10 items-center justify-center">
+                                        @if ($key === 'jampe')
+                                            <div class="jampe-loader" style="--jampe-container: 90px; --jampe-box: 14px;">
+                                                <div class="jampe-box"></div>
+                                                <div class="jampe-box"></div>
+                                                <div class="jampe-box"></div>
+                                                <div class="jampe-box"></div>
+                                                <div class="jampe-box"></div>
+                                            </div>
+                                        @elseif ($key === 'bars')
+                                            <div class="bars-loader" style="--bars-height: 32px;">
+                                                <span></span>
+                                                <span></span>
+                                                <span></span>
+                                                <span></span>
+                                                <span></span>
+                                            </div>
+                                        @elseif ($key === 'hand')
+                                            <div class="hand-loader" style="transform: scale(0.32);">
+                                                <div class="hand-finger hand-finger-1">
+                                                    <div class="hand-finger-item">
+                                                        <span></span>
+                                                        <i></i>
+                                                    </div>
+                                                </div>
+                                                <div class="hand-finger hand-finger-2">
+                                                    <div class="hand-finger-item">
+                                                        <span></span>
+                                                        <i></i>
+                                                    </div>
+                                                </div>
+                                                <div class="hand-finger hand-finger-3">
+                                                    <div class="hand-finger-item">
+                                                        <span></span>
+                                                        <i></i>
+                                                    </div>
+                                                </div>
+                                                <div class="hand-finger hand-finger-4">
+                                                    <div class="hand-finger-item">
+                                                        <span></span>
+                                                        <i></i>
+                                                    </div>
+                                                </div>
+                                                <div class="hand-last-finger">
+                                                    <div class="hand-last-finger-item">
+                                                        <i></i>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        @else
+                                            <div class="size-8 animate-spin rounded-full border-4 border-brand/20 border-t-brand-lime"></div>
+                                        @endif
+                                    </div>
+                                    <span class="text-xs font-medium {{ $loading_screen_style === $key ? 'text-brand' : 'text-zinc-600' }}">{{ $label }}</span>
+                                </button>
+                            @endforeach
+                        </div>
+                        @error('loading_screen_style') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                     </div>
 
                     <div class="flex items-center justify-between gap-4 border-t border-zinc-100 pt-4">
