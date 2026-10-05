@@ -1,4 +1,4 @@
-# AM2AM Desk
+# Handloft
 
 Team Management & Task Tracking — an internal Laravel + Livewire application for managing team members, projects and tasks with full assignment history, daily time logging, automatic work-history tracking, and notifications.
 

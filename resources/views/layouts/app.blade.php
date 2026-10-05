@@ -6,19 +6,35 @@
 
         <title>{{ $title ?? config('app.name') }}</title>
 
+        <link rel="icon" href="/favicon.ico" sizes="any">
+        <link rel="icon" href="/logo.svg" type="image/svg+xml">
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
         @vite(['resources/css/app.css', 'resources/js/app.js'])
 
         @livewireStyles
 
-        {{-- Carves a round notch into the sidebar's right edge around the
-             collapse toggle, so the edge itself curves smoothly away from the
-             button instead of the button sitting on top of a straight line.
-             Desktop-only, matching where the toggle button is shown. --}}
+        {{-- Carves a notch into the sidebar's right edge around the collapse
+             toggle, with rounded (filleted) shoulders so the edge flows into
+             the notch instead of meeting it at a sharp corner. The cut shape
+             is an SVG (notch r=22 around the 18px-radius button, leaving a
+             4px gap ring; fillets r=10), subtracted from a solid layer.
+             Its 31px vertical center sits on the button's center (42px from
+             the bottom). Desktop-only, matching where the toggle is shown. --}}
         <style>
             @media (min-width: 1024px) {
                 .sidebar-notch {
-                    mask-image: radial-gradient(circle at 100% calc(100% - 42px), transparent 24px, black 24px);
-                    -webkit-mask-image: radial-gradient(circle at 100% calc(100% - 42px), transparent 24px, black 24px);
+                    --notch: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 62'%3E%3Cpath d='M24 0.603A10 10 0 0 1 17.125 10.102A22 22 0 0 0 17.125 51.898A10 10 0 0 1 24 61.397Z' fill='black'/%3E%3C/svg%3E");
+                    mask-image: linear-gradient(#000 0 0), var(--notch);
+                    mask-size: 100% 100%, 24px 62px;
+                    mask-position: 0 0, right 0 bottom 11px;
+                    mask-repeat: no-repeat;
+                    mask-composite: exclude;
+                    -webkit-mask-image: linear-gradient(#000 0 0), var(--notch);
+                    -webkit-mask-size: 100% 100%, 24px 62px;
+                    -webkit-mask-position: 0 0, right 0 bottom 11px;
+                    -webkit-mask-repeat: no-repeat;
+                    -webkit-mask-composite: xor;
                 }
             }
 
@@ -348,9 +364,16 @@
         x-data="{
             sidebarOpen: false,
             sidebarCollapsed: localStorage.getItem('sidebarCollapsed') === 'true',
+            flyout: { show: false, top: 0, label: '' },
             toggleCollapsed() {
                 this.sidebarCollapsed = ! this.sidebarCollapsed;
+                this.flyout.show = false;
                 localStorage.setItem('sidebarCollapsed', this.sidebarCollapsed);
+            },
+            showFlyout(el, label) {
+                if (! this.sidebarCollapsed || window.innerWidth < 1024) return;
+                const rect = el.getBoundingClientRect();
+                this.flyout = { show: true, top: rect.top + rect.height / 2, label };
             },
         }"
     >
@@ -423,8 +446,8 @@
                         <div class="jampe-box"></div>
                     </div>
                 @endif
-                <div class="flex items-center gap-2 text-xl font-semibold text-zinc-900">
-                    <span class="h-2.5 w-2.5 rounded-full bg-brand-lime"></span>
+                <div class="flex items-center gap-2.5 text-xl font-semibold text-zinc-900">
+                    <x-logo-mark class="size-9 shrink-0" />
                     {{ config('app.name') }}
                 </div>
             </div>
@@ -435,9 +458,10 @@
             <aside
                 class="sidebar-notch fixed inset-y-0 left-0 z-30 w-64 transform overflow-x-hidden overflow-y-auto bg-zinc-900 text-zinc-300 transition-[transform,width] duration-300 ease-in-out lg:translate-x-0"
                 :class="[sidebarOpen ? 'translate-x-0' : '-translate-x-full', sidebarCollapsed ? 'lg:w-20' : 'lg:w-64']"
+                @scroll="flyout.show = false"
             >
-                <div class="flex h-16 items-center gap-2 px-6 text-lg font-semibold text-white" :class="sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''">
-                    <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-brand-lime"></span>
+                <div class="flex h-16 items-center gap-2.5 px-6 text-lg font-semibold text-white" :class="sidebarCollapsed ? 'lg:justify-center lg:gap-0 lg:px-0' : ''">
+                    <x-logo-mark class="size-8 shrink-0" />
                     <span class="overflow-hidden whitespace-nowrap transition-all duration-200" :class="sidebarCollapsed ? 'lg:w-0 lg:opacity-0' : 'w-auto opacity-100'">{{ config('app.name') }}</span>
                 </div>
 
@@ -496,7 +520,8 @@
                             >
                                 <button
                                     type="button"
-                                    title="{{ $item['label'] }}"
+                                    @mouseenter="showFlyout($el, @js($item['label']))"
+                                    @mouseleave="flyout.show = false"
                                     @click="sidebarCollapsed ? Livewire.navigate('{{ route($visibleChildren->first()['route']) }}') : (open = ! open)"
                                     class="flex w-full items-center gap-2.5 overflow-hidden rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors duration-200 ease-in-out {{ $childActive ? 'bg-brand text-white' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' }}"
                                     :class="sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''"
@@ -538,7 +563,8 @@
                             <span
                                 class="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-zinc-500"
                                 :class="sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''"
-                                title="{{ $item['label'] }} (coming soon)"
+                                @mouseenter="showFlyout($el, @js($item['label'].' · Soon'))"
+                                @mouseleave="flyout.show = false"
                             >
                                 <span class="flex items-center gap-2.5 overflow-hidden">
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4.5 shrink-0"><path fill-rule="evenodd" d="{{ $item['icon'] }}" clip-rule="evenodd" /></svg>
@@ -550,7 +576,8 @@
                             <a
                                 href="{{ route($item['route']) }}"
                                 wire:navigate
-                                title="{{ $item['label'] }}"
+                                @mouseenter="showFlyout($el, @js($item['label']))"
+                                @mouseleave="flyout.show = false"
                                 class="flex items-center gap-2.5 overflow-hidden rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200 ease-in-out {{ request()->routeIs($item['route'], \Illuminate\Support\Str::before($item['route'], '.').'.*') ? 'bg-brand text-white' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' }}"
                                 :class="sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''"
                             >
@@ -562,14 +589,13 @@
                 </nav>
             </aside>
 
-            {{-- Collapse toggle: a dark circular handle anchored to the
-                 sidebar's edge, sliding along with it as it collapses/expands.
-                 Same color as the sidebar with only a soft shadow (no hard
-                 ring) so it reads as an extension of it, not a separate chip. --}}
+            {{-- Collapse toggle: a dark circular handle seated in the
+                 sidebar's notch (see .sidebar-notch), sliding along with the
+                 edge as it collapses/expands. --}}
             <button
                 type="button"
                 @click="toggleCollapsed()"
-                class="fixed bottom-6 z-40 hidden size-9 -translate-x-1/2 items-center justify-center rounded-full bg-zinc-900 text-zinc-300 shadow-[0_2px_10px_rgba(0,0,0,0.35)] transition-[left,background-color,color] duration-300 ease-in-out hover:bg-brand hover:text-white lg:flex"
+                class="fixed bottom-6 z-40 hidden size-9 -translate-x-1/2 items-center justify-center rounded-full bg-zinc-900 text-zinc-300 transition-[left,background-color,color] duration-300 ease-in-out hover:bg-brand hover:text-white lg:flex"
                 :style="{ left: (sidebarCollapsed ? 80 : 256) + 'px' }"
                 title="Toggle sidebar"
             >
@@ -578,6 +604,31 @@
                     <path fill-rule="evenodd" d="M7.79 5.23a.75.75 0 01-.02 1.06L3.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" />
                 </svg>
             </button>
+
+            {{-- Collapsed-sidebar label: a tab that grows out of the sidebar
+                 edge beside the hovered nav item. Lives outside the <aside>
+                 because the aside clips its overflow (and its notch mask
+                 would clip it too). The two 10px shoulder pieces are filled
+                 everywhere except a quarter circle, giving the concave curve
+                 where the tab meets the edge. --}}
+            <div
+                x-show="flyout.show"
+                x-cloak
+                x-transition:enter="transition ease-out duration-150"
+                x-transition:enter-start="opacity-0 -translate-x-2"
+                x-transition:enter-end="opacity-100 translate-x-0"
+                x-transition:leave="transition ease-in duration-100"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                class="pointer-events-none fixed left-20 z-40 hidden -translate-y-1/2 lg:block"
+                :style="{ top: flyout.top + 'px' }"
+            >
+                <div class="relative">
+                    <span class="absolute bottom-full left-0 size-2.5" style="background: radial-gradient(circle at 100% 0, transparent 10px, #18181b 10.5px);"></span>
+                    <span class="block whitespace-nowrap rounded-r-lg bg-zinc-900 py-2 pl-3 pr-4 text-sm font-medium text-white" x-text="flyout.label"></span>
+                    <span class="absolute left-0 top-full size-2.5" style="background: radial-gradient(circle at 100% 100%, transparent 10px, #18181b 10.5px);"></span>
+                </div>
+            </div>
 
             <div
                 x-show="sidebarOpen"

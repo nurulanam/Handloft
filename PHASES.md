@@ -1,6 +1,6 @@
 # Development Phase Breakdown
 
-**Project:** Team Management, Task Tracking & Lead CRM (internal codename: AM2AM Desk) **Stack:** Laravel + Livewire (Volt/Livewire components) + MySQL + Tailwind **Source of truth:** `am2am desk requirements.md`
+**Project:** Team Management, Task Tracking & Lead CRM (product name: Handloft, formerly AM2AM Desk) **Stack:** Laravel + Livewire (Volt/Livewire components) + MySQL + Tailwind **Source of truth:** `am2am desk requirements.md`
 
 This document breaks the SRS into implementation phases small enough to build, test, and demo independently. Each phase lists scope, the DB tables/models it introduces, the main Livewire components/pages, and a "done when" checklist. We will implement strictly phase by phase — no phase starts until the previous one is accepted.
 
