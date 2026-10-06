@@ -41,7 +41,7 @@ new #[Layout('layouts.app')] #[Title('Starred')] class extends Component
 <div class="space-y-6">
     <div>
         <h1 class="text-2xl font-semibold text-zinc-900">Starred</h1>
-        <p class="text-sm text-zinc-500">Tasks you've starred for quick access.</p>
+        <p class="hidden text-sm text-zinc-500 sm:block">Tasks you've starred for quick access.</p>
     </div>
 
     <div class="overflow-hidden rounded-lg border border-zinc-200 bg-white">

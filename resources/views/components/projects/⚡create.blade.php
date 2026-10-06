@@ -72,15 +72,14 @@ new #[Layout('layouts.app')] #[Title('Create Project')] class extends Component
 ?>
 
 <div>
-    <div class="mb-6 flex items-center justify-between">
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-            <h1 class="text-2xl font-semibold text-zinc-900">Create Project</h1>
-            <p class="text-sm text-zinc-500">Group related tasks together under one project.</p>
+            <h1 class="text-xl font-semibold text-zinc-900 sm:text-2xl">Create Project</h1>
         </div>
 
         <div class="flex items-center gap-3">
             <a href="{{ route('projects.index') }}" wire:navigate class="text-sm font-medium text-zinc-600 hover:text-zinc-900">Cancel</a>
-            <button type="submit" form="create-project-form" class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90" wire:loading.attr="disabled">
+            <button type="submit" form="create-project-form" class="whitespace-nowrap rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90" wire:loading.attr="disabled">
                 Create Project
             </button>
         </div>
@@ -103,7 +102,7 @@ new #[Layout('layouts.app')] #[Title('Create Project')] class extends Component
                 <div>
                     <label class="block text-sm font-medium text-zinc-700">Description</label>
                     <div wire:ignore x-data="quillEditor(@js($description))" class="mt-1">
-                        <div x-ref="editor" class="min-h-64 rounded-b-lg border border-zinc-300 bg-white text-sm [&_.ql-toolbar]:rounded-t-lg [&_.ql-toolbar]:border-zinc-300"></div>
+                        <div x-ref="editor" class="min-h-40 rounded-b-lg border sm:min-h-64 border-zinc-300 bg-white text-sm [&_.ql-toolbar]:rounded-t-lg [&_.ql-toolbar]:border-zinc-300"></div>
                         <input type="hidden" x-ref="input" wire:model="description">
                     </div>
                     @error('description') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
@@ -116,15 +115,6 @@ new #[Layout('layouts.app')] #[Title('Create Project')] class extends Component
                     <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Details</h3>
 
                     <div class="mt-3 divide-y divide-zinc-100">
-                        {{-- Reporter (fixed — the person filling out this form) --}}
-                        <div class="flex items-center justify-between gap-3 py-2.5">
-                            <span class="text-sm text-zinc-500">Created by</span>
-                            <span class="flex items-center gap-2">
-                                <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-[10px] font-semibold text-white">{{ \App\Support\Avatar::initials(auth()->user()->name) }}</span>
-                                <span class="text-sm text-zinc-900">{{ auth()->user()->name }}</span>
-                            </span>
-                        </div>
-
                         {{-- Project Coordinator --}}
                         <div class="flex items-center justify-between gap-3 py-2.5">
                             <span class="text-sm text-zinc-500">Coordinator</span>
@@ -153,35 +143,32 @@ new #[Layout('layouts.app')] #[Title('Create Project')] class extends Component
                         <div class="flex items-center justify-between gap-3 py-2.5">
                             <span class="text-sm text-zinc-500">Start date</span>
 
-                            <div class="relative" x-data="{ open: false }">
-                                <button type="button" @click="open = ! open" class="text-sm {{ $start_date ? 'text-zinc-900' : 'text-zinc-400' }} hover:text-brand">
-                                    {{ $start_date ? \Illuminate\Support\Carbon::parse($start_date)->format('d M Y') : 'Add start date' }}
-                                </button>
-
-                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 rounded-lg border border-zinc-200 bg-white p-2 shadow-lg">
-                                    <input wire:model.live="start_date" type="date" class="block rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                                </div>
-                            </div>
+                            {{-- The native date input sits invisibly over the label, so one tap opens the device's own date picker. --}}
+                            <label class="group relative -my-1.5 cursor-pointer py-1.5">
+                                <span class="text-sm {{ $start_date ? 'text-zinc-900' : 'text-zinc-400' }} group-hover:text-brand">{{ $start_date ? \Illuminate\Support\Carbon::parse($start_date)->format('d M Y') : 'Add start date' }}</span>
+                                <input wire:model.live="start_date" type="date" class="absolute inset-0 h-full w-full cursor-pointer opacity-0" x-data @click="(() => { try { $el.showPicker() } catch (e) {} })()">
+                            </label>
                         </div>
 
                         {{-- Deadline --}}
                         <div class="flex items-center justify-between gap-3 py-2.5">
                             <span class="text-sm text-zinc-500">Deadline</span>
 
-                            <div class="relative" x-data="{ open: false }">
-                                <button type="button" @click="open = ! open" class="text-sm {{ $deadline ? 'text-zinc-900' : 'text-zinc-400' }} hover:text-brand">
-                                    {{ $deadline ? \Illuminate\Support\Carbon::parse($deadline)->format('d M Y') : 'Add deadline' }}
-                                </button>
-
-                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 rounded-lg border border-zinc-200 bg-white p-2 shadow-lg">
-                                    <input wire:model.live="deadline" type="date" class="block rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                                </div>
-                            </div>
+                            {{-- The native date input sits invisibly over the label, so one tap opens the device's own date picker. --}}
+                            <label class="group relative -my-1.5 cursor-pointer py-1.5">
+                                <span class="text-sm {{ $deadline ? 'text-zinc-900' : 'text-zinc-400' }} group-hover:text-brand">{{ $deadline ? \Illuminate\Support\Carbon::parse($deadline)->format('d M Y') : 'Add deadline' }}</span>
+                                <input wire:model.live="deadline" type="date" class="absolute inset-0 h-full w-full cursor-pointer opacity-0" x-data @click="(() => { try { $el.showPicker() } catch (e) {} })()">
+                            </label>
                         </div>
                         @error('deadline') <p class="pb-2 text-xs text-red-600">{{ $message }}</p> @enderror
                     </div>
                 </div>
             </div>
+        </div>
+        {{-- Phones: the header actions scroll away on a long form, so repeat them where the form ends. --}}
+        <div class="mt-6 flex gap-3 sm:hidden">
+            <a href="{{ route('projects.index') }}" wire:navigate class="flex-1 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-center text-sm font-medium text-zinc-700 hover:bg-zinc-50">Cancel</a>
+            <button type="submit" class="flex-1 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand/90" wire:loading.attr="disabled">Create Project</button>
         </div>
     </form>
 </div>

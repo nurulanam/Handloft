@@ -40,14 +40,15 @@ new class extends Component
 ?>
 
 <div class="relative" x-data="{ open: false }" wire:poll.30s>
-    <button type="button" @click="open = ! open" class="relative rounded-full p-2 text-zinc-500 hover:bg-zinc-100" title="Notifications">
-        <span aria-hidden="true">&#128276;</span>
+    <button type="button" @click="open = ! open" class="relative rounded-full p-2 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700" title="Notifications">
+        <span class="sr-only">Notifications</span>
+        <x-nav-icon name="notifications" class="size-5" />
         @if ($unreadCount > 0)
             <span class="absolute right-0.5 top-0.5 flex size-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-semibold text-white">{{ $unreadCount > 9 ? '9+' : $unreadCount }}</span>
         @endif
     </button>
 
-    <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-30 mt-2 w-80 rounded-lg border border-zinc-200 bg-white py-2 shadow-lg">
+    <div x-show="open" x-cloak @click.outside="open = false" x-transition class="fixed inset-x-4 top-16 z-30 rounded-lg border border-zinc-200 bg-white py-2 shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80">
         <div class="flex items-center justify-between px-3 pb-2">
             <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Notifications</p>
             @if ($unreadCount > 0)

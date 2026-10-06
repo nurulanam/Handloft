@@ -249,11 +249,11 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
 ?>
 
 <div class="space-y-6">
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-3">
         @unless ($projectId)
             <div>
                 <h1 class="text-2xl font-semibold text-zinc-900">Tasks</h1>
-                <p class="text-sm text-zinc-500">Create, assign, and track work across the team.</p>
+                <p class="hidden text-sm text-zinc-500 sm:block">Create, assign, and track work across the team.</p>
             </div>
         @else
             <h2 class="text-lg font-semibold text-zinc-900">Tasks</h2>
@@ -279,7 +279,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                 </div>
             @endif
 
-            <a href="{{ route('tasks.create', $projectId ? ['project' => $projectId] : []) }}" wire:navigate class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90">
+            <a href="{{ route('tasks.create', $projectId ? ['project' => $projectId] : []) }}" wire:navigate class="shrink-0 whitespace-nowrap rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90">
                 Create Task
             </a>
         </div>
@@ -372,12 +372,14 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                     x-on:mouseenter="if (draggingId !== null) overStatus = '{{ $status->value }}'"
                     :class="draggingId !== null && moved && overStatus === '{{ $status->value }}' ? 'ring-2 ring-brand-lime' : ''"
                 >
-                    <div class="flex items-center justify-between border-b border-zinc-200 px-3 py-2">
-                        <h3 class="text-sm font-semibold text-zinc-900">{{ $status->label() }}</h3>
+                    @php $columnEmpty = $board[$status->value]->isEmpty(); @endphp
+                    <div class="flex items-center justify-between border-zinc-200 px-3 py-2 {{ $columnEmpty ? 'sm:border-b' : 'border-b' }}">
+                        <h3 class="text-sm font-semibold {{ $columnEmpty ? 'text-zinc-500 sm:text-zinc-900' : 'text-zinc-900' }}">{{ $status->label() }}</h3>
                         <span class="rounded-full px-2 py-0.5 text-xs font-semibold {{ $status->pillClasses() }}">{{ $board[$status->value]->count() }}</span>
                     </div>
 
-                    <div class="flex-1 space-y-2 p-2">
+                    {{-- On phones the columns stack, so an empty one shows only its header rather than a whole "No tasks" box. --}}
+                    <div class="flex-1 space-y-2 p-2 {{ $columnEmpty ? 'hidden sm:block' : '' }}">
                         @forelse ($board[$status->value] as $task)
                             <div
                                 x-on:mousedown.prevent="startDrag({{ $task->id }}, $event)"
@@ -456,7 +458,39 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
             </div>
         @endif
     @else
-        <div class="overflow-hidden rounded-lg border border-zinc-200 bg-white">
+        {{-- Phones: one card per task — the seven-column table can't fit. --}}
+        <div class="divide-y divide-zinc-100 overflow-hidden rounded-lg border border-zinc-200 bg-white sm:hidden">
+            @forelse ($tasks as $task)
+                <div class="flex gap-3 px-4 py-3 {{ $this->connectionAccentClass($task, auth()->user()) }}">
+                    <a href="{{ route('tasks.show', $task) }}" wire:navigate class="min-w-0 flex-1">
+                        <div class="flex items-center gap-1.5">
+                            <span class="shrink-0 rounded-full bg-violet-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-violet-700">{{ $task->task_key }}</span>
+                            <span class="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium {{ $task->status->pillClasses() }}">{{ $task->status->label() }}</span>
+                            @if ($task->isOverdue())
+                                <span class="shrink-0 rounded-full bg-red-50 px-1.5 py-0.5 text-[11px] font-medium text-red-600">Overdue</span>
+                            @endif
+                        </div>
+                        <p class="mt-1 truncate text-sm font-medium text-zinc-900">{{ $task->title }}</p>
+                        <p class="mt-0.5 truncate text-xs text-zinc-500">
+                            {{ $task->currentAssignment?->assignedTo?->name ?? 'Unassigned' }}
+                            · {{ $task->priority->label() }}
+                            @if ($task->deadline)
+                                · Due {{ $task->deadline->format('d M') }}
+                            @endif
+                        </p>
+                    </a>
+                    <button type="button" wire:click="toggleStar({{ $task->id }})" class="-mr-1 shrink-0 self-start p-1 {{ $task->starredBy->isNotEmpty() ? 'text-amber-400' : 'text-zinc-300 hover:text-amber-400' }}" title="Star">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5">
+                            <path d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z" />
+                        </svg>
+                    </button>
+                </div>
+            @empty
+                <p class="px-4 py-8 text-center text-sm text-zinc-500">No tasks here yet.</p>
+            @endforelse
+        </div>
+
+        <div class="hidden overflow-x-auto rounded-lg border border-zinc-200 bg-white sm:block">
             <table class="min-w-full divide-y divide-zinc-200">
                 <thead class="bg-zinc-50">
                     <tr>
@@ -479,19 +513,19 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                                     </svg>
                                 </button>
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="whitespace-nowrap px-4 py-3">
                                 <span class="inline-block rounded-full bg-violet-100 px-2 py-0.5 font-mono text-xs font-semibold text-violet-700">{{ $task->task_key }}</span>
                             </td>
                             <td class="px-4 py-3 text-sm font-medium text-zinc-900">{{ $task->title }}</td>
                             <td class="px-4 py-3 text-sm text-zinc-500">{{ $task->currentAssignment?->assignedTo?->name ?? '—' }}</td>
                             <td class="px-4 py-3 text-sm text-zinc-500">{{ $task->priority->label() }}</td>
-                            <td class="px-4 py-3 text-sm">
+                            <td class="whitespace-nowrap px-4 py-3 text-sm">
                                 <span class="rounded-full px-2 py-0.5 text-xs font-medium {{ $task->status->pillClasses() }}">{{ $task->status->label() }}</span>
                                 @if ($task->isOverdue())
                                     <span class="ml-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600">Overdue</span>
                                 @endif
                             </td>
-                            <td class="px-4 py-3 text-sm text-zinc-500">{{ $task->deadline?->format('d M Y') ?? '—' }}</td>
+                            <td class="whitespace-nowrap px-4 py-3 text-sm text-zinc-500">{{ $task->deadline?->format('d M Y') ?? '—' }}</td>
                         </tr>
                     @empty
                         <tr>

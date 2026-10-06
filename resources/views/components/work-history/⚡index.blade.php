@@ -224,7 +224,7 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
     <div class="flex items-center justify-between">
         <div>
             <h1 class="text-2xl font-semibold text-zinc-900">Work History</h1>
-            <p class="text-sm text-zinc-500">Everyone's daily time logs — as assignee, Reporter, or QA/Reviewer.</p>
+            <p class="hidden text-sm text-zinc-500 sm:block">Everyone's daily time logs — as assignee, Reporter, or QA/Reviewer.</p>
         </div>
     </div>
 
@@ -247,23 +247,24 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
     @endif
 
     <div class="flex flex-wrap items-end gap-3">
-        <div class="flex gap-2">
-            @foreach (['today' => 'Today', 'week' => 'This Week', 'month' => 'This Month', 'custom' => 'Custom Range'] as $key => $label)
+        <div class="inline-flex rounded-lg border border-zinc-300 bg-white p-0.5">
+            @foreach (['today' => ['Today', 'Today'], 'week' => ['Week', 'This Week'], 'month' => ['Month', 'This Month'], 'custom' => ['Custom', 'Custom Range']] as $key => [$short, $label])
                 <button
                     type="button"
                     wire:click="$set('range', '{{ $key }}')"
-                    class="rounded-lg border px-3 py-1.5 text-sm font-medium {{ $range === $key ? 'border-brand bg-brand text-white' : 'border-zinc-300 text-zinc-600 hover:bg-zinc-50' }}"
+                    class="whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium {{ $range === $key ? 'bg-brand text-white' : 'text-zinc-600 hover:bg-zinc-50' }}"
                 >
-                    {{ $label }}
+                    <span class="sm:hidden">{{ $short }}</span>
+                    <span class="hidden sm:inline">{{ $label }}</span>
                 </button>
             @endforeach
         </div>
 
         @if ($range === 'custom')
-            <div class="flex items-center gap-2">
-                <input wire:model.live="from" type="date" class="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+            <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+                <input wire:model.live="from" type="date" class="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
                 <span class="text-sm text-zinc-500">to</span>
-                <input wire:model.live="to" type="date" class="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                <input wire:model.live="to" type="date" class="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
             </div>
         @endif
 
@@ -303,26 +304,30 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
             <table class="min-w-full divide-y divide-zinc-200">
                 <thead class="bg-zinc-50">
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Last Logged</th>
+                        <th class="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 sm:table-cell">Last Logged</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Task</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Status</th>
+                        <th class="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 sm:table-cell">Status</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">Hours</th>
                     </tr>
                 </thead>
                 @forelse ($tasks as $task)
                     <tbody x-data="{ open: false }" class="divide-y divide-zinc-100">
                         <tr>
-                            <td class="px-4 py-3 text-sm text-zinc-500">{{ \Illuminate\Support\Carbon::parse($task->latest_log_date)->format('d M Y') }}</td>
+                            <td class="hidden whitespace-nowrap px-4 py-3 text-sm text-zinc-500 sm:table-cell">{{ \Illuminate\Support\Carbon::parse($task->latest_log_date)->format('d M Y') }}</td>
                             <td class="px-4 py-3 text-sm font-medium text-zinc-900">
                                 <a href="{{ route('tasks.show', $task) }}" wire:navigate class="hover:text-brand">
                                     <span class="mr-1 inline-block rounded-full bg-violet-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-violet-700">{{ $task->task_key }}</span>
                                     {{ $task->title }}
                                 </a>
+                                <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-normal text-zinc-500 sm:hidden">
+                                    <span class="whitespace-nowrap">{{ \Illuminate\Support\Carbon::parse($task->latest_log_date)->format('d M Y') }}</span>
+                                    <span class="inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 font-medium {{ $task->status->pillClasses() }}">{{ $task->status->label() }}</span>
+                                </div>
                             </td>
-                            <td class="px-4 py-3 text-sm">
-                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $task->status->pillClasses() }}">{{ $task->status->label() }}</span>
+                            <td class="hidden px-4 py-3 text-sm sm:table-cell">
+                                <span class="inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium {{ $task->status->pillClasses() }}">{{ $task->status->label() }}</span>
                             </td>
-                            <td class="px-4 py-3 text-sm text-zinc-500">
+                            <td class="whitespace-nowrap px-4 py-3 text-sm text-zinc-500">
                                 <button type="button" @click="open = ! open" class="flex items-center gap-1 hover:text-brand">
                                     {{ Duration::forHumans((float) $task->period_hours) }}
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5 text-zinc-400 transition-transform" :class="open ? 'rotate-180' : ''">

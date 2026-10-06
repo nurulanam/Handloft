@@ -146,15 +146,14 @@ new #[Layout('layouts.app')] #[Title('User')] class extends Component
 ?>
 
 <div>
-    <div class="mb-6 flex items-center justify-between">
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-            <h1 class="text-2xl font-semibold text-zinc-900">{{ $user ? 'Edit User' : 'Create User' }}</h1>
-            <p class="text-sm text-zinc-500">Admin-managed account — there is no public registration.</p>
+            <h1 class="text-xl font-semibold text-zinc-900 sm:text-2xl">{{ $user ? 'Edit User' : 'Create User' }}</h1>
         </div>
 
         <div class="flex items-center gap-3">
             <a href="{{ route('users.index') }}" wire:navigate class="text-sm font-medium text-zinc-600 hover:text-zinc-900">Cancel</a>
-            <button type="submit" form="user-form" class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90" wire:loading.attr="disabled">
+            <button type="submit" form="user-form" class="whitespace-nowrap rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90" wire:loading.attr="disabled">
                 {{ $user ? 'Save Changes' : 'Create User' }}
             </button>
         </div>
@@ -162,36 +161,34 @@ new #[Layout('layouts.app')] #[Title('User')] class extends Component
 
     <form id="user-form" wire:submit="save">
         {{-- Profile header --}}
-        <div class="rounded-lg border border-zinc-200 bg-white p-6">
-            <div class="flex flex-col items-center gap-3 sm:flex-row sm:items-center">
+        <div class="rounded-lg border border-zinc-200 bg-white p-4 sm:p-6">
+            <div class="flex items-center gap-4">
                 <div class="relative shrink-0">
                     @if ($photo)
-                        <img src="{{ $photo->temporaryUrl() }}" class="size-24 rounded-full object-cover">
+                        <img src="{{ $photo->temporaryUrl() }}" class="size-16 rounded-full object-cover sm:size-24">
                     @elseif ($user?->profile_photo)
-                        <img src="{{ Storage::url($user->profile_photo) }}" class="size-24 rounded-full object-cover">
+                        <img src="{{ Storage::url($user->profile_photo) }}" class="size-16 rounded-full object-cover sm:size-24">
                     @else
-                        <div class="flex size-24 items-center justify-center rounded-full bg-brand text-2xl font-semibold text-white">
+                        <div class="flex size-16 items-center justify-center rounded-full bg-brand text-xl font-semibold text-white sm:size-24 sm:text-2xl">
                             {{ Avatar::initials($name ?: 'New User') }}
                         </div>
                     @endif
 
                     <label class="absolute -bottom-1 -right-1 flex size-8 cursor-pointer items-center justify-center rounded-full border-2 border-white bg-zinc-900 text-white hover:bg-zinc-700" title="Change photo">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4">
-                            <path fill-rule="evenodd" d="M10 2a.75.75 0 01.75.75v.258a33.186 33.186 0 016.668.83.75.75 0 01-.336 1.461 31.28 31.28 0 00-1.103-.232l1.702 7.545a.75.75 0 01-.387.832A4.981 4.981 0 0115 14c-.825 0-1.606-.2-2.294-.556a.75.75 0 01-.387-.832l1.77-7.849a31.743 31.743 0 00-3.339-.254v11.505a20.01 20.01 0 013.78.501.75.75 0 11-.339 1.462A18.558 18.558 0 0010 17.5c-1.442 0-2.845.165-4.191.477a.75.75 0 01-.338-1.462 20.01 20.01 0 013.779-.501V4.509c-1.129.026-2.243.112-3.34.254l1.771 7.85a.75.75 0 01-.387.83A4.981 4.981 0 015 14a4.98 4.98 0 01-2.294-.556.75.75 0 01-.387-.832L4.02 5.067c-.37.07-.738.148-1.103.232a.75.75 0 01-.336-1.462 33.186 33.186 0 016.669-.829V2.75A.75.75 0 0110 2z" clip-rule="evenodd" />
-                        </svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg>
                         <input wire:model="photo" type="file" accept="image/*" class="sr-only">
                     </label>
                 </div>
 
-                <div class="text-center sm:text-left">
-                    <p class="text-lg font-semibold text-zinc-900">{{ $name ?: 'New User' }}</p>
+                <div class="min-w-0">
+                    <p class="truncate text-lg font-semibold text-zinc-900">{{ $name ?: 'New User' }}</p>
                     <p class="text-sm text-zinc-500">{{ $role ? \App\Enums\Role::from($role)->label() : 'No role selected yet' }}</p>
                     <span class="mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium {{ $status === 'active' ? 'bg-brand/10 text-brand' : 'bg-zinc-100 text-zinc-500' }}">
                         {{ ucfirst($status) }}
                     </span>
                 </div>
             </div>
-            @error('photo') <p class="mt-3 text-center text-sm text-red-600 sm:text-left">{{ $message }}</p> @enderror
+            @error('photo') <p class="mt-3 text-sm text-red-600">{{ $message }}</p> @enderror
         </div>
 
         <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -287,6 +284,11 @@ new #[Layout('layouts.app')] #[Title('User')] class extends Component
                     </select>
                 </div>
             </div>
+        </div>
+        {{-- Phones: the header actions scroll away on a long form, so repeat them where the form ends. --}}
+        <div class="mt-6 flex gap-3 sm:hidden">
+            <a href="{{ route('users.index') }}" wire:navigate class="flex-1 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-center text-sm font-medium text-zinc-700 hover:bg-zinc-50">Cancel</a>
+            <button type="submit" class="flex-1 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand/90" wire:loading.attr="disabled">{{ $user ? 'Save Changes' : 'Create User' }}</button>
         </div>
     </form>
 </div>

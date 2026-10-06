@@ -40,14 +40,14 @@ new #[Layout('layouts.app')] #[Title('Projects')] class extends Component
 ?>
 
 <div class="space-y-6">
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <h1 class="text-2xl font-semibold text-zinc-900">Projects</h1>
-            <p class="text-sm text-zinc-500">Group related tasks together and track overall progress.</p>
+            <p class="hidden text-sm text-zinc-500 sm:block">Group related tasks together and track overall progress.</p>
         </div>
 
         @if ($canCreate)
-            <a href="{{ route('projects.create') }}" wire:navigate class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90">
+            <a href="{{ route('projects.create') }}" wire:navigate class="shrink-0 whitespace-nowrap rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90">
                 New Project
             </a>
         @endif

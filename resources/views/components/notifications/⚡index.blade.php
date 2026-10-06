@@ -38,14 +38,14 @@ new #[Layout('layouts.app')] #[Title('Notifications')] class extends Component
 ?>
 
 <div class="space-y-6">
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
             <h1 class="text-2xl font-semibold text-zinc-900">Notifications</h1>
-            <p class="text-sm text-zinc-500">Updates on projects and tasks connected to you.</p>
+            <p class="hidden text-sm text-zinc-500 sm:block">Updates on projects and tasks connected to you.</p>
         </div>
 
         @if ($unreadCount > 0)
-            <button type="button" wire:click="markAllAsRead" class="text-sm font-medium text-brand hover:underline">Mark all as read</button>
+            <button type="button" wire:click="markAllAsRead" class="whitespace-nowrap text-sm font-medium text-brand hover:underline">Mark all as read</button>
         @endif
     </div>
 
@@ -58,15 +58,16 @@ new #[Layout('layouts.app')] #[Title('Notifications')] class extends Component
                         wire:click="openNotification('{{ $notification->id }}')"
                         class="flex w-full items-start gap-3 px-4 py-4 text-left hover:bg-zinc-50"
                     >
-                        @unless ($notification->read_at)
-                            <span class="mt-1.5 size-2 shrink-0 rounded-full bg-brand"></span>
-                        @else
-                            <span class="mt-1.5 size-2 shrink-0 rounded-full bg-transparent"></span>
-                        @endunless
+                        <span class="relative flex size-9 shrink-0 items-center justify-center rounded-full {{ $notification->read_at ? 'bg-zinc-100 text-zinc-400' : 'bg-brand/10 text-brand' }}">
+                            <x-nav-icon :name="isset($notification->data['task_id']) ? 'tasks' : 'projects'" class="size-4" />
+                            @unless ($notification->read_at)
+                                <span class="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-white bg-brand"></span>
+                            @endunless
+                        </span>
 
                         <div class="min-w-0 flex-1">
                             <p class="text-sm {{ $notification->read_at ? 'text-zinc-600' : 'font-medium text-zinc-900' }}">{{ $notification->data['message'] ?? '' }}</p>
-                            <p class="mt-0.5 text-xs text-zinc-400">{{ $notification->created_at->format('d M Y — h:i A') }}</p>
+                            <p class="mt-0.5 text-xs text-zinc-400" title="{{ $notification->created_at->format('d M Y — h:i A') }}">{{ $notification->created_at->diffForHumans() }}</p>
                         </div>
                     </button>
                 </li>

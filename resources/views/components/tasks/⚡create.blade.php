@@ -123,25 +123,27 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
 ?>
 
 <div>
-    <div class="mb-6 flex items-center justify-between">
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-            <h1 class="text-2xl font-semibold text-zinc-900">Create Task</h1>
-            <p class="text-sm text-zinc-500">Assign work to yourself or any team member.</p>
+            <h1 class="text-xl font-semibold text-zinc-900 sm:text-2xl">Create Task</h1>
         </div>
 
         <div class="flex items-center gap-3">
             <a href="{{ route('tasks.index') }}" wire:navigate class="text-sm font-medium text-zinc-600 hover:text-zinc-900">Cancel</a>
-            <button type="submit" form="create-task-form" class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90" wire:loading.attr="disabled">
+            <button type="submit" form="create-task-form" class="whitespace-nowrap rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90" wire:loading.attr="disabled">
                 Create Task
             </button>
         </div>
     </div>
 
     <form id="create-task-form" wire:submit="save">
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {{-- On phones both column wrappers are display:contents so Details (assignee, priority, dates)
+             can sit right under the description instead of after attachments and notes; from lg up the
+             wrappers are real columns again and the order classes are inert. --}}
+        <div class="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-6">
             {{-- Left: Title + Description --}}
-            <div class="space-y-4 lg:col-span-2">
-                <div>
+            <div class="contents lg:col-span-2 lg:block lg:space-y-4">
+                <div class="order-1">
                     <input
                         wire:model="title"
                         type="text"
@@ -151,18 +153,22 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
                     @error('title') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                 </div>
 
-                <div>
+                <div class="order-2">
                     <label class="block text-sm font-medium text-zinc-700">Description</label>
                     <div wire:ignore x-data="quillEditor(@js($description))" class="mt-1">
-                        <div x-ref="editor" class="min-h-64 rounded-b-lg border border-zinc-300 bg-white text-sm [&_.ql-toolbar]:rounded-t-lg [&_.ql-toolbar]:border-zinc-300"></div>
+                        <div x-ref="editor" class="min-h-40 rounded-b-lg border sm:min-h-64 border-zinc-300 bg-white text-sm [&_.ql-toolbar]:rounded-t-lg [&_.ql-toolbar]:border-zinc-300"></div>
                         <input type="hidden" x-ref="input" wire:model="description">
                     </div>
                     @error('description') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                 </div>
 
-                <div>
+                <div class="order-4">
                     <label class="block text-sm font-medium text-zinc-700">Attachments</label>
-                    <input wire:model="attachments" type="file" multiple class="mt-1 block w-full text-sm text-zinc-600 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm">
+                    <label class="mt-1 inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-600 hover:border-brand hover:text-brand">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/></svg>
+                        Add files
+                        <input wire:model="attachments" type="file" multiple class="sr-only">
+                    </label>
                     @error('attachments.*') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
 
                     @if (! empty($attachments))
@@ -185,7 +191,7 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
                     @endif
                 </div>
 
-                <div>
+                <div class="order-5">
                     <label class="block text-sm font-medium text-zinc-700">Notes</label>
                     <textarea wire:model="notes" rows="3" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40"></textarea>
                     @error('notes') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
@@ -193,15 +199,15 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
             </div>
 
             {{-- Right: Details --}}
-            <div class="space-y-4 lg:sticky lg:top-20 lg:self-start">
-                {{-- Status (fixed — new tasks always start Pending) --}}
-                <div>
+            <div class="contents lg:sticky lg:top-20 lg:block lg:space-y-4 lg:self-start">
+                {{-- Status (fixed — new tasks always start Pending); not worth the space on phones. --}}
+                <div class="hidden lg:block">
                     <span class="inline-flex items-center rounded-full bg-zinc-100 px-3 py-1.5 text-sm font-medium text-zinc-700">
                         Pending
                     </span>
                 </div>
 
-                <div class="rounded-lg border border-zinc-200 bg-white" x-data="{ open: true }">
+                <div class="order-3 rounded-lg border border-zinc-200 bg-white" x-data="{ open: true }">
                     <button type="button" @click="open = ! open" class="flex w-full items-center gap-1.5 px-4 py-3 text-left">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5 text-zinc-400 transition-transform" :class="open ? 'rotate-90' : ''">
                             <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
@@ -311,15 +317,11 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
                         <div class="flex items-center justify-between gap-3 py-2.5">
                             <span class="text-sm text-zinc-500">Due date</span>
 
-                            <div class="relative" x-data="{ open: false }">
-                                <button type="button" @click="open = ! open" class="text-sm {{ $deadline ? 'text-zinc-900' : 'text-zinc-400' }} hover:text-brand">
-                                    {{ $deadline ? \Illuminate\Support\Carbon::parse($deadline)->format('d M Y') : 'Add due date' }}
-                                </button>
-
-                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 rounded-lg border border-zinc-200 bg-white p-2 shadow-lg">
-                                    <input wire:model.live="deadline" type="date" class="block rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                                </div>
-                            </div>
+                            {{-- The native date input sits invisibly over the label, so one tap opens the device's own date picker. --}}
+                            <label class="group relative -my-1.5 cursor-pointer py-1.5">
+                                <span class="text-sm {{ $deadline ? 'text-zinc-900' : 'text-zinc-400' }} group-hover:text-brand">{{ $deadline ? \Illuminate\Support\Carbon::parse($deadline)->format('d M Y') : 'Add due date' }}</span>
+                                <input wire:model.live="deadline" type="date" class="absolute inset-0 h-full w-full cursor-pointer opacity-0" x-data @click="(() => { try { $el.showPicker() } catch (e) {} })()">
+                            </label>
                         </div>
                         @error('deadline') <p class="pb-2 text-xs text-red-600">{{ $message }}</p> @enderror
 
@@ -327,15 +329,11 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
                         <div class="flex items-center justify-between gap-3 py-2.5">
                             <span class="text-sm text-zinc-500">Start date</span>
 
-                            <div class="relative" x-data="{ open: false }">
-                                <button type="button" @click="open = ! open" class="text-sm {{ $start_date ? 'text-zinc-900' : 'text-zinc-400' }} hover:text-brand">
-                                    {{ $start_date ? \Illuminate\Support\Carbon::parse($start_date)->format('d M Y') : 'Add start date' }}
-                                </button>
-
-                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 rounded-lg border border-zinc-200 bg-white p-2 shadow-lg">
-                                    <input wire:model.live="start_date" type="date" class="block rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                                </div>
-                            </div>
+                            {{-- The native date input sits invisibly over the label, so one tap opens the device's own date picker. --}}
+                            <label class="group relative -my-1.5 cursor-pointer py-1.5">
+                                <span class="text-sm {{ $start_date ? 'text-zinc-900' : 'text-zinc-400' }} group-hover:text-brand">{{ $start_date ? \Illuminate\Support\Carbon::parse($start_date)->format('d M Y') : 'Add start date' }}</span>
+                                <input wire:model.live="start_date" type="date" class="absolute inset-0 h-full w-full cursor-pointer opacity-0" x-data @click="(() => { try { $el.showPicker() } catch (e) {} })()">
+                            </label>
                         </div>
 
                         {{-- Category --}}
@@ -376,6 +374,11 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
                     </div>
                 </div>
             </div>
+        </div>
+        {{-- Phones: the header actions scroll away on a long form, so repeat them where the form ends. --}}
+        <div class="mt-6 flex gap-3 sm:hidden">
+            <a href="{{ route('tasks.index') }}" wire:navigate class="flex-1 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-center text-sm font-medium text-zinc-700 hover:bg-zinc-50">Cancel</a>
+            <button type="submit" class="flex-1 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand/90" wire:loading.attr="disabled">Create Task</button>
         </div>
     </form>
 </div>

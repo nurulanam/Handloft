@@ -807,21 +807,39 @@
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5"><path fill-rule="evenodd" d="M2 4.75A.75.75 0 012.75 4h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 4.75zM2 10a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 10zm0 5.25a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75a.75.75 0 01-.75-.75z" clip-rule="evenodd" /></svg>
                     </button>
 
-                    <div class="flex flex-1 items-center justify-end gap-4">
+                    {{-- The sidebar (and its logo) is hidden below lg, so the brand lives here on smaller screens. --}}
+                    <a href="{{ route('dashboard') }}" wire:navigate class="ml-1 flex items-center gap-2 lg:hidden">
+                        <x-logo-mark class="size-7 shrink-0" />
+                        <span class="text-base font-semibold text-zinc-900">{{ config('app.name') }}</span>
+                    </a>
+
+                    <div class="flex flex-1 items-center justify-end gap-2 sm:gap-3">
                         <livewire:notifications.bell />
 
-                        <div class="flex items-center gap-3">
-                            <div class="text-right">
-                                <p class="text-sm font-medium text-zinc-900">{{ auth()->user()->name }}</p>
-                                <p class="text-xs text-zinc-500">{{ auth()->user()->getRoleNames()->first() ?? 'No role' }}</p>
-                            </div>
+                        @php $role = auth()->user()->getRoleNames()->first(); @endphp
+                        <div class="relative" x-data="{ open: false }">
+                            <button type="button" @click="open = ! open" class="flex items-center gap-2.5 rounded-full p-0.5 hover:bg-zinc-100 sm:rounded-lg sm:py-1 sm:pl-1 sm:pr-2" :aria-expanded="open">
+                                <span class="flex size-8 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white">{{ \App\Support\Avatar::initials(auth()->user()->name) }}</span>
+                                <span class="hidden text-left sm:block">
+                                    <span class="block text-sm font-medium leading-tight text-zinc-900">{{ auth()->user()->name }}</span>
+                                    <span class="block text-xs leading-tight text-zinc-500">{{ $role ? \Illuminate\Support\Str::headline($role) : 'No role' }}</span>
+                                </span>
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="hidden size-4 text-zinc-400 sm:block"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
+                            </button>
 
-                            <form method="POST" action="{{ route('logout') }}">
-                                @csrf
-                                <button type="submit" class="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50">
-                                    Log out
-                                </button>
-                            </form>
+                            <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-30 mt-2 w-56 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                                <div class="border-b border-zinc-100 px-3 py-2.5">
+                                    <p class="truncate text-sm font-medium text-zinc-900">{{ auth()->user()->name }}</p>
+                                    <p class="truncate text-xs text-zinc-500">{{ auth()->user()->email }}</p>
+                                </div>
+                                <form method="POST" action="{{ route('logout') }}">
+                                    @csrf
+                                    <button type="submit" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4 text-zinc-400"><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></svg>
+                                        Log out
+                                    </button>
+                                </form>
+                            </div>
                         </div>
                     </div>
                 </header>

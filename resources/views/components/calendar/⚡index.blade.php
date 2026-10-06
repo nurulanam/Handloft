@@ -237,24 +237,24 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
         </div>
 
         <div class="flex flex-wrap gap-2">
-            <div class="flex gap-2">
+            <div class="inline-flex rounded-lg border border-zinc-300 bg-white p-0.5">
                 @foreach (['created' => 'Created', 'deadline' => 'Deadline'] as $key => $label)
                     <button
                         type="button"
                         wire:click="setDateType('{{ $key }}')"
-                        class="rounded-lg border px-3 py-1.5 text-sm font-medium {{ $dateType === $key ? 'border-brand bg-brand text-white' : 'border-zinc-300 text-zinc-600 hover:bg-zinc-50' }}"
+                        class="rounded-md px-3 py-1 text-sm font-medium {{ $dateType === $key ? 'bg-brand text-white' : 'text-zinc-600 hover:bg-zinc-50' }}"
                     >
                         {{ $label }}
                     </button>
                 @endforeach
             </div>
 
-            <div class="flex gap-2">
+            <div class="inline-flex rounded-lg border border-zinc-300 bg-white p-0.5">
                 @foreach (['month' => 'Month', 'week' => 'Week', 'day' => 'Day'] as $key => $label)
                     <button
                         type="button"
                         wire:click="setView('{{ $key }}')"
-                        class="rounded-lg border px-3 py-1.5 text-sm font-medium {{ $view === $key ? 'border-brand bg-brand text-white' : 'border-zinc-300 text-zinc-600 hover:bg-zinc-50' }}"
+                        class="rounded-md px-3 py-1 text-sm font-medium {{ $view === $key ? 'bg-brand text-white' : 'text-zinc-600 hover:bg-zinc-50' }}"
                     >
                         {{ $label }}
                     </button>
@@ -319,7 +319,35 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
             @endforelse
         </div>
     @else
-        <div class="overflow-hidden rounded-lg border border-zinc-200 bg-white">
+        {{-- Phones: week view as a vertical agenda — seven 50px columns can't
+             fit readable items. Month view keeps the grid, with dots instead
+             of chips (below). --}}
+        @if ($view === 'week')
+            <div class="space-y-2 sm:hidden">
+                @foreach ($days as $day)
+                    @php $agendaEvents = $eventsByDate->get($day->toDateString(), collect()); @endphp
+                    <div class="rounded-lg border bg-white {{ $day->isToday() ? 'border-brand' : 'border-zinc-200' }}">
+                        <div class="flex items-center justify-between px-3 py-2 {{ $agendaEvents->isNotEmpty() ? 'border-b border-zinc-100' : '' }}">
+                            <span class="text-sm font-semibold {{ $day->isToday() ? 'text-brand' : 'text-zinc-900' }}">{{ $day->format('D, d M') }}</span>
+                            @if ($day->isToday())
+                                <span class="rounded-full bg-brand px-2 py-0.5 text-[10px] font-medium text-white">Today</span>
+                            @elseif ($agendaEvents->isEmpty())
+                                <span class="text-xs text-zinc-400">Nothing</span>
+                            @endif
+                        </div>
+                        @foreach ($agendaEvents as $event)
+                            <a href="{{ $event['url'] }}" wire:navigate class="flex items-center gap-2 px-3 py-2 hover:bg-zinc-50 {{ ! $loop->last ? 'border-b border-zinc-100' : '' }}">
+                                <span class="size-2 shrink-0 rounded-full {{ $event['type'] === 'project' ? 'bg-sky-400' : 'bg-violet-400' }}"></span>
+                                <span class="min-w-0 flex-1 truncate text-sm text-zinc-900">{{ $event['title'] }}</span>
+                                <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium {{ $event['classes'] }}">{{ $event['status_label'] }}</span>
+                            </a>
+                        @endforeach
+                    </div>
+                @endforeach
+            </div>
+        @endif
+
+        <div class="overflow-hidden rounded-lg border border-zinc-200 bg-white {{ $view === 'week' ? 'hidden sm:block' : '' }}">
             <div class="grid grid-cols-7 border-b border-zinc-200 bg-zinc-50">
                 @foreach (['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as $weekday)
                     <div class="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">{{ $weekday }}</div>
@@ -336,14 +364,25 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
                     @endphp
                     <div
                         wire:click="openDay('{{ $day->toDateString() }}')"
-                        class="min-h-28 cursor-pointer border-b border-r border-zinc-100 p-1.5 hover:bg-zinc-50 {{ $isCurrentMonth ? 'bg-white' : 'bg-zinc-50' }} {{ $isToday ? 'ring-2 ring-inset ring-brand' : '' }}"
+                        class="min-h-16 cursor-pointer border-b border-r border-zinc-100 p-1 hover:bg-zinc-50 sm:min-h-28 sm:p-1.5 {{ $isCurrentMonth ? 'bg-white' : 'bg-zinc-50' }} {{ $isToday ? 'ring-2 ring-inset ring-brand' : '' }}"
                         title="Show everything on {{ $day->format('d M Y') }}"
                     >
                         <span class="inline-flex size-6 items-center justify-center rounded-full text-xs font-medium {{ $isToday ? 'bg-brand text-white' : ($isCurrentMonth ? 'text-zinc-700' : 'text-zinc-300') }}">
                             {{ $day->format('j') }}
                         </span>
 
-                        <div class="mt-1 space-y-1">
+                        @if ($dayEventsForCell->isNotEmpty())
+                            <div class="mt-1 flex flex-wrap items-center gap-1 px-0.5 sm:hidden">
+                                @foreach ($dayEventsForCell->take(4) as $event)
+                                    <span class="size-1.5 rounded-full {{ $event['type'] === 'project' ? 'bg-sky-400' : 'bg-violet-400' }}"></span>
+                                @endforeach
+                                @if ($dayEventsForCell->count() > 4)
+                                    <span class="text-[9px] font-medium leading-none text-zinc-400">+{{ $dayEventsForCell->count() - 4 }}</span>
+                                @endif
+                            </div>
+                        @endif
+
+                        <div class="mt-1 hidden space-y-1 sm:block">
                             @foreach ($dayEventsForCell->take($visibleLimit) as $event)
                                 <a href="{{ $event['url'] }}" wire:navigate @click.stop class="block truncate rounded px-1.5 py-0.5 text-[11px] font-medium {{ $event['classes'] }}" title="{{ $event['icon_label'] }} — {{ $event['title'] }}">
                                     {{ $event['title'] }}
@@ -365,7 +404,8 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
     <div class="flex flex-wrap items-center gap-4 text-xs text-zinc-500">
         <span class="flex items-center gap-1.5"><span class="size-2.5 rounded-full bg-violet-400"></span> Task</span>
         <span class="flex items-center gap-1.5"><span class="size-2.5 rounded-full bg-sky-400"></span> Project</span>
-        <span>Colors reflect status — click any item to open it.</span>
+        <span class="sm:hidden">{{ $view === 'month' ? 'Tap a day to see everything on it.' : 'Tap an item to open it.' }}</span>
+        <span class="hidden sm:inline">Colors reflect status — click any item to open it.</span>
     </div>
 
     {{-- Day detail modal --}}

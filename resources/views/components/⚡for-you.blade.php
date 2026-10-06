@@ -85,7 +85,7 @@ new #[Layout('layouts.app')] #[Title('For You')] class extends Component
 <div class="space-y-6">
     <div>
         <h1 class="text-2xl font-semibold text-zinc-900">For You</h1>
-        <p class="text-sm text-zinc-500">Everything waiting on you right now, across every task you're connected to.</p>
+        <p class="hidden text-sm text-zinc-500 sm:block">Everything waiting on you right now.</p>
     </div>
 
     @if ($queueTruncated)
@@ -95,8 +95,22 @@ new #[Layout('layouts.app')] #[Title('For You')] class extends Component
         </div>
     @endif
 
+    @php
+        [$filledSections, $emptySections] = $sections->partition(fn ($section) => $section['tasks']->isNotEmpty());
+    @endphp
+
+    @if ($filledSections->isEmpty())
+        <div class="flex flex-col items-center rounded-lg border border-zinc-200 bg-white px-6 py-12 text-center">
+            <span class="flex size-12 items-center justify-center rounded-full bg-brand/10 text-brand">
+                <x-nav-icon name="tasks" class="size-6" />
+            </span>
+            <p class="mt-3 text-sm font-semibold text-zinc-900">You're all caught up</p>
+            <p class="mt-1 text-sm text-zinc-500">Nothing is waiting on you right now.</p>
+        </div>
+    @else
+    {{-- Only sections with work in them get a card; empty ones are summed up in one line below instead of each taking a card to say "nothing here". --}}
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        @foreach ($sections as $section)
+        @foreach ($filledSections as $section)
             <div class="flex flex-col rounded-lg border border-zinc-200 bg-white">
                 <div class="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
                     <span class="inline-flex items-center gap-2 text-sm font-semibold text-zinc-900">
@@ -105,9 +119,6 @@ new #[Layout('layouts.app')] #[Title('For You')] class extends Component
                     </span>
                 </div>
 
-                @if ($section['tasks']->isEmpty())
-                    <p class="px-4 py-6 text-center text-sm text-zinc-400">Nothing here right now.</p>
-                @else
                     <div class="divide-y divide-zinc-100">
                         @foreach ($section['visibleTasks'] as $task)
                             <div class="flex items-center gap-2 px-4 py-3 hover:bg-zinc-50">
@@ -144,8 +155,14 @@ new #[Layout('layouts.app')] #[Title('For You')] class extends Component
                             </button>
                         </div>
                     @endif
-                @endif
             </div>
         @endforeach
     </div>
+
+    @if ($emptySections->isNotEmpty())
+        <p class="text-sm text-zinc-400">
+            Nothing in {{ $emptySections->map(fn ($section) => $section['status']->label())->join(', ', ' or ') }} right now.
+        </p>
+    @endif
+    @endif
 </div>

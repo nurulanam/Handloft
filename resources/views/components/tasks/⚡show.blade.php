@@ -580,11 +580,14 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         <p class="mt-1 text-sm text-zinc-500">Created by {{ $task->creator->name }} on {{ $task->created_at->format('d M Y') }}</p>
     </div>
 
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+    {{-- On phones both column wrappers are display:contents, so every card becomes its own grid row and
+         the order-* classes put status and Details right under the title instead of after the whole
+         activity log. From lg up the wrappers are real columns again and the order classes are inert. --}}
+    <div class="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3">
         {{-- Main column --}}
-        <div class="space-y-6 lg:col-span-2">
+        <div class="contents lg:col-span-2 lg:block lg:space-y-6">
             {{-- Description --}}
-            <div class="rounded-lg border border-zinc-200 bg-white p-5" x-data="lazyQuillEditor(@js($task->description))">
+            <div class="order-3 rounded-lg border border-zinc-200 bg-white p-4 sm:p-5" x-data="lazyQuillEditor(@js($task->description))">
                 <div class="flex items-center justify-between">
                     <h2 class="text-sm font-semibold text-zinc-900">Description</h2>
                     @if ($canEditMeta)
@@ -641,7 +644,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
             </div>
 
             {{-- Attachments (task-level + comment attachments, combined) --}}
-            <div class="rounded-lg border border-zinc-200 bg-white p-5">
+            <div class="order-5 rounded-lg border border-zinc-200 bg-white p-4 sm:p-5">
                 <h2 class="mb-4 text-sm font-semibold text-zinc-900">Attachments ({{ $allAttachments->count() }})</h2>
 
                 @if ($allAttachments->isNotEmpty())
@@ -670,7 +673,11 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
 
                 @if ($canEditMeta)
                     <div class="mt-3 border-t border-zinc-100 pt-3">
-                        <input wire:model="newAttachments" type="file" multiple class="block w-full text-xs text-zinc-500 file:mr-2 file:rounded-md file:border-0 file:bg-zinc-100 file:px-2 file:py-1 file:text-xs">
+                        <label class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-zinc-300 px-3 py-1.5 text-sm text-zinc-600 hover:border-brand hover:text-brand">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/></svg>
+                            Add files
+                            <input wire:model="newAttachments" type="file" multiple class="sr-only">
+                        </label>
                         @error('newAttachments.*') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
 
                         @if (! empty($newAttachments))
@@ -696,7 +703,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
             </div>
 
             {{-- Comments --}}
-            <div class="rounded-lg border border-zinc-200 bg-white p-5">
+            <div class="order-6 rounded-lg border border-zinc-200 bg-white p-4 sm:p-5">
                 <h2 class="mb-4 text-sm font-semibold text-zinc-900">Comments</h2>
 
                 <div class="space-y-4">
@@ -761,7 +768,11 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                         @endif
 
                         <div class="mt-2 flex items-center justify-between gap-3">
-                            <input type="file" wire:model="commentAttachments" multiple class="text-xs text-zinc-500 file:mr-2 file:rounded-md file:border-0 file:bg-zinc-100 file:px-2 file:py-1 file:text-xs">
+                            <label class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/></svg>
+                                Attach
+                                <input type="file" wire:model="commentAttachments" multiple class="sr-only">
+                            </label>
                             <button type="button" wire:click="addComment" class="shrink-0 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90">Comment</button>
                         </div>
                         @error('commentAttachments.*') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
@@ -770,11 +781,17 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
             </div>
 
             {{-- Activity Timeline --}}
-            <div class="rounded-lg border border-zinc-200 bg-white p-5">
-                <h2 class="mb-4 text-sm font-semibold text-zinc-900">Activity Timeline</h2>
+            @php $hiddenEntries = max(0, $timeline->count() - 5); @endphp
+            <div class="order-8 rounded-lg border border-zinc-200 bg-white p-4 sm:p-5" x-data="{ all: false }">
+                <div class="mb-4 flex items-center justify-between">
+                    <h2 class="text-sm font-semibold text-zinc-900">Activity</h2>
+                    @if ($hiddenEntries > 0)
+                        <button type="button" @click="all = ! all" class="text-xs font-medium text-brand hover:underline" x-text="all ? 'Show recent only' : 'Show all {{ $timeline->count() }}'"></button>
+                    @endif
+                </div>
                 <ol class="space-y-4 border-l border-zinc-200 pl-4">
                     @foreach ($timeline as $entry)
-                        <li>
+                        <li @if ($loop->index < $hiddenEntries) x-show="all" x-cloak @endif>
                             <p class="text-sm text-zinc-900">{{ $entry->description }}</p>
                             <p class="text-xs text-zinc-500">{{ $entry->occurred_at->format('d M Y — h:i A') }}</p>
                         </li>
@@ -784,9 +801,9 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         </div>
 
         {{-- Sidebar --}}
-        <div class="space-y-4 lg:sticky lg:top-20 lg:self-start">
+        <div class="contents lg:sticky lg:top-20 lg:block lg:space-y-4 lg:self-start">
             {{-- Status dropdown menu --}}
-            <div class="relative inline-block" x-data="dropdownMenu()">
+            <div class="relative order-1 inline-block justify-self-start" x-data="dropdownMenu()">
                 <button
                     type="button"
                     @click="open = ! open"
@@ -813,7 +830,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
             </div>
 
             {{-- Details --}}
-            <div class="rounded-lg border border-zinc-200 bg-white" x-data="{ open: true }">
+            <div class="order-2 rounded-lg border border-zinc-200 bg-white" x-data="{ open: true }">
                 <button type="button" @click="open = ! open" class="flex w-full items-center gap-1.5 px-4 py-3 text-left">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5 text-zinc-400 transition-transform" :class="open ? 'rotate-90' : ''">
                         <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
@@ -1010,7 +1027,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                 </div>
             </div>
 
-            <div class="rounded-lg border border-zinc-200 bg-white p-4">
+            <div class="order-4 rounded-lg border border-zinc-200 bg-white p-4">
                 <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Subtasks</h3>
 
                 <div class="mt-2 space-y-2">
@@ -1052,7 +1069,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                 @endif
             </div>
 
-            <div class="rounded-lg border border-zinc-200 bg-white p-4">
+            <div class="order-7 rounded-lg border border-zinc-200 bg-white p-4">
                 <div class="flex items-center justify-between">
                     <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Time Logs</h3>
                     <span class="text-sm font-semibold text-brand">{{ Duration::forHumans((float) $totalLoggedHours) }}</span>
@@ -1062,10 +1079,10 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                     @forelse ($timeLogs as $log)
                         <div class="flex items-center justify-between gap-2 rounded-md border border-zinc-100 px-2 py-1.5 text-sm">
                             <div class="min-w-0">
-                                <div class="flex items-center gap-1.5">
-                                    <span class="font-medium text-zinc-900">{{ $log->logged_date->format('d M Y') }}</span>
+                                <div class="flex min-w-0 items-center gap-1.5">
+                                    <span class="shrink-0 whitespace-nowrap font-medium text-zinc-900">{{ $log->logged_date->format('d M') }}</span>
                                     <span class="text-zinc-400">·</span>
-                                    <span class="text-zinc-600">{{ $log->user->name }}</span>
+                                    <span class="truncate text-zinc-600">{{ $log->user->name }}</span>
                                 </div>
                                 @if ($log->note)
                                     <p class="truncate text-xs text-zinc-500">{{ $log->note }}</p>

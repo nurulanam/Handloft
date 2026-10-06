@@ -230,12 +230,11 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
 <div class="max-w-4xl space-y-6">
     <div>
         <h1 class="text-2xl font-semibold text-zinc-900">Settings</h1>
-        <p class="text-sm text-zinc-500">App-wide preferences.</p>
     </div>
 
     <div class="flex flex-col gap-6 lg:flex-row">
         {{-- Sub-sidebar --}}
-        <nav class="flex shrink-0 gap-1 overflow-x-auto lg:w-48 lg:flex-col lg:overflow-visible">
+        <nav class="grid shrink-0 grid-cols-3 gap-1 rounded-lg border border-zinc-200 bg-white p-1 lg:flex lg:w-48 lg:flex-col lg:border-0 lg:bg-transparent lg:p-0">
             @foreach ([
                 'loading-screen' => 'Loading Screen',
                 'smtp' => 'Email / SMTP',
@@ -244,7 +243,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                 <button
                     type="button"
                     wire:click="$set('tab', '{{ $key }}')"
-                    class="shrink-0 rounded-lg px-3 py-2 text-left text-sm font-medium {{ $tab === $key ? 'bg-brand/10 text-brand' : 'text-zinc-600 hover:bg-zinc-100' }}"
+                    class="rounded-md px-2 py-2 text-center text-xs font-medium leading-tight sm:text-sm lg:rounded-lg lg:px-3 lg:text-left {{ $tab === $key ? 'bg-brand/10 text-brand' : 'text-zinc-600 hover:bg-zinc-100' }}"
                 >
                     {{ $label }}
                 </button>
@@ -260,7 +259,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                     <div class="flex items-center justify-between gap-4 py-3">
                         <div>
                             <p class="text-sm font-medium text-zinc-900">Show loading screen after login</p>
-                            <p class="text-xs text-zinc-500">Briefly shows a branded loading overlay over the dashboard right after signing in.</p>
+                            <p class="text-xs text-zinc-500">A branded overlay shown right after signing in.</p>
                         </div>
 
                         <label class="relative inline-flex shrink-0 cursor-pointer items-center">
@@ -293,7 +292,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                             <label for="loading_screen_opacity" class="text-sm font-medium text-zinc-900">Overlay transparency</label>
                             <span class="text-sm font-semibold text-brand">{{ $loading_screen_opacity }}%</span>
                         </div>
-                        <p class="text-xs text-zinc-500">How strong the white glass tint is — lower is more see-through.</p>
+                        <p class="text-xs text-zinc-500">Lower is more see-through.</p>
                         <input
                             wire:model.live="loading_screen_opacity"
                             id="loading_screen_opacity"
@@ -312,7 +311,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                             <label for="loading_screen_blur" class="text-sm font-medium text-zinc-900">Overlay blur</label>
                             <span class="text-sm font-semibold text-brand">{{ $loading_screen_blur }}px</span>
                         </div>
-                        <p class="text-xs text-zinc-500">How blurred the dashboard looks behind the glass.</p>
+                        <p class="text-xs text-zinc-500">Blur behind the overlay.</p>
                         <input
                             wire:model.live="loading_screen_blur"
                             id="loading_screen_blur"
@@ -328,7 +327,6 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
 
                     <div class="border-t border-zinc-100 py-3" :class="! $wire.show_loading_screen ? 'opacity-40' : ''" x-data>
                         <p class="text-sm font-medium text-zinc-900">Animation</p>
-                        <p class="text-xs text-zinc-500">Which loading animation plays inside the overlay.</p>
 
                         <div class="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
                             @foreach (['jampe' => 'Jumping Boxes', 'bars' => 'Equalizer Bars', 'hand' => 'Typing Hand', 'spinner' => 'Classic Spinner'] as $key => $label)
@@ -420,7 +418,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                 <div class="space-y-4">
                     <form wire:submit="saveSmtp" class="space-y-4 rounded-lg border border-zinc-200 bg-white p-5">
                         <h2 class="text-sm font-semibold uppercase tracking-wide text-zinc-500">Email / SMTP</h2>
-                        <p class="-mt-2 text-xs text-zinc-500">Overrides the server's default mail configuration. Leave blank to keep using the default.</p>
+                        <p class="-mt-2 text-xs text-zinc-500">Leave blank to use the server's default.</p>
 
                         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div class="sm:col-span-2">
@@ -478,7 +476,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
 
                     <div class="rounded-lg border border-zinc-200 bg-white p-5">
                         <h2 class="text-sm font-semibold uppercase tracking-wide text-zinc-500">Live Test</h2>
-                        <p class="mt-1 text-xs text-zinc-500">Sends a real email using the settings above — saved or not — so you can verify them before committing.</p>
+                        <p class="mt-1 text-xs text-zinc-500">Sends a real email with the settings above, saved or not.</p>
 
                         <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
                             <div class="flex-1">
@@ -498,12 +496,12 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                 <div class="space-y-4">
                     <form wire:submit="saveMailTemplate" class="space-y-4 rounded-lg border border-zinc-200 bg-white p-5">
                         <h2 class="text-sm font-semibold uppercase tracking-wide text-zinc-500">Email Template</h2>
-                        <p class="-mt-2 text-xs text-zinc-500">Every notification email (task assignments, QA, project coordination, etc.) shares this one template — change its colors and footer note here instead of editing code.</p>
+                        <p class="-mt-2 text-xs text-zinc-500">Shared by every notification email.</p>
 
                         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div>
                                 <label for="mail_brand_color" class="block text-sm font-medium text-zinc-700">Brand Color</label>
-                                <p class="text-xs text-zinc-500">Used for the header link and the button background.</p>
+                                <p class="text-xs text-zinc-500">Header link and button background.</p>
                                 <div class="mt-1 flex items-center gap-2">
                                     <input wire:model.live="mail_brand_color" type="color" class="h-9 w-12 shrink-0 cursor-pointer rounded border border-zinc-300 bg-white p-1">
                                     <input wire:model.live="mail_brand_color" type="text" maxlength="7" class="block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
@@ -513,7 +511,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
 
                             <div>
                                 <label for="mail_button_text_color" class="block text-sm font-medium text-zinc-700">Button Text Color</label>
-                                <p class="text-xs text-zinc-500">The label color drawn on top of the button background.</p>
+                                <p class="text-xs text-zinc-500">Text on the button.</p>
                                 <div class="mt-1 flex items-center gap-2">
                                     <input wire:model.live="mail_button_text_color" type="color" class="h-9 w-12 shrink-0 cursor-pointer rounded border border-zinc-300 bg-white p-1">
                                     <input wire:model.live="mail_button_text_color" type="text" maxlength="7" class="block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
@@ -524,7 +522,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                             <div class="sm:col-span-2">
                                 <label for="mail_footer_note" class="block text-sm font-medium text-zinc-700">Footer Note (optional)</label>
                                 <input wire:model.live="mail_footer_note" id="mail_footer_note" type="text" maxlength="255" placeholder="e.g. Questions? Reply to this email or reach us at support@example.com" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                                <p class="mt-1 text-xs text-zinc-500">Shown above the copyright line at the bottom of every email.</p>
+                                <p class="mt-1 text-xs text-zinc-500">Shown above the copyright line.</p>
                                 @error('mail_footer_note') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
                             </div>
                         </div>
@@ -561,7 +559,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
 
                     <div class="rounded-lg border border-zinc-200 bg-white p-5">
                         <h2 class="text-sm font-semibold uppercase tracking-wide text-zinc-500">Send a Real Preview</h2>
-                        <p class="mt-1 text-xs text-zinc-500">Saves the colors above, then sends a real sample notification email so you can see exactly how it renders in an actual inbox.</p>
+                        <p class="mt-1 text-xs text-zinc-500">Saves the colors above, then emails you a real sample.</p>
 
                         <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
                             <div class="flex-1">
