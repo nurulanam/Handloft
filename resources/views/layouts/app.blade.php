@@ -171,6 +171,54 @@
                 20% { transform: scaleY(1); }
             }
 
+            /* Mobile shortcut bar: the same curved-notch trick as
+               .sidebar-notch, but the bite sits on the bar's top edge and
+               slides. --notch-x (set by Alpine to the active item's center,
+               in px) drives both the bite and the floating circle above it.
+               Bite: r=30 around a 24px-radius circle (6px gap ring), with
+               r=10 fillets where it meets the edge. preserveAspectRatio=none
+               lets the bite flatten to nothing (mask height 0) when no
+               shortcut page is active, so it closes smoothly instead of
+               popping. Only the background layer is masked — a mask clips
+               every descendant, and the circle and risen icon sit above the
+               bar's edge. These rules are only the resting state: the motion
+               between states is run from Alpine with the Web Animations API,
+               because wire:navigate moves the persisted bar to the new page
+               mid-tap, which cancels CSS transitions but not script ones. */
+            .notch-bar {
+                --notch: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 32' preserveAspectRatio='none'%3E%3Cpath d='M1.27 0A10 10 0 0 1 10.95 7.5A30 30 0 0 0 69.05 7.5A10 10 0 0 1 78.73 0Z' fill='black'/%3E%3C/svg%3E");
+                mask-image: linear-gradient(#000 0 0), var(--notch);
+                mask-size: 100% 100%, 80px 0;
+                mask-position: 0 0, calc(var(--notch-x) - 40px) 0;
+                mask-repeat: no-repeat;
+                mask-composite: exclude;
+                -webkit-mask-image: linear-gradient(#000 0 0), var(--notch);
+                -webkit-mask-size: 100% 100%, 80px 0;
+                -webkit-mask-position: 0 0, calc(var(--notch-x) - 40px) 0;
+                -webkit-mask-repeat: no-repeat;
+                -webkit-mask-composite: xor;
+            }
+
+            .notch-open .notch-bar {
+                mask-size: 100% 100%, 80px 32px;
+                -webkit-mask-size: 100% 100%, 80px 32px;
+            }
+
+            /* Resting position in `translate` and size in `scale`; the slide
+               animates `transform` on top. CSS applies these as translate,
+               then scale, then transform — so the circle scales in place and
+               the slide offset rides along without fighting either. */
+            .notch-circle {
+                translate: calc(var(--notch-x) - 24px) -24px;
+                scale: 0;
+            }
+
+            .notch-open .notch-circle {
+                scale: 1;
+            }
+        </style>
+
+        <style>
             /* Post-login loading animation: a cartoon hand with four fingers
                and a thumb "typing", each lifting and curling in sequence.
                Adapted from https://sm-amzad-hossain.github.io/Hand-Animation/,
@@ -467,40 +515,26 @@
 
                 <nav class="space-y-1 px-3 pb-8">
                     @php
-                        $icons = [
-                            'dashboard' => 'M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z',
-                            'for-you' => 'M10.75 2a2.25 2.25 0 00-2.236 2H6.75A2.75 2.75 0 004 6.75v10.5A2.75 2.75 0 006.75 20h6.5A2.75 2.75 0 0016 17.25V6.75A2.75 2.75 0 0013.25 4h-1.764A2.25 2.25 0 0010.75 2zM6.5 10a.75.75 0 000 1.5h5a.75.75 0 000-1.5h-5zm0 3a.75.75 0 000 1.5h3a.75.75 0 000-1.5h-3z',
-                            'star' => 'M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z',
-                            'users' => 'M7 8a3 3 0 100-6 3 3 0 000 6zM14.5 9a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM1.615 16.428a1.224 1.224 0 01-.569-1.175 6.002 6.002 0 0111.908 0c.058.467-.172.92-.57 1.174A9.953 9.953 0 017 18a9.953 9.953 0 01-5.385-1.572zM14.5 16h-.106c.07-.297.088-.611.048-.933a7.47 7.47 0 00-1.588-3.755 4.502 4.502 0 015.874 2.636.818.818 0 01-.36.98A7.465 7.465 0 0114.5 16z',
-                            'folder' => 'M2 6a2 2 0 012-2h4.586a1 1 0 01.707.293l1.414 1.414a1 1 0 00.707.293H16a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z',
-                            'clipboard' => 'M10.75 2a2.25 2.25 0 00-2.236 2H6.75A2.75 2.75 0 004 6.75v10.5A2.75 2.75 0 006.75 20h6.5A2.75 2.75 0 0016 17.25V6.75A2.75 2.75 0 0013.25 4h-1.764A2.25 2.25 0 0010.75 2zM8.5 12.75a.75.75 0 000 1.5h3a.75.75 0 000-1.5h-3zm-2.5.75a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm.75-3.75a.75.75 0 100-1.5.75.75 0 000 1.5zm2.5 0a.75.75 0 000-1.5h3a.75.75 0 000 1.5h-3z',
-                            'clock' => 'M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z',
-                            'calendar' => 'M5.75 2a.75.75 0 01.75.75V4h7V2.75a.75.75 0 011.5 0V4h.25A2.75 2.75 0 0118 6.75v8.5A2.75 2.75 0 0115.25 18H4.75A2.75 2.75 0 012 15.25v-8.5A2.75 2.75 0 014.75 4H5V2.75A.75.75 0 015.75 2zM3.5 8.5v6.75c0 .69.56 1.25 1.25 1.25h10.5c.69 0 1.25-.56 1.25-1.25V8.5h-13z',
-                            'chart' => 'M15.5 2A1.5 1.5 0 0014 3.5v13a1.5 1.5 0 001.5 1.5h1a1.5 1.5 0 001.5-1.5v-13A1.5 1.5 0 0016.5 2h-1zM9.5 6A1.5 1.5 0 008 7.5v9A1.5 1.5 0 009.5 18h1a1.5 1.5 0 001.5-1.5v-9A1.5 1.5 0 0010.5 6h-1zM3.5 10A1.5 1.5 0 002 11.5v5A1.5 1.5 0 003.5 18h1A1.5 1.5 0 006 16.5v-5A1.5 1.5 0 004.5 10h-1z',
-                            'bell' => 'M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM8.5 16a1.5 1.5 0 003 0h-3z',
-                            'cog' => 'M11.078 2.25c-.917-1.5-3.239-1.5-4.156 0l-.114.185c-.494.804-1.454 1.201-2.373.98a2.638 2.638 0 00-3.223 3.222c.22.919-.177 1.88-.98 2.374l-.185.113c-1.5.917-1.5 3.24 0 4.156l.185.114c.803.494 1.2 1.454.98 2.373a2.638 2.638 0 003.222 3.223c.919-.22 1.88.177 2.374.98l.113.185c.917 1.5 3.24 1.5 4.156 0l.114-.185c.494-.803 1.454-1.2 2.373-.98a2.638 2.638 0 003.223-3.222c-.22-.919.177-1.88.98-2.374l.185-.113c1.5-.917 1.5-3.24 0-4.156l-.185-.114c-.803-.494-1.2-1.454-.98-2.373a2.638 2.638 0 00-3.222-3.223c-.919.22-1.88-.177-2.374-.98l-.113-.185zM10 13a3 3 0 100-6 3 3 0 000 6z',
-                        ];
-
                         $chevron = 'M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z';
 
                         $navigation = [
-                            ['label' => 'Dashboard', 'route' => 'dashboard', 'icon' => $icons['dashboard']],
-                            ['label' => 'For You', 'route' => 'for-you', 'icon' => $icons['for-you']],
-                            ['label' => 'Starred', 'route' => 'starred', 'icon' => $icons['star']],
-                            ['label' => 'Team', 'route' => 'users.index', 'icon' => $icons['users'], 'hidden' => auth()->user()->cannot('manage-users')],
-                            ['label' => 'Projects', 'icon' => $icons['folder'], 'children' => [
+                            ['label' => 'Dashboard', 'route' => 'dashboard', 'icon' => 'dashboard'],
+                            ['label' => 'For You', 'route' => 'for-you', 'icon' => 'for-you'],
+                            ['label' => 'Starred', 'route' => 'starred', 'icon' => 'starred'],
+                            ['label' => 'Team', 'route' => 'users.index', 'icon' => 'team', 'hidden' => auth()->user()->cannot('manage-users')],
+                            ['label' => 'Projects', 'icon' => 'projects', 'children' => [
                                 ['label' => 'All Projects', 'route' => 'projects.index'],
                                 ['label' => 'Create Project', 'route' => 'projects.create', 'hidden' => auth()->user()->cannot('create', \App\Models\Project::class)],
                             ]],
-                            ['label' => 'Tasks', 'icon' => $icons['clipboard'], 'children' => [
+                            ['label' => 'Tasks', 'icon' => 'tasks', 'children' => [
                                 ['label' => 'All Tasks', 'route' => 'tasks.index'],
                                 ['label' => 'Create Task', 'route' => 'tasks.create'],
                             ]],
-                            ['label' => 'Work History', 'route' => 'work-history.index', 'icon' => $icons['clock']],
-                            ['label' => 'Calendar', 'route' => 'calendar.index', 'icon' => $icons['calendar']],
-                            ['label' => 'Reports', 'icon' => $icons['chart'], 'disabled' => true],
-                            ['label' => 'Notifications', 'route' => 'notifications.index', 'icon' => $icons['bell']],
-                            ['label' => 'Settings', 'route' => 'settings', 'icon' => $icons['cog'], 'hidden' => auth()->user()->cannot('manage-settings')],
+                            ['label' => 'Work History', 'route' => 'work-history.index', 'icon' => 'work-history'],
+                            ['label' => 'Calendar', 'route' => 'calendar.index', 'icon' => 'calendar'],
+                            ['label' => 'Reports', 'icon' => 'reports', 'disabled' => true],
+                            ['label' => 'Notifications', 'route' => 'notifications.index', 'icon' => 'notifications'],
+                            ['label' => 'Settings', 'route' => 'settings', 'icon' => 'settings', 'hidden' => auth()->user()->cannot('manage-settings')],
                         ];
                     @endphp
 
@@ -526,7 +560,7 @@
                                     class="flex w-full items-center gap-2.5 overflow-hidden rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors duration-200 ease-in-out {{ $childActive ? 'bg-brand text-white' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' }}"
                                     :class="sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''"
                                 >
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4.5 shrink-0"><path fill-rule="evenodd" d="{{ $item['icon'] }}" clip-rule="evenodd" /></svg>
+                                    <x-nav-icon :name="$item['icon']" class="size-4.5 shrink-0" />
                                     <span class="flex-1 whitespace-nowrap text-left transition-all duration-200" :class="sidebarCollapsed ? 'lg:hidden' : ''">{{ $item['label'] }}</span>
                                     <svg
                                         xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
@@ -567,7 +601,7 @@
                                 @mouseleave="flyout.show = false"
                             >
                                 <span class="flex items-center gap-2.5 overflow-hidden">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4.5 shrink-0"><path fill-rule="evenodd" d="{{ $item['icon'] }}" clip-rule="evenodd" /></svg>
+                                    <x-nav-icon :name="$item['icon']" class="size-4.5 shrink-0" />
                                     <span class="whitespace-nowrap transition-all duration-200" :class="sidebarCollapsed ? 'lg:hidden' : ''">{{ $item['label'] }}</span>
                                 </span>
                                 <span class="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] uppercase tracking-wide" :class="sidebarCollapsed ? 'lg:hidden' : ''">Soon</span>
@@ -581,7 +615,7 @@
                                 class="flex items-center gap-2.5 overflow-hidden rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200 ease-in-out {{ request()->routeIs($item['route'], \Illuminate\Support\Str::before($item['route'], '.').'.*') ? 'bg-brand text-white' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' }}"
                                 :class="sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''"
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4.5 shrink-0"><path fill-rule="evenodd" d="{{ $item['icon'] }}" clip-rule="evenodd" /></svg>
+                                <x-nav-icon :name="$item['icon']" class="size-4.5 shrink-0" />
                                 <span class="whitespace-nowrap transition-all duration-200" :class="sidebarCollapsed ? 'lg:hidden' : ''">{{ $item['label'] }}</span>
                             </a>
                         @endif
@@ -630,6 +664,130 @@
                 </div>
             </div>
 
+            {{-- Mobile shortcut bar. The active icon rises into a floating
+                 circle with a curved notch under it (see .notch-bar); tapping
+                 another icon slides the notch and circle over and swaps which
+                 icon is raised. State lives in Alpine and is matched against
+                 the URL, so the bar is persisted across wire:navigate — the
+                 slide finishes instead of the bar being redrawn mid-move.
+                 Placed before the drawer overlay (same z-index) so an open
+                 drawer dims it like the rest of the page. --}}
+            {{-- Shortcuts are the pages people reach for on a phone: home,
+                 what's waiting on them, all tasks, and the short list they're
+                 tracking. Calendar stays in the drawer — its month grid doesn't
+                 fit a phone, and it's an occasional glance, not a daily one. --}}
+            @php
+                $mobileNav = collect([
+                    ['label' => 'Dashboard', 'route' => 'dashboard', 'icon' => 'dashboard'],
+                    ['label' => 'For You', 'route' => 'for-you', 'icon' => 'for-you'],
+                    ['label' => 'Tasks', 'route' => 'tasks.index', 'icon' => 'tasks'],
+                    ['label' => 'Starred', 'route' => 'starred', 'icon' => 'starred'],
+                ])->map(fn ($item) => $item + ['path' => parse_url(route($item['route']), PHP_URL_PATH)]);
+            @endphp
+            @persist('mobile-shortcuts')
+                <nav
+                    x-data="{
+                        paths: @js($mobileNav->pluck('path')),
+                        active: -1,
+                        x: -100,
+                        matchIndex() {
+                            const path = location.pathname;
+                            return this.paths.findIndex(p => path === p || path.startsWith(p + '/'));
+                        },
+                        centerOf(index) {
+                            const item = this.$refs.items.children[index];
+                            return item.offsetLeft + item.offsetWidth / 2;
+                        },
+                        {{-- Where the circle is on screen right now, including any slide in flight, so a tap mid-animation continues from there instead of jumping. --}}
+                        currentX() {
+                            if (this.active < 0) return this.x;
+                            const circle = this.$refs.circle.getBoundingClientRect();
+                            return circle.left - this.$root.getBoundingClientRect().left + circle.width / 2;
+                        },
+                        {{-- Animations start before the state changes, in the same task, so the browser never paints a frame of the new resting state before the motion begins (that flash was a visible jitter on tap). --}}
+                        go(index) {
+                            if (index === this.active) return;
+                            const prev = this.active;
+                            const fromX = this.currentX();
+                            const toX = index >= 0 ? this.centerOf(index) : this.x;
+                            this.animate(prev, index, fromX, toX);
+                            this.active = index;
+                            this.x = toX;
+                        },
+                        animate(prev, next, fromX, toX) {
+                            const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+                            const move = { duration: reduce ? 0 : 450, easing: 'cubic-bezier(0.65, 0, 0.35, 1)' };
+                            const pop = { ...move, easing: 'cubic-bezier(0.34, 1.45, 0.64, 1)' };
+                            const { bar, circle } = this.$refs;
+                            const icons = this.$refs.items.querySelectorAll('svg');
+                            const labels = this.$refs.items.querySelectorAll('[data-label]');
+                            const maskAt = (x) => ({ maskPosition: `0 0, ${x - 40}px 0`, webkitMaskPosition: `0 0, ${x - 40}px 0` });
+                            const maskDepth = (h) => ({ maskSize: `100% 100%, 80px ${h}px`, webkitMaskSize: `100% 100%, 80px ${h}px` });
+
+                            [bar, circle, ...icons, ...labels].forEach(el => el.getAnimations().forEach(a => a.cancel()));
+
+                            if (prev >= 0 && next >= 0) {
+                                circle.animate([{ transform: `translateX(${fromX - toX}px)` }, { transform: 'none' }], move);
+                                bar.animate([maskAt(fromX), maskAt(toX)], move);
+                            } else if (next >= 0) {
+                                circle.animate([{ scale: 0 }, { scale: 1 }], pop);
+                                bar.animate([maskDepth(0), maskDepth(32)], move);
+                            } else if (prev >= 0) {
+                                circle.animate([{ scale: 1 }, { scale: 0 }], move);
+                                bar.animate([maskDepth(32), maskDepth(0)], move);
+                            }
+
+                            if (prev >= 0) {
+                                icons[prev].animate([{ translate: '0 -2rem' }, { translate: '0 0' }], move);
+                                labels[prev].animate([{ opacity: 1 }, { opacity: 0 }], { ...move, duration: move.duration / 3 });
+                            }
+                            if (next >= 0) {
+                                {{-- The icon waits for the circle to arrive, then pops up into it; rising at once would leave it floating above the bar on its own. --}}
+                                icons[next].animate([{ translate: '0 0' }, { translate: '0 -2rem' }], { ...pop, duration: move.duration * 0.65, delay: move.duration * 0.5, fill: 'backwards' });
+                                labels[next].animate([{ opacity: 0, translate: '0 4px' }, { opacity: 1, translate: '0 0' }], { ...move, duration: move.duration * 0.5, delay: move.duration * 0.6, fill: 'backwards' });
+                            }
+                        },
+                    }"
+                    x-init="
+                        active = matchIndex();
+                        if (active >= 0) x = centerOf(active);
+                        document.addEventListener('livewire:navigated', () => go(matchIndex()));
+                    "
+                    @resize.window="if (active >= 0) x = centerOf(active)"
+                    :class="{ 'notch-open': active >= 0 }"
+                    :style="{ '--notch-x': x + 'px' }"
+                    class="fixed inset-x-0 bottom-0 z-20 lg:hidden"
+                    style="--notch-x: -100px; height: calc(4rem + env(safe-area-inset-bottom));"
+                    aria-label="Shortcuts"
+                >
+                    <div x-ref="bar" class="notch-bar absolute inset-0 bg-zinc-900"></div>
+                    <div x-ref="circle" class="notch-circle absolute left-0 top-0 size-12 rounded-full bg-brand shadow-lg shadow-brand/30"></div>
+
+                    <div x-ref="items" class="relative flex h-16">
+                        @foreach ($mobileNav as $index => $item)
+                            <a
+                                href="{{ route($item['route']) }}"
+                                wire:navigate
+                                @click="go({{ $index }})"
+                                class="relative flex flex-1 items-center justify-center"
+                                :aria-current="active === {{ $index }} ? 'page' : null"
+                            >
+                                <x-nav-icon
+                                    :name="$item['icon']"
+                                    class="size-6 transition-colors duration-300"
+                                    x-bind:class="active === {{ $index }} ? '-translate-y-8 text-white' : 'text-zinc-400'"
+                                />
+                                <span
+                                    data-label
+                                    class="absolute bottom-1.5 text-[11px] font-medium text-brand-lime"
+                                    :class="active === {{ $index }} ? 'opacity-100' : 'opacity-0'"
+                                >{{ $item['label'] }}</span>
+                            </a>
+                        @endforeach
+                    </div>
+                </nav>
+            @endpersist
+
             <div
                 x-show="sidebarOpen"
                 x-cloak
@@ -638,7 +796,7 @@
             ></div>
 
             {{-- Main column --}}
-            <div class="flex flex-1 flex-col" :class="sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'">
+            <div class="flex min-w-0 flex-1 flex-col" :class="sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'">
                 <header class="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-zinc-200 bg-white px-4 sm:px-6">
                     <button
                         type="button"
@@ -646,7 +804,7 @@
                         @click="sidebarOpen = ! sidebarOpen"
                     >
                         <span class="sr-only">Toggle sidebar</span>
-                        &#9776;
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5"><path fill-rule="evenodd" d="M2 4.75A.75.75 0 012.75 4h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 4.75zM2 10a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 10zm0 5.25a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75a.75.75 0 01-.75-.75z" clip-rule="evenodd" /></svg>
                     </button>
 
                     <div class="flex flex-1 items-center justify-end gap-4">
@@ -668,7 +826,7 @@
                     </div>
                 </header>
 
-                <main class="flex-1 p-4 sm:p-6">
+                <main class="flex-1 p-4 pb-24 sm:p-6 lg:pb-6">
                     {{ $slot }}
                 </main>
             </div>

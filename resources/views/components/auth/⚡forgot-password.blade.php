@@ -31,11 +31,11 @@ new #[Layout('layouts.guest')] #[Title('Forgot password')] class extends Compone
 ?>
 
 <div>
-    <h1 class="mb-2 text-xl font-semibold text-zinc-900">Forgot your password?</h1>
+    <h1 class="mb-1 text-2xl font-semibold tracking-tight text-zinc-900">Forgot your password?</h1>
     <p class="mb-6 text-sm text-zinc-500">Enter your email and we'll send you a password reset link.</p>
 
     @if ($status)
-        <div class="mb-4 rounded-lg border border-brand/20 bg-brand/5 px-4 py-3 text-sm text-brand">
+        <div class="mb-4 rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-sm text-brand">
             {{ $status }}
         </div>
     @endif
@@ -48,7 +48,7 @@ new #[Layout('layouts.guest')] #[Title('Forgot password')] class extends Compone
                 id="email"
                 type="email"
                 autofocus
-                class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40"
+                class="mt-1.5 block w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 transition-shadow focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand-lime/20"
             >
             @error('email')
                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -57,7 +57,7 @@ new #[Layout('layouts.guest')] #[Title('Forgot password')] class extends Compone
 
         <button
             type="submit"
-            class="w-full rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90"
+            class="w-full rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand/90"
         >
             Send reset link
         </button>

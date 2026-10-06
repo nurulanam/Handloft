@@ -63,7 +63,7 @@ new #[Layout('layouts.app')] #[Title('Starred')] class extends Component
                     </a>
 
                     <span class="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium {{ $task->status->pillClasses() }}">{{ $task->status->label() }}</span>
-                    <span class="shrink-0 text-xs text-zinc-400">{{ $task->deadline?->format('d M Y') ?? '—' }}</span>
+                    <span class="hidden shrink-0 text-xs text-zinc-400 sm:inline">{{ $task->deadline?->format('d M Y') ?? '—' }}</span>
                 </div>
             @empty
                 <p class="px-4 py-8 text-center text-sm text-zinc-400">No starred tasks yet. Star a task from its page or the board to pin it here.</p>
