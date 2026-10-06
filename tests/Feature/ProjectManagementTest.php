@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ProjectStatus;
 use App\Enums\Role;
 use App\Enums\TaskStatus;
 use App\Models\Project;
@@ -81,6 +82,34 @@ class ProjectManagementTest extends TestCase
         $response = $this->actingAs($manager)->get(route('dashboard'));
 
         $response->assertSee('Create Project');
+    }
+
+    public function test_the_project_list_can_be_searched_filtered_and_sorted(): void
+    {
+        $manager = $this->manager('Rahim');
+        $alpha = Project::factory()->create(['name' => 'Alpha launch', 'created_by' => $manager->id, 'deadline' => now()->addDays(20)]);
+        $beta = Project::factory()->create(['name' => 'Beta rebrand', 'created_by' => $manager->id, 'deadline' => now()->addDays(3), 'status' => ProjectStatus::Completed]);
+        $gamma = Project::factory()->create(['name' => 'Gamma audit', 'created_by' => $manager->id, 'deadline' => null]);
+
+        Task::factory()->create(['created_by' => $manager->id, 'project_id' => $beta->id, 'status' => TaskStatus::Done]);
+        Task::factory()->count(2)->create(['created_by' => $manager->id, 'project_id' => $alpha->id, 'status' => TaskStatus::Todo]);
+
+        $names = fn ($projects) => $projects->pluck('name')->all();
+
+        Livewire::actingAs($manager)->test('projects.index')
+            ->set('search', 'rebrand')
+            ->assertViewHas('projects', fn ($p) => $names($p) === ['Beta rebrand'])
+            ->set('search', '')
+            ->set('status', ProjectStatus::Completed->value)
+            ->assertViewHas('projects', fn ($p) => $names($p) === ['Beta rebrand'])
+            ->call('clearFilters')
+            ->set('sort', 'deadline')
+            ->assertViewHas('projects', fn ($p) => $names($p) === ['Beta rebrand', 'Alpha launch', 'Gamma audit'])
+            ->set('sort', 'progress-desc')
+            ->assertViewHas('projects', fn ($p) => $names($p)[0] === 'Beta rebrand')
+            ->set('sort', 'name')
+            ->assertViewHas('projects', fn ($p) => $names($p) === ['Alpha launch', 'Beta rebrand', 'Gamma audit'])
+            ->assertViewHas('statusCounts', fn ($counts) => (int) $counts['active'] === 2 && (int) $counts['completed'] === 1);
     }
 
     public function test_anyone_can_view_the_project_list_and_detail(): void
