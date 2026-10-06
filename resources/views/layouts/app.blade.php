@@ -548,8 +548,8 @@
             {{-- Phones: a frosted-glass drawer that slides in from the left, matching the notification
                  sheet's glass and easing, and follows the finger for swipe-to-close. Desktop keeps the dark rail. --}}
             <aside
-                class="sidebar-notch fixed inset-y-0 left-0 z-30 w-72 overflow-x-hidden overflow-y-auto rounded-r-3xl border-r border-white/60 bg-white/70 text-zinc-700 shadow-2xl backdrop-blur-xl backdrop-saturate-150 transition-[translate,width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] lg:translate-x-0 lg:rounded-none lg:border-0 lg:bg-zinc-900 lg:text-zinc-300 lg:shadow-none lg:backdrop-blur-none lg:backdrop-saturate-100 lg:ease-in-out"
-                :class="[sidebarOpen ? 'translate-x-0' : '-translate-x-full', sidebarCollapsed ? 'lg:w-20' : 'lg:w-64']"
+                class="sidebar-notch fixed inset-y-0 left-0 z-30 w-72 overflow-x-hidden overflow-y-auto rounded-r-3xl border-r border-white/60 bg-white/70 text-zinc-700 backdrop-blur-xl backdrop-saturate-150 transition-[translate,width,box-shadow] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] lg:translate-x-0 lg:rounded-none lg:border-0 lg:bg-zinc-900 lg:text-zinc-300 lg:shadow-none lg:backdrop-blur-none lg:backdrop-saturate-100 lg:ease-in-out"
+                :class="[sidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full', sidebarCollapsed ? 'lg:w-20' : 'lg:w-64']"
                 :style="drag?.on ? { transform: `translateX(${drag.dx}px)`, transition: 'none' } : {}"
                 @scroll="flyout.show = false"
                 @touchstart.passive="dragStart($event)"

@@ -81,6 +81,26 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
         $this->cursor = now()->toDateString();
     }
 
+    /**
+     * Jump straight to a date picked on phones: "Y-m" from the month
+     * picker (keeping the current day where it fits) or a full "Y-m-d".
+     */
+    public function jumpTo(string $value): void
+    {
+        if (preg_match('/^\d{4}-\d{2}$/', $value)) {
+            [$year, $month] = array_map('intval', explode('-', $value));
+            $anchor = Carbon::parse($this->cursor);
+
+            $this->cursor = $anchor->setDate($year, $month, min($anchor->day, Carbon::create($year, $month, 1)->daysInMonth))->toDateString();
+
+            return;
+        }
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            $this->cursor = Carbon::parse($value)->toDateString();
+        }
+    }
+
     public function setMonth(int $month): void
     {
         $anchor = Carbon::parse($this->cursor);
@@ -224,10 +244,10 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
 ?>
 
 <div class="space-y-4">
-    <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="flex items-center justify-between gap-3">
         <div>
-            <h1 class="text-2xl font-semibold text-zinc-900">Calendar</h1>
-            <p class="text-sm text-zinc-500">
+            <h1 class="text-xl font-semibold text-zinc-900 sm:text-2xl">Calendar</h1>
+            <p class="hidden text-sm text-zinc-500 sm:block">
                 @if ($dateType === 'deadline')
                     Task and project deadlines, at a glance.
                 @else
@@ -236,58 +256,68 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
             </p>
         </div>
 
-        <div class="flex flex-wrap gap-2">
-            <div class="inline-flex rounded-lg border border-zinc-300 bg-white p-0.5">
-                @foreach (['created' => 'Created', 'deadline' => 'Deadline'] as $key => $label)
-                    <button
-                        type="button"
-                        wire:click="setDateType('{{ $key }}')"
-                        class="rounded-md px-3 py-1 text-sm font-medium {{ $dateType === $key ? 'bg-brand text-white' : 'text-zinc-600 hover:bg-zinc-50' }}"
-                    >
-                        {{ $label }}
-                    </button>
-                @endforeach
-            </div>
+        <div class="inline-flex shrink-0 rounded-lg border border-zinc-300 bg-white p-0.5" role="group" aria-label="Show by">
+            @foreach (['created' => 'Created', 'deadline' => 'Deadline'] as $key => $label)
+                <button
+                    type="button"
+                    wire:click="setDateType('{{ $key }}')"
+                    class="rounded-md px-2.5 py-1 text-xs font-medium sm:px-3 sm:text-sm {{ $dateType === $key ? 'bg-brand text-white' : 'text-zinc-600 hover:bg-zinc-50' }}"
+                >
+                    {{ $label }}
+                </button>
+            @endforeach
+        </div>
+    </div>
 
-            <div class="inline-flex rounded-lg border border-zinc-300 bg-white p-0.5">
+    <div class="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-4">
+        <div class="flex items-center gap-1">
+            <button type="button" wire:click="previous" class="rounded-lg p-2 text-zinc-500 hover:bg-zinc-100" title="Previous">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4"><path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" /></svg>
+            </button>
+
+            {{-- Phones: the range label is itself the jump-to control — the native month/date picker sits
+                 invisibly over it (one tap opens it), replacing the month and year dropdowns. --}}
+            <label class="relative flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 sm:flex-none sm:px-1">
+                <span class="truncate text-sm font-semibold text-zinc-900">{{ $rangeLabel }}</span>
+                @if ($view === 'day' && $anchor->isToday())
+                    <span class="shrink-0 rounded-full bg-brand px-2 py-0.5 text-xs font-medium text-white">Today</span>
+                @endif
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4 shrink-0 text-zinc-400 sm:hidden"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
+                <input
+                    type="{{ $view === 'month' ? 'month' : 'date' }}"
+                    value="{{ $view === 'month' ? $anchor->format('Y-m') : $anchor->toDateString() }}"
+                    wire:change="jumpTo($event.target.value)"
+                    class="absolute inset-0 h-full w-full cursor-pointer opacity-0 sm:hidden"
+                    aria-label="Jump to date"
+                    x-data @click="(() => { try { $el.showPicker() } catch (e) {} })()"
+                >
+            </label>
+
+            <button type="button" wire:click="next" class="rounded-lg p-2 text-zinc-500 hover:bg-zinc-100" title="Next">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
+            </button>
+            <button type="button" wire:click="goToToday" class="ml-1 shrink-0 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50">Today</button>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <div class="grid flex-1 grid-cols-3 rounded-lg border border-zinc-300 bg-white p-0.5 sm:inline-flex sm:flex-none">
                 @foreach (['month' => 'Month', 'week' => 'Week', 'day' => 'Day'] as $key => $label)
                     <button
                         type="button"
                         wire:click="setView('{{ $key }}')"
-                        class="rounded-md px-3 py-1 text-sm font-medium {{ $view === $key ? 'bg-brand text-white' : 'text-zinc-600 hover:bg-zinc-50' }}"
+                        class="rounded-md px-3 py-1.5 text-sm font-medium sm:py-1 {{ $view === $key ? 'bg-brand text-white' : 'text-zinc-600 hover:bg-zinc-50' }}"
                     >
                         {{ $label }}
                     </button>
                 @endforeach
             </div>
-        </div>
-    </div>
 
-    <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3">
-        <div class="flex items-center gap-2">
-            <button type="button" wire:click="previous" class="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100" title="Previous">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4"><path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" /></svg>
-            </button>
-            <button type="button" wire:click="goToToday" class="rounded-lg border border-zinc-300 px-3 py-1 text-sm font-medium text-zinc-600 hover:bg-zinc-50">Today</button>
-            <button type="button" wire:click="next" class="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100" title="Next">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
-            </button>
-        </div>
-
-        <h2 class="flex items-center gap-2 text-sm font-semibold text-zinc-900">
-            {{ $rangeLabel }}
-            @if ($view === 'day' && $anchor->isToday())
-                <span class="rounded-full bg-brand px-2 py-0.5 text-xs font-medium text-white">Today</span>
-            @endif
-        </h2>
-
-        <div class="flex items-center gap-2">
-            <select wire:change="setMonth($event.target.value)" class="rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+            <select wire:change="setMonth($event.target.value)" class="hidden rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40 sm:block" aria-label="Month">
                 @foreach ($monthOptions as $value => $label)
                     <option value="{{ $value }}" @selected($anchor->month === $value)>{{ $label }}</option>
                 @endforeach
             </select>
-            <select wire:change="setYear($event.target.value)" class="rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+            <select wire:change="setYear($event.target.value)" class="hidden rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40 sm:block" aria-label="Year">
                 @foreach ($yearOptions as $year)
                     <option value="{{ $year }}" @selected($anchor->year === $year)>{{ $year }}</option>
                 @endforeach

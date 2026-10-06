@@ -192,6 +192,18 @@ class CalendarTest extends TestCase
         $component->assertSet('cursor', now()->toDateString());
     }
 
+    public function test_jumping_to_a_month_or_date_moves_the_cursor(): void
+    {
+        $karim = $this->teamMember('Karim');
+
+        $component = Livewire::actingAs($karim)->test('calendar.index');
+        $component->set('cursor', '2026-01-31');
+
+        $component->call('jumpTo', '2026-02')->assertSet('cursor', '2026-02-28');
+        $component->call('jumpTo', '2026-07-14')->assertSet('cursor', '2026-07-14');
+        $component->call('jumpTo', 'nonsense')->assertSet('cursor', '2026-07-14');
+    }
+
     public function test_todays_day_is_marked_with_a_ring_in_month_view(): void
     {
         $karim = $this->teamMember('Karim');

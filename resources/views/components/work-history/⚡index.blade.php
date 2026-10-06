@@ -220,59 +220,71 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
 };
 ?>
 
-<div class="space-y-6">
+<div class="space-y-4 sm:space-y-6">
     <div class="flex items-center justify-between">
         <div>
-            <h1 class="text-2xl font-semibold text-zinc-900">Work History</h1>
+            <h1 class="text-xl font-semibold text-zinc-900 sm:text-2xl">Work History</h1>
             <p class="hidden text-sm text-zinc-500 sm:block">Everyone's daily time logs — as assignee, Reporter, or QA/Reviewer.</p>
         </div>
     </div>
 
-    @if ($canViewAll)
-        <div class="rounded-lg border border-zinc-200 bg-white p-4">
-            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">Team members</p>
-            <div class="flex flex-wrap gap-2">
-                @foreach ($allUsers as $option)
-                    <label class="cursor-pointer">
-                        <input type="checkbox" wire:model.live="compareUserIds" value="{{ $option->id }}" class="peer sr-only">
-                        <span class="inline-flex items-center gap-1.5 rounded-full border border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-600 peer-checked:border-brand peer-checked:bg-brand peer-checked:text-white">
-                            <span class="flex size-4 items-center justify-center rounded-full bg-zinc-200 text-[9px] font-semibold text-zinc-600 peer-checked:bg-white/20 peer-checked:text-white">{{ Avatar::initials($option->name) }}</span>
-                            {{ $option->name }}
-                        </span>
-                    </label>
+    <div class="rounded-lg border border-zinc-200 bg-white">
+        @if ($canViewAll)
+            <div class="border-b border-zinc-100 p-3 sm:p-4">
+                <div class="mb-2 flex items-baseline justify-between gap-3">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Team members</p>
+                    <p class="text-xs text-zinc-400">
+                        <span class="sm:hidden">Pick several to compare</span>
+                        <span class="hidden sm:inline">Select multiple to compare hours side by side.</span>
+                    </p>
+                </div>
+                {{-- Phones: one swipeable row instead of a wrapping block of chips. --}}
+                <div x-data x-init="setTimeout(() => { const c = $el.querySelector('input:checked'); if (c) $el.scrollLeft = c.closest('label').offsetLeft - 12 })" class="relative -mx-3 flex gap-2 overflow-x-auto px-3 pb-0.5 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden">
+                    @foreach ($allUsers as $option)
+                        <label class="shrink-0 cursor-pointer">
+                            <input type="checkbox" wire:model.live="compareUserIds" value="{{ $option->id }}" class="peer sr-only">
+                            <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-zinc-300 py-1 pl-1 pr-3 text-xs font-medium text-zinc-600 peer-checked:border-brand peer-checked:bg-brand peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-brand-lime/50">
+                                <span class="flex size-5 items-center justify-center rounded-full bg-zinc-900/10 text-[9px] font-semibold">{{ Avatar::initials($option->name) }}</span>
+                                {{ $option->name }}
+                            </span>
+                        </label>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
+        <div class="flex flex-col gap-3 p-3 sm:flex-row sm:flex-wrap sm:items-center sm:p-4">
+            <div class="grid grid-cols-4 rounded-lg border border-zinc-300 bg-white p-0.5 sm:inline-flex">
+                @foreach (['today' => ['Today', 'Today'], 'week' => ['Week', 'This Week'], 'month' => ['Month', 'This Month'], 'custom' => ['Custom', 'Custom Range']] as $key => [$short, $label])
+                    <button
+                        type="button"
+                        wire:click="$set('range', '{{ $key }}')"
+                        class="whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium sm:py-1 {{ $range === $key ? 'bg-brand text-white' : 'text-zinc-600 hover:bg-zinc-50' }}"
+                    >
+                        <span class="sm:hidden">{{ $short }}</span>
+                        <span class="hidden sm:inline">{{ $label }}</span>
+                    </button>
                 @endforeach
             </div>
-            <p class="mt-2 text-xs text-zinc-400">Select multiple to compare hours side by side.</p>
+
+            @if ($range === 'custom')
+                <div class="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+                    @foreach (['from' => 'From', 'to' => 'To'] as $field => $label)
+                        <label class="relative block">
+                            <span class="pointer-events-none absolute left-3 top-1.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">{{ $label }}</span>
+                            <input wire:model.live="{{ $field }}" type="date" class="block w-full min-w-0 rounded-lg border border-zinc-300 bg-white px-3 pb-1.5 pt-5 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40 sm:w-40">
+                        </label>
+                    @endforeach
+                </div>
+            @endif
+
+            @if ($mode === 'single')
+                <div class="flex items-center justify-between gap-3 rounded-lg bg-brand/5 px-3 py-2 sm:ml-auto">
+                    <span class="text-xs font-medium text-zinc-500">{{ $viewingUser->is(auth()->user()) ? 'Your total' : $viewingUser->name.'\'s total' }}</span>
+                    <span class="text-base font-semibold text-brand">{{ Duration::forHumans($summaryHours) }}</span>
+                </div>
+            @endif
         </div>
-    @endif
-
-    <div class="flex flex-wrap items-end gap-3">
-        <div class="inline-flex rounded-lg border border-zinc-300 bg-white p-0.5">
-            @foreach (['today' => ['Today', 'Today'], 'week' => ['Week', 'This Week'], 'month' => ['Month', 'This Month'], 'custom' => ['Custom', 'Custom Range']] as $key => [$short, $label])
-                <button
-                    type="button"
-                    wire:click="$set('range', '{{ $key }}')"
-                    class="whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium {{ $range === $key ? 'bg-brand text-white' : 'text-zinc-600 hover:bg-zinc-50' }}"
-                >
-                    <span class="sm:hidden">{{ $short }}</span>
-                    <span class="hidden sm:inline">{{ $label }}</span>
-                </button>
-            @endforeach
-        </div>
-
-        @if ($range === 'custom')
-            <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-                <input wire:model.live="from" type="date" class="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                <span class="text-sm text-zinc-500">to</span>
-                <input wire:model.live="to" type="date" class="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-            </div>
-        @endif
-
-        @if ($mode === 'single')
-            <div class="ml-auto rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700">
-                {{ $viewingUser->is(auth()->user()) ? 'Your total' : $viewingUser->name.'\'s total' }}: {{ Duration::forHumans($summaryHours) }}
-            </div>
-        @endif
     </div>
 
     @if ($mode === 'compare')
