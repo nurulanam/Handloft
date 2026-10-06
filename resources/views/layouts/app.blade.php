@@ -530,29 +530,55 @@
                     @php
                         $chevron = 'M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z';
 
-                        $navigation = [
-                            ['label' => 'Dashboard', 'route' => 'dashboard', 'icon' => 'dashboard'],
-                            ['label' => 'For You', 'route' => 'for-you', 'icon' => 'for-you'],
-                            ['label' => 'Starred', 'route' => 'starred', 'icon' => 'starred'],
-                            ['label' => 'Team', 'route' => 'users.index', 'icon' => 'team', 'hidden' => auth()->user()->cannot('manage-users')],
-                            ['label' => 'Projects', 'icon' => 'projects', 'children' => [
-                                ['label' => 'All Projects', 'route' => 'projects.index'],
-                                ['label' => 'Create Project', 'route' => 'projects.create', 'hidden' => auth()->user()->cannot('create', \App\Models\Project::class)],
+                        $sections = [
+                            ['heading' => null, 'items' => [
+                                ['label' => 'Dashboard', 'route' => 'dashboard', 'icon' => 'dashboard'],
+                                ['label' => 'For You', 'route' => 'for-you', 'icon' => 'for-you'],
+                                ['label' => 'Starred', 'route' => 'starred', 'icon' => 'starred'],
+                                ['label' => 'Notifications', 'route' => 'notifications.index', 'icon' => 'notifications'],
                             ]],
-                            ['label' => 'Tasks', 'icon' => 'tasks', 'children' => [
-                                ['label' => 'All Tasks', 'route' => 'tasks.index'],
-                                ['label' => 'Create Task', 'route' => 'tasks.create'],
+                            ['heading' => 'Workspace', 'items' => [
+                                ['label' => 'Projects', 'icon' => 'projects', 'children' => [
+                                    ['label' => 'All Projects', 'route' => 'projects.index'],
+                                    ['label' => 'Create Project', 'route' => 'projects.create', 'hidden' => auth()->user()->cannot('create', \App\Models\Project::class)],
+                                ]],
+                                ['label' => 'Tasks', 'icon' => 'tasks', 'children' => [
+                                    ['label' => 'All Tasks', 'route' => 'tasks.index'],
+                                    ['label' => 'Create Task', 'route' => 'tasks.create'],
+                                ]],
+                                ['label' => 'Calendar', 'route' => 'calendar.index', 'icon' => 'calendar'],
                             ]],
-                            ['label' => 'Work History', 'route' => 'work-history.index', 'icon' => 'work-history'],
-                            ['label' => 'Calendar', 'route' => 'calendar.index', 'icon' => 'calendar'],
-                            ['label' => 'Reports', 'icon' => 'reports', 'disabled' => true],
-                            ['label' => 'Notifications', 'route' => 'notifications.index', 'icon' => 'notifications'],
-                            ['label' => 'Settings', 'route' => 'settings', 'icon' => 'settings', 'hidden' => auth()->user()->cannot('manage-settings')],
+                            ['heading' => 'Insights', 'items' => [
+                                ['label' => 'Work History', 'route' => 'work-history.index', 'icon' => 'work-history'],
+                                ['label' => 'Reports', 'icon' => 'reports', 'disabled' => true],
+                            ]],
+                            ['heading' => 'Manage', 'items' => [
+                                ['label' => 'Team', 'route' => 'users.index', 'icon' => 'team', 'hidden' => auth()->user()->cannot('manage-users')],
+                                ['label' => 'Settings', 'route' => 'settings', 'icon' => 'settings', 'hidden' => auth()->user()->cannot('manage-settings')],
+                            ]],
                         ];
+
+                        $navigation = [];
+                        foreach ($sections as $section) {
+                            $visible = array_values(array_filter($section['items'], fn ($item) => empty($item['hidden'])));
+                            if ($visible === []) {
+                                continue;
+                            }
+                            if ($section['heading']) {
+                                $navigation[] = ['heading' => $section['heading']];
+                            }
+                            array_push($navigation, ...$visible);
+                        }
                     @endphp
 
+                    {{-- Grouped into sections; a section whose items are all hidden for this user (e.g. Manage for a team
+                         member) is dropped along with its heading. The collapsed desktop rail shows a divider instead. --}}
                     @foreach ($navigation as $item)
-                        @continue(! empty($item['hidden']))
+                        @if (! empty($item['heading']))
+                            <p class="px-3 pb-1 pt-5 text-[11px] font-semibold uppercase tracking-wider text-zinc-400 lg:text-zinc-500" :class="sidebarCollapsed ? 'lg:hidden' : ''">{{ $item['heading'] }}</p>
+                            <div class="mx-3 my-3 hidden border-t border-zinc-800" :class="sidebarCollapsed ? 'lg:block' : ''"></div>
+                            @continue
+                        @endif
 
                         @if (! empty($item['children']))
                             @php
