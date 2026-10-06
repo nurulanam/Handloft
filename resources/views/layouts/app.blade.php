@@ -848,7 +848,7 @@
                         @php $role = auth()->user()->getRoleNames()->first(); @endphp
                         <div class="relative" x-data="{ open: false }">
                             <button type="button" @click="open = ! open" class="flex items-center gap-2.5 rounded-full p-0.5 hover:bg-zinc-100 sm:rounded-lg sm:py-1 sm:pl-1 sm:pr-2" :aria-expanded="open">
-                                <span class="flex size-8 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white">{{ \App\Support\Avatar::initials(auth()->user()->name) }}</span>
+                                <x-user-avatar :user="auth()->user()" class="size-8 rounded-full text-xs" />
                                 <span class="hidden text-left sm:block">
                                     <span class="block text-sm font-medium leading-tight text-zinc-900">{{ auth()->user()->name }}</span>
                                     <span class="block text-xs leading-tight text-zinc-500">{{ $role ? \Illuminate\Support\Str::headline($role) : 'No role' }}</span>
@@ -869,13 +869,17 @@
                                 class="absolute right-0 z-30 mt-2 w-64 origin-top-right overflow-hidden rounded-2xl border border-white/60 bg-white/70 p-1.5 shadow-2xl shadow-zinc-900/20 backdrop-blur-xl backdrop-saturate-150"
                             >
                                 <div class="flex items-center gap-3 rounded-xl bg-white/85 px-3 py-2.5 shadow-sm">
-                                    <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white">{{ \App\Support\Avatar::initials(auth()->user()->name) }}</span>
+                                    <x-user-avatar :user="auth()->user()" class="size-9 rounded-full text-xs" />
                                     <span class="min-w-0">
                                         <span class="block truncate text-sm font-medium text-zinc-900">{{ auth()->user()->name }}</span>
                                         <span class="block truncate text-xs text-zinc-500">{{ auth()->user()->email }}</span>
                                     </span>
                                 </div>
-                                <button type="button" @click="open = false; $dispatch('confirm-logout')" class="mt-1.5 flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium text-zinc-700 transition-colors hover:bg-red-500/10 hover:text-red-600">
+                                <a href="{{ route('profile') }}" wire:navigate @click="open = false" class="mt-1.5 flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors {{ request()->routeIs('profile') ? 'bg-brand/10 text-brand' : 'text-zinc-700 hover:bg-white/80' }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
+                                    My profile
+                                </a>
+                                <button type="button" @click="open = false; $dispatch('confirm-logout')" class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium text-zinc-700 transition-colors hover:bg-red-500/10 hover:text-red-600">
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></svg>
                                     Log out
                                 </button>
@@ -952,7 +956,7 @@
                     </div>
 
                     <div class="mt-4 flex items-center gap-3 rounded-2xl bg-white/80 px-3 py-2.5 shadow-sm">
-                        <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white">{{ \App\Support\Avatar::initials(auth()->user()->name) }}</span>
+                        <x-user-avatar :user="auth()->user()" class="size-9 rounded-full text-xs" />
                         <span class="min-w-0 text-left">
                             <span class="block truncate text-sm font-medium text-zinc-900">{{ auth()->user()->name }}</span>
                             <span class="block truncate text-xs text-zinc-500">{{ auth()->user()->email }}</span>

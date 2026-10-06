@@ -46,6 +46,17 @@ class UserManagementTest extends TestCase
         $this->assertSame('karim', $user->user_id);
     }
 
+    public function test_the_team_list_leaves_out_super_admins(): void
+    {
+        $admin = User::role(Role::SuperAdmin->value)->firstOrFail();
+        $member = User::factory()->create(['name' => 'Rahim Team Member', 'status' => 'active']);
+        $member->assignRole(Role::TeamMember->value);
+
+        Livewire::actingAs($admin)->test('users.index')
+            ->assertSee('Rahim Team Member')
+            ->assertViewHas('users', fn ($users) => $users->doesntContain('id', $admin->id));
+    }
+
     public function test_non_admin_cannot_create_a_user(): void
     {
         RoleModel::findOrCreate(Role::TeamMember->value);

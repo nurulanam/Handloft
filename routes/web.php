@@ -43,6 +43,8 @@ Route::middleware('auth')->group(function () {
     Route::livewire('/calendar', 'calendar.index')->name('calendar.index');
 
     Route::livewire('/settings', 'settings')->name('settings');
+
+    Route::livewire('/profile', 'profile')->name('profile');
 });
 
 // Unknown URLs land here instead of 404ing before the middleware runs, so the

@@ -171,3 +171,162 @@ window.Echo?.connector?.pusher?.connection?.bind('state_change', ({ current }) =
 
     liveWasConnected = true;
 });
+
+// Profile photo cropper: drag to position, zoom (slider, wheel or pinch), then
+// the browser crops a 512px square and uploads only that via Livewire, which
+// saves it on arrival (the profile component's updatedPhoto()).
+document.addEventListener('alpine:init', () => {
+    Alpine.data('photoCropper', () => ({
+        open: false,
+        src: null,
+        img: null,
+        size: 288,
+        base: 1,
+        zoom: 1,
+        x: 0,
+        y: 0,
+        pointers: {},
+        pinchFrom: null,
+        dragging: false,
+        saving: false,
+        error: '',
+
+        get scale() {
+            return this.base * this.zoom;
+        },
+
+        pick(event) {
+            const file = event.target.files[0];
+            event.target.value = '';
+            this.error = '';
+
+            if (! file) {
+                return;
+            }
+
+            if (! file.type.startsWith('image/')) {
+                this.error = 'Choose an image file.';
+
+                return;
+            }
+
+            this.load(URL.createObjectURL(file));
+        },
+
+        load(url) {
+            const img = new Image();
+            img.onload = () => {
+                this.img = img;
+                this.src = url;
+                this.saving = false;
+                this.open = true;
+                this.$nextTick(() => this.fit());
+            };
+            img.onerror = () => {
+                this.error = "That image couldn't be opened.";
+            };
+            img.src = url;
+        },
+
+        fit() {
+            this.size = this.$refs.frame.clientWidth;
+            this.base = Math.max(this.size / this.img.naturalWidth, this.size / this.img.naturalHeight);
+            this.zoom = 1;
+            this.x = (this.size - this.img.naturalWidth * this.base) / 2;
+            this.y = (this.size - this.img.naturalHeight * this.base) / 2;
+        },
+
+        clamp() {
+            const width = this.img.naturalWidth * this.scale;
+            const height = this.img.naturalHeight * this.scale;
+            this.x = Math.min(0, Math.max(this.size - width, this.x));
+            this.y = Math.min(0, Math.max(this.size - height, this.y));
+        },
+
+        // Zoom around a point in the frame (its centre by default), so what's under it stays put.
+        setZoom(zoom, cx = this.size / 2, cy = this.size / 2) {
+            zoom = Math.min(4, Math.max(1, zoom));
+            const ratio = zoom / this.zoom;
+            this.x = cx - (cx - this.x) * ratio;
+            this.y = cy - (cy - this.y) * ratio;
+            this.zoom = zoom;
+            this.clamp();
+        },
+
+        down(event) {
+            this.$refs.frame.setPointerCapture(event.pointerId);
+            this.pointers[event.pointerId] = { x: event.clientX, y: event.clientY };
+            this.dragging = true;
+            this.pinchFrom = null;
+        },
+
+        move(event) {
+            const previous = this.pointers[event.pointerId];
+
+            if (! previous) {
+                return;
+            }
+
+            const ids = Object.keys(this.pointers);
+
+            if (ids.length === 1) {
+                this.x += event.clientX - previous.x;
+                this.y += event.clientY - previous.y;
+                this.clamp();
+            }
+
+            this.pointers[event.pointerId] = { x: event.clientX, y: event.clientY };
+
+            if (ids.length === 2) {
+                const [a, b] = ids.map((id) => this.pointers[id]);
+                const distance = Math.hypot(a.x - b.x, a.y - b.y);
+                const rect = this.$refs.frame.getBoundingClientRect();
+
+                if (this.pinchFrom) {
+                    this.setZoom(this.zoom * (distance / this.pinchFrom), (a.x + b.x) / 2 - rect.left, (a.y + b.y) / 2 - rect.top);
+                }
+
+                this.pinchFrom = distance;
+            }
+        },
+
+        up(event) {
+            delete this.pointers[event.pointerId];
+            this.pinchFrom = null;
+            this.dragging = Object.keys(this.pointers).length > 0;
+        },
+
+        wheel(event) {
+            const rect = this.$refs.frame.getBoundingClientRect();
+            this.setZoom(this.zoom * (1 - event.deltaY * 0.0015), event.clientX - rect.left, event.clientY - rect.top);
+        },
+
+        close() {
+            this.open = false;
+            this.pointers = {};
+        },
+
+        save() {
+            const output = 512;
+            const canvas = document.createElement('canvas');
+            canvas.width = output;
+            canvas.height = output;
+
+            const source = this.size / this.scale;
+            canvas.getContext('2d').drawImage(this.img, -this.x / this.scale, -this.y / this.scale, source, source, 0, 0, output, output);
+
+            this.saving = true;
+            canvas.toBlob((blob) => {
+                this.$wire.upload(
+                    'photo',
+                    new File([blob], 'profile-photo.jpg', { type: 'image/jpeg' }),
+                    () => this.close(),
+                    () => {
+                        this.saving = false;
+                        this.error = 'Upload failed — please try again.';
+                    },
+                );
+            }, 'image/jpeg', 0.9);
+        },
+    }));
+});

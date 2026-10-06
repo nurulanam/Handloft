@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\Role;
 use App\Models\User;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
@@ -19,7 +20,8 @@ new #[Layout('layouts.app')] #[Title('Team')] class extends Component
     public function with(): array
     {
         return [
-            'users' => User::query()->orderBy('name')->paginate(15),
+            // Super Admin accounts are system owners, not team members, so they're left off the list.
+            'users' => User::query()->withoutRole(Role::SuperAdmin->value)->orderBy('name')->paginate(15),
             'canViewAllWorkHistory' => auth()->user()->can('view-all-work-history'),
         ];
     }
