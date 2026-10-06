@@ -1,9 +1,19 @@
-{{-- Handloft mark: an H of two posts (teammates) joined by a lime arrow (the
-     handoff), under a lime roofline (the shared loft). Keep in sync with
-     public/logo.svg, which is the same drawing as a standalone file. --}}
+{{-- Handloft mark: a capital H as a handshake. Two pillars are two teammates; each reaches out half of
+     the crossbar at a different height, the white hand passing to the lime one: work handed across, never
+     dropped. Keep in sync with public/logo.svg (same drawing). Gradient ids are unique per instance,
+     because a gradient referenced from a hidden copy (e.g. a logo that is display:none at this breakpoint)
+     would otherwise fail to paint in the visible ones. --}}
+@php $id = 'hl'.\Illuminate\Support\Str::random(6); @endphp
 <svg {{ $attributes->merge(['xmlns' => 'http://www.w3.org/2000/svg', 'viewBox' => '0 0 40 40', 'aria-hidden' => 'true']) }}>
-    <rect width="40" height="40" rx="10" fill="#10512a"/>
-    <path d="M13 30V18M27 30V18" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
-    <path d="M10.5 18.5 20 10.5 29.5 18.5" fill="none" stroke="#bfef1e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M13 24h9.75M20.25 21.25 23 24l-2.75 2.75" fill="none" stroke="#bfef1e" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <defs>
+        <linearGradient id="{{ $id }}-bg" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#1f8443"/><stop offset="1" stop-color="#0b3f20"/></linearGradient>
+        <radialGradient id="{{ $id }}-gloss" cx="9" cy="5" r="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff" stop-opacity=".2"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    </defs>
+    <rect width="40" height="40" rx="11" fill="url(#{{ $id }}-bg)"/>
+    <rect width="40" height="40" rx="11" fill="url(#{{ $id }}-gloss)"/>
+    <rect x=".5" y=".5" width="39" height="39" rx="10.5" fill="none" stroke="#fff" stroke-opacity=".14"/>
+    <rect x="8.5" y="8.5" width="7" height="23" rx="3.5" fill="#fff"/>
+    <rect x="8.5" y="12.5" width="15" height="5.5" rx="2.75" fill="#fff"/>
+    <rect x="24.5" y="8.5" width="7" height="23" rx="3.5" fill="#bfef1e"/>
+    <rect x="16.5" y="22" width="15" height="5.5" rx="2.75" fill="#bfef1e"/>
 </svg>

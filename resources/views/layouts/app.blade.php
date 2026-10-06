@@ -875,13 +875,10 @@
                                         <span class="block truncate text-xs text-zinc-500">{{ auth()->user()->email }}</span>
                                     </span>
                                 </div>
-                                <form method="POST" action="{{ route('logout') }}" class="mt-1.5">
-                                    @csrf
-                                    <button type="submit" class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium text-zinc-700 transition-colors hover:bg-red-500/10 hover:text-red-600">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></svg>
-                                        Log out
-                                    </button>
-                                </form>
+                                <button type="button" @click="open = false; $dispatch('confirm-logout')" class="mt-1.5 flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium text-zinc-700 transition-colors hover:bg-red-500/10 hover:text-red-600">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></svg>
+                                    Log out
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -890,6 +887,86 @@
                 <main class="flex-1 p-4 pb-24 sm:p-6 lg:pb-6">
                     {{ $slot }}
                 </main>
+            </div>
+        </div>
+
+        {{-- Log-out confirmation (opened by dispatching `confirm-logout`). Phones: a frosted-glass sheet that
+             slides up from the bottom and can be swiped down to dismiss. sm and up: a centered glass dialog. --}}
+        <div
+            x-data="{
+                open: false,
+                submitting: false,
+                dragY: 0,
+                startY: null,
+                show() { this.dragY = 0; this.startY = null; this.submitting = false; this.open = true; this.$nextTick(() => this.$refs.cancel?.focus()); },
+                dragStart(e) { this.startY = e.touches[0].clientY; },
+                dragMove(e) { if (this.startY !== null) this.dragY = Math.max(0, e.touches[0].clientY - this.startY); },
+                dragEnd() {
+                    this.startY = null;
+                    if (this.dragY > 80) { this.open = false; }
+                    this.dragY = 0;
+                },
+            }"
+            @confirm-logout.window="show()"
+            @keydown.escape.window="open = false"
+            x-effect="document.body.classList.toggle('overflow-hidden', open)"
+        >
+            <div
+                x-show="open"
+                x-cloak
+                x-transition:enter="transition-opacity duration-300"
+                x-transition:enter-start="opacity-0"
+                x-transition:leave="transition-opacity duration-300"
+                x-transition:leave-end="opacity-0"
+                @click="open = false"
+                class="fixed inset-0 z-65 bg-zinc-900/30 backdrop-blur-sm"
+            ></div>
+
+            <div class="pointer-events-none fixed inset-x-0 bottom-0 z-65 sm:inset-0 sm:flex sm:items-center sm:justify-center sm:p-4">
+                <div
+                    x-show="open"
+                    x-cloak
+                    x-transition:enter="transition duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
+                    x-transition:enter-start="translate-y-full sm:translate-y-4 sm:scale-95 sm:opacity-0"
+                    x-transition:enter-end="translate-y-0 sm:scale-100 sm:opacity-100"
+                    x-transition:leave="transition duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] sm:duration-200"
+                    x-transition:leave-start="translate-y-0 sm:scale-100 sm:opacity-100"
+                    x-transition:leave-end="translate-y-full sm:translate-y-4 sm:scale-95 sm:opacity-0"
+                    :style="startY !== null ? `transform: translateY(${dragY}px); transition: none` : ''"
+                    class="pointer-events-auto w-full rounded-t-[2rem] border-t border-white/60 bg-white/75 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 shadow-2xl shadow-zinc-900/25 backdrop-blur-xl backdrop-saturate-150 sm:max-w-sm sm:rounded-3xl sm:border sm:p-6"
+                    role="alertdialog"
+                    aria-modal="true"
+                    aria-labelledby="logout-title"
+                >
+                    {{-- Drag handle: swipe down here (or on the header) to dismiss. --}}
+                    <div class="flex justify-center pb-3 pt-1 sm:hidden" @touchstart.passive="dragStart($event)" @touchmove.passive="dragMove($event)" @touchend="dragEnd()">
+                        <span class="h-1.5 w-10 rounded-full bg-zinc-900/20"></span>
+                    </div>
+
+                    <div class="text-center sm:text-left" @touchstart.passive="dragStart($event)" @touchmove.passive="dragMove($event)" @touchend="dragEnd()">
+                        <span class="mx-auto flex size-12 items-center justify-center rounded-full bg-red-500/10 text-red-600 sm:mx-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5.5"><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></svg>
+                        </span>
+                        <h2 id="logout-title" class="mt-4 text-lg font-semibold text-zinc-900">Log out?</h2>
+                        <p class="mt-1 text-sm text-zinc-500">You'll need to sign in again to get back to {{ config('app.name') }}.</p>
+                    </div>
+
+                    <div class="mt-4 flex items-center gap-3 rounded-2xl bg-white/80 px-3 py-2.5 shadow-sm">
+                        <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white">{{ \App\Support\Avatar::initials(auth()->user()->name) }}</span>
+                        <span class="min-w-0 text-left">
+                            <span class="block truncate text-sm font-medium text-zinc-900">{{ auth()->user()->name }}</span>
+                            <span class="block truncate text-xs text-zinc-500">{{ auth()->user()->email }}</span>
+                        </span>
+                    </div>
+
+                    <form method="POST" action="{{ route('logout') }}" @submit="submitting = true" class="mt-5 flex flex-col gap-2.5 sm:flex-row-reverse">
+                        @csrf
+                        <button type="submit" :disabled="submitting" class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-70 sm:py-2.5">
+                            <span x-text="submitting ? 'Logging out…' : 'Log out'">Log out</span>
+                        </button>
+                        <button type="button" x-ref="cancel" @click="open = false" class="flex-1 rounded-xl bg-zinc-900/5 px-4 py-3 text-sm font-semibold text-zinc-700 hover:bg-zinc-900/10 sm:py-2.5">Cancel</button>
+                    </form>
+                </div>
             </div>
         </div>
 

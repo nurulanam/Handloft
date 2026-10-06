@@ -50,7 +50,7 @@ new class extends Component
 
         return [
             'unreadCount' => $user->unreadNotifications()->count(),
-            'recent' => $user->notifications()->latest()->take(8)->get(),
+            'recent' => $user->notifications()->latest()->take(5)->get(),
         ];
     }
 
@@ -70,6 +70,17 @@ new class extends Component
         $notification->markAsRead();
 
         $this->redirect($notification->data['url'] ?? route('notifications.index'), navigate: true);
+    }
+
+    public function toggleRead(string $id): void
+    {
+        $notification = auth()->user()->notifications()->where('id', $id)->first();
+
+        if (! $notification) {
+            return;
+        }
+
+        $notification->read_at ? $notification->markAsUnread() : $notification->markAsRead();
     }
 
     public function markAllAsRead(): void
@@ -178,10 +189,11 @@ new class extends Component
 
         <div class="max-h-96 space-y-1.5 overflow-y-auto overscroll-contain px-2">
             @forelse ($recent as $notification)
+                <div wire:key="bell-{{ $notification->id }}" class="group flex items-start gap-1 rounded-xl py-2.5 pl-3 pr-1.5 transition-colors {{ $notification->read_at ? 'bg-white/40 hover:bg-white/70' : 'bg-white/85 shadow-sm hover:bg-white' }}">
                 <button
                     type="button"
                     wire:click="openNotification('{{ $notification->id }}')"
-                    class="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors {{ $notification->read_at ? 'bg-white/40 hover:bg-white/70' : 'bg-white/85 shadow-sm hover:bg-white' }}"
+                    class="flex min-w-0 flex-1 items-start gap-3 text-left"
                 >
                     <span class="relative flex size-8 shrink-0 items-center justify-center rounded-full {{ $notification->read_at ? 'bg-zinc-900/5 text-zinc-500' : 'bg-brand/10 text-brand' }}">
                         <x-nav-icon :name="isset($notification->data['task_id']) ? 'tasks' : 'projects'" class="size-4" />
@@ -194,6 +206,20 @@ new class extends Component
                         <span class="mt-0.5 block text-xs text-zinc-500">{{ $notification->created_at->diffForHumans() }}</span>
                     </span>
                 </button>
+                    <button
+                        type="button"
+                        wire:click="toggleRead('{{ $notification->id }}')"
+                        class="flex size-7 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white hover:text-brand opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                        title="{{ $notification->read_at ? 'Mark as unread' : 'Mark as read' }}"
+                    >
+                        <span class="sr-only">{{ $notification->read_at ? 'Mark as unread' : 'Mark as read' }}</span>
+                        @if ($notification->read_at)
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                        @else
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M21.2 8.4c.5.38.8.97.8 1.6v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V10a2 2 0 0 1 .8-1.6l8-6a2 2 0 0 1 2.4 0l8 6Z"/><path d="m22 10-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 10"/></svg>
+                        @endif
+                    </button>
+                </div>
             @empty
                 <p class="py-8 text-center text-sm text-zinc-500">No notifications yet.</p>
             @endforelse
@@ -256,10 +282,11 @@ new class extends Component
 
                 <div class="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-3">
                     @forelse ($recent as $notification)
+                        <div wire:key="sheet-{{ $notification->id }}" class="flex items-start gap-1 rounded-2xl py-3 pl-3 pr-1.5 transition-colors {{ $notification->read_at ? 'bg-white/40' : 'bg-white/85 shadow-sm' }}">
                         <button
                             type="button"
                             wire:click="openNotification('{{ $notification->id }}')"
-                            class="flex w-full items-start gap-3 rounded-2xl px-3 py-3 text-left transition-colors {{ $notification->read_at ? 'bg-white/40 active:bg-white/70' : 'bg-white/85 shadow-sm active:bg-white' }}"
+                            class="flex min-w-0 flex-1 items-start gap-3 text-left"
                         >
                             <span class="relative flex size-9 shrink-0 items-center justify-center rounded-full {{ $notification->read_at ? 'bg-zinc-900/5 text-zinc-500' : 'bg-brand/10 text-brand' }}">
                                 <x-nav-icon :name="isset($notification->data['task_id']) ? 'tasks' : 'projects'" class="size-4" />
@@ -272,6 +299,20 @@ new class extends Component
                                 <span class="mt-0.5 block text-xs text-zinc-500">{{ $notification->created_at->diffForHumans() }}</span>
                             </span>
                         </button>
+                            <button
+                        type="button"
+                        wire:click="toggleRead('{{ $notification->id }}')"
+                        class="flex size-9 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white hover:text-brand "
+                        title="{{ $notification->read_at ? 'Mark as unread' : 'Mark as read' }}"
+                    >
+                        <span class="sr-only">{{ $notification->read_at ? 'Mark as unread' : 'Mark as read' }}</span>
+                        @if ($notification->read_at)
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                        @else
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M21.2 8.4c.5.38.8.97.8 1.6v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V10a2 2 0 0 1 .8-1.6l8-6a2 2 0 0 1 2.4 0l8 6Z"/><path d="m22 10-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 10"/></svg>
+                        @endif
+                    </button>
+                        </div>
                     @empty
                         <p class="py-10 text-center text-sm text-zinc-500">No notifications yet.</p>
                     @endforelse

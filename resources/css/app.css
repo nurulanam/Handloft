@@ -154,3 +154,72 @@
 @media (prefers-reduced-motion: reduce) {
     .toast-island, .toast-island-body, .toast-timer { animation: none; }
 }
+
+/* Sign-in hero (phones): the two "live activity" cards drift gently. */
+@keyframes float-y {
+    0%, 100% { translate: 0 0; }
+    50% { translate: 0 -6px; }
+}
+
+.float-slow { animation: float-y 6s ease-in-out infinite; }
+.float-slower { animation: float-y 7.5s ease-in-out -2s infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+    .float-slow, .float-slower { animation: none; }
+}
+
+/* Sign-in screens: the bright glows behind the glass drift slowly, so the
+   frosting visibly reacts to what moves behind it. */
+@keyframes glow-drift {
+    0%, 100% { translate: 0 0; scale: 1; }
+    50% { translate: -40px -24px; scale: 1.12; }
+}
+
+.glow-drift { animation: glow-drift 16s ease-in-out infinite; }
+.glow-drift-alt { animation: glow-drift 20s ease-in-out -8s infinite reverse; }
+
+@media (prefers-reduced-motion: reduce) {
+    .glow-drift, .glow-drift-alt { animation: none; }
+}
+
+/* Sign-in screens: the glass sheet (card on desktop) rises into place, then its
+   contents follow in a quick stagger; the hero fades in behind it. Replays on
+   each page, including wire:navigate between login and forgot password. */
+@keyframes auth-rise {
+    from { opacity: 0; transform: translateY(var(--rise, 56px)); }
+    to { opacity: 1; transform: none; }
+}
+
+@keyframes auth-fade-up {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+}
+
+.auth-sheet {
+    animation: auth-rise 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (min-width: 1024px) {
+    .auth-sheet { --rise: 24px; }
+}
+
+.auth-hero {
+    animation: auth-fade-up 600ms ease-out both;
+}
+
+.auth-sheet > div > *,
+.auth-sheet form > * {
+    animation: auth-fade-up 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.auth-sheet > div > :nth-child(1) { animation-delay: 180ms; }
+.auth-sheet > div > :nth-child(2) { animation-delay: 240ms; }
+.auth-sheet > div > :nth-child(n + 3) { animation-delay: 300ms; }
+.auth-sheet form > :nth-child(1) { animation-delay: 320ms; }
+.auth-sheet form > :nth-child(2) { animation-delay: 380ms; }
+.auth-sheet form > :nth-child(3) { animation-delay: 440ms; }
+.auth-sheet form > :nth-child(n + 4) { animation-delay: 500ms; }
+
+@media (prefers-reduced-motion: reduce) {
+    .auth-sheet, .auth-hero, .auth-sheet > div > *, .auth-sheet form > * { animation: none; }
+}

@@ -1,7 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">
     <title>Handloft</title>
-    <rect width="40" height="40" rx="10" fill="#10512a"/>
-    <path d="M13 30V18M27 30V18" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
-    <path d="M10.5 18.5 20 10.5 29.5 18.5" fill="none" stroke="#bfef1e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M13 24h9.75M20.25 21.25 23 24l-2.75 2.75" fill="none" stroke="#bfef1e" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <defs>
+        <linearGradient id="bg" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#1f8443"/><stop offset="1" stop-color="#0b3f20"/></linearGradient>
+        <radialGradient id="gloss" cx="9" cy="5" r="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff" stop-opacity=".2"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    </defs>
+    <rect width="40" height="40" rx="11" fill="url(#bg)"/>
+    <rect width="40" height="40" rx="11" fill="url(#gloss)"/>
+    <rect x=".5" y=".5" width="39" height="39" rx="10.5" fill="none" stroke="#fff" stroke-opacity=".14"/>
+    <rect x="8.5" y="8.5" width="7" height="23" rx="3.5" fill="#fff"/>
+    <rect x="8.5" y="12.5" width="15" height="5.5" rx="2.75" fill="#fff"/>
+    <rect x="24.5" y="8.5" width="7" height="23" rx="3.5" fill="#bfef1e"/>
+    <rect x="16.5" y="22" width="15" height="5.5" rx="2.75" fill="#bfef1e"/>
 </svg>

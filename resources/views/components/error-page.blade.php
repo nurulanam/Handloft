@@ -63,7 +63,7 @@
                 Error {{ $code }}
             </span>
             <h1 class="mt-3 text-2xl font-semibold text-zinc-900">{{ $guestTitle }}</h1>
-            <p class="mt-2 text-sm text-zinc-500">{{ $guestMessage }}</p>
+            <p class="mt-2 text-sm text-zinc-600">{{ $guestMessage }}</p>
             <a href="{{ route('login') }}" class="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand/90">Go to sign in</a>
         </div>
     @endcomponent
