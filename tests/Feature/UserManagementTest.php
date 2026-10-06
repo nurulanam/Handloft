@@ -57,6 +57,30 @@ class UserManagementTest extends TestCase
             ->assertViewHas('users', fn ($users) => $users->doesntContain('id', $admin->id));
     }
 
+    public function test_the_team_list_can_be_searched_and_filtered(): void
+    {
+        $admin = User::role(Role::SuperAdmin->value)->firstOrFail();
+        $designer = User::factory()->create(['name' => 'Dina Designer', 'department' => 'Design', 'status' => 'active']);
+        $designer->assignRole(Role::TeamMember->value);
+        $manager = User::factory()->create(['name' => 'Mira Manager', 'department' => 'Ops', 'status' => 'inactive']);
+        $manager->assignRole(Role::Manager->value);
+
+        $names = fn ($users) => $users->pluck('name')->all();
+
+        Livewire::actingAs($admin)->test('users.index')
+            ->set('search', 'design')
+            ->assertViewHas('users', fn ($users) => $names($users) === ['Dina Designer'])
+            ->set('search', '')
+            ->set('role', Role::Manager->value)
+            ->assertViewHas('users', fn ($users) => $names($users) === ['Mira Manager'])
+            ->set('role', '')
+            ->set('status', 'active')
+            ->assertViewHas('users', fn ($users) => $names($users) === ['Dina Designer'])
+            ->call('clearFilters')
+            ->assertViewHas('users', fn ($users) => count($names($users)) === 2)
+            ->assertViewHas('summary', fn ($summary) => $summary['total'] === 2 && $summary['managers'] === 1 && $summary['inactive'] === 1);
+    }
+
     public function test_non_admin_cannot_create_a_user(): void
     {
         RoleModel::findOrCreate(Role::TeamMember->value);
