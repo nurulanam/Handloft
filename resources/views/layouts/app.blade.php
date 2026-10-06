@@ -199,6 +199,32 @@
                 -webkit-mask-composite: xor;
             }
 
+            /* Glass needs something behind it to frost, and the page under the bar is mostly flat white —
+               two faint brand tints (.notch-backdrop) drift slowly *behind* the bar, and the bar itself is
+               frosted glass on top. Both layers carry the notch mask, and nothing else is drawn there, so the
+               cut-out shows the page straight through. */
+            .notch-backdrop span {
+                position: absolute;
+                border-radius: 9999px;
+                filter: blur(16px);
+                animation: notch-drift var(--drift, 14s) ease-in-out infinite alternate;
+            }
+
+            @keyframes notch-drift {
+                from { transform: translate(0, 0) scale(1); }
+                to { transform: translate(var(--dx, 40px), var(--dy, -8px)) scale(1.15); }
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+                .notch-backdrop span { animation: none; }
+            }
+
+            .notch-glass {
+                background-color: rgb(255 255 255 / 0.45);
+                -webkit-backdrop-filter: blur(18px) saturate(1.6);
+                backdrop-filter: blur(18px) saturate(1.6);
+            }
+
             .notch-open .notch-bar {
                 mask-size: 100% 100%, 80px 32px;
                 -webkit-mask-size: 100% 100%, 80px 32px;
@@ -216,6 +242,7 @@
             .notch-open .notch-circle {
                 scale: 1;
             }
+
         </style>
 
         <style>
@@ -411,6 +438,21 @@
         class="min-h-screen bg-zinc-50 font-sans antialiased"
         x-data="{
             sidebarOpen: false,
+            drag: null,
+            dragStart(e) {
+                if (! this.sidebarOpen || window.innerWidth >= 1024) return;
+                this.drag = { x: e.touches[0].clientX, y: e.touches[0].clientY, dx: 0, on: null };
+            },
+            dragMove(e) {
+                if (! this.drag) return;
+                const dx = e.touches[0].clientX - this.drag.x, dy = e.touches[0].clientY - this.drag.y;
+                if (this.drag.on === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) this.drag.on = Math.abs(dx) > Math.abs(dy);
+                if (this.drag.on) this.drag.dx = Math.min(0, dx);
+            },
+            dragEnd() {
+                if (this.drag?.on && this.drag.dx < -60) this.sidebarOpen = false;
+                this.drag = null;
+            },
             sidebarCollapsed: localStorage.getItem('sidebarCollapsed') === 'true',
             flyout: { show: false, top: 0, label: '' },
             toggleCollapsed() {
@@ -503,14 +545,25 @@
 
         <div class="flex min-h-screen">
             {{-- Sidebar --}}
+            {{-- Phones: a frosted-glass drawer that slides in from the left, matching the notification
+                 sheet's glass and easing, and follows the finger for swipe-to-close. Desktop keeps the dark rail. --}}
             <aside
-                class="sidebar-notch fixed inset-y-0 left-0 z-30 w-64 transform overflow-x-hidden overflow-y-auto bg-zinc-900 text-zinc-300 transition-[transform,width] duration-300 ease-in-out lg:translate-x-0"
+                class="sidebar-notch fixed inset-y-0 left-0 z-30 w-72 overflow-x-hidden overflow-y-auto rounded-r-3xl border-r border-white/60 bg-white/70 text-zinc-700 shadow-2xl backdrop-blur-xl backdrop-saturate-150 transition-[translate,width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] lg:translate-x-0 lg:rounded-none lg:border-0 lg:bg-zinc-900 lg:text-zinc-300 lg:shadow-none lg:backdrop-blur-none lg:backdrop-saturate-100 lg:ease-in-out"
                 :class="[sidebarOpen ? 'translate-x-0' : '-translate-x-full', sidebarCollapsed ? 'lg:w-20' : 'lg:w-64']"
+                :style="drag?.on ? { transform: `translateX(${drag.dx}px)`, transition: 'none' } : {}"
                 @scroll="flyout.show = false"
+                @touchstart.passive="dragStart($event)"
+                @touchmove.passive="dragMove($event)"
+                @touchend="dragEnd()"
+                @touchcancel="dragEnd()"
             >
-                <div class="flex h-16 items-center gap-2.5 px-6 text-lg font-semibold text-white" :class="sidebarCollapsed ? 'lg:justify-center lg:gap-0 lg:px-0' : ''">
+                <div class="flex h-16 items-center gap-2.5 px-6 text-lg font-semibold text-zinc-900 lg:text-white" :class="sidebarCollapsed ? 'lg:justify-center lg:gap-0 lg:px-0' : ''">
                     <x-logo-mark class="size-8 shrink-0" />
                     <span class="overflow-hidden whitespace-nowrap transition-all duration-200" :class="sidebarCollapsed ? 'lg:w-0 lg:opacity-0' : 'w-auto opacity-100'">{{ config('app.name') }}</span>
+                    <button type="button" @click="sidebarOpen = false" class="-mr-3 ml-auto rounded-full p-2 text-zinc-500 hover:bg-white/60 active:bg-zinc-900/5 lg:hidden" title="Close menu">
+                        <span class="sr-only">Close menu</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>
+                    </button>
                 </div>
 
                 <nav class="space-y-1 px-3 pb-8">
@@ -557,7 +610,7 @@
                                     @mouseenter="showFlyout($el, @js($item['label']))"
                                     @mouseleave="flyout.show = false"
                                     @click="sidebarCollapsed ? Livewire.navigate('{{ route($visibleChildren->first()['route']) }}') : (open = ! open)"
-                                    class="flex w-full items-center gap-2.5 overflow-hidden rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors duration-200 ease-in-out {{ $childActive ? 'bg-brand text-white' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' }}"
+                                    class="flex w-full items-center gap-2.5 overflow-hidden rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors duration-200 ease-in-out {{ $childActive ? 'bg-brand text-white shadow-sm shadow-brand/20 lg:shadow-none' : 'text-zinc-600 hover:bg-zinc-900/5 hover:text-zinc-900 lg:text-zinc-400 lg:hover:bg-zinc-800 lg:hover:text-white' }}"
                                     :class="sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''"
                                 >
                                     <x-nav-icon :name="$item['icon']" class="size-4.5 shrink-0" />
@@ -580,12 +633,12 @@
                                     :style="{ height: height }"
                                     :class="sidebarCollapsed ? 'lg:hidden' : ''"
                                 >
-                                    <div x-ref="submenuPanel" class="ml-4 mt-1 space-y-0.5 border-l border-zinc-800 pl-4">
+                                    <div x-ref="submenuPanel" class="ml-4 mt-1 space-y-0.5 border-l border-zinc-900/10 pl-4 lg:border-zinc-800">
                                         @foreach ($visibleChildren as $child)
                                             <a
                                                 href="{{ route($child['route']) }}"
                                                 wire:navigate
-                                                class="block rounded-lg px-3 py-1.5 text-sm transition {{ request()->routeIs($child['route']) ? 'font-medium text-white' : 'text-zinc-400 hover:text-white' }}"
+                                                class="block rounded-lg px-3 py-1.5 text-sm transition {{ request()->routeIs($child['route']) ? 'font-semibold text-brand lg:font-medium lg:text-white' : 'text-zinc-500 hover:text-zinc-900 lg:text-zinc-400 lg:hover:text-white' }}"
                                             >
                                                 {{ $child['label'] }}
                                             </a>
@@ -595,7 +648,7 @@
                             </div>
                         @elseif (! empty($item['disabled']))
                             <span
-                                class="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-zinc-500"
+                                class="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-zinc-400 lg:text-zinc-500"
                                 :class="sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''"
                                 @mouseenter="showFlyout($el, @js($item['label'].' · Soon'))"
                                 @mouseleave="flyout.show = false"
@@ -604,7 +657,7 @@
                                     <x-nav-icon :name="$item['icon']" class="size-4.5 shrink-0" />
                                     <span class="whitespace-nowrap transition-all duration-200" :class="sidebarCollapsed ? 'lg:hidden' : ''">{{ $item['label'] }}</span>
                                 </span>
-                                <span class="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] uppercase tracking-wide" :class="sidebarCollapsed ? 'lg:hidden' : ''">Soon</span>
+                                <span class="rounded bg-zinc-900/5 px-1.5 py-0.5 text-[10px] lg:bg-zinc-800 uppercase tracking-wide" :class="sidebarCollapsed ? 'lg:hidden' : ''">Soon</span>
                             </span>
                         @else
                             <a
@@ -612,7 +665,7 @@
                                 wire:navigate
                                 @mouseenter="showFlyout($el, @js($item['label']))"
                                 @mouseleave="flyout.show = false"
-                                class="flex items-center gap-2.5 overflow-hidden rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200 ease-in-out {{ request()->routeIs($item['route'], \Illuminate\Support\Str::before($item['route'], '.').'.*') ? 'bg-brand text-white' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white' }}"
+                                class="flex items-center gap-2.5 overflow-hidden rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200 ease-in-out {{ request()->routeIs($item['route'], \Illuminate\Support\Str::before($item['route'], '.').'.*') ? 'bg-brand text-white shadow-sm shadow-brand/20 lg:shadow-none' : 'text-zinc-600 hover:bg-zinc-900/5 hover:text-zinc-900 lg:text-zinc-400 lg:hover:bg-zinc-800 lg:hover:text-white' }}"
                                 :class="sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''"
                             >
                                 <x-nav-icon :name="$item['icon']" class="size-4.5 shrink-0" />
@@ -718,33 +771,33 @@
                             const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
                             const move = { duration: reduce ? 0 : 450, easing: 'cubic-bezier(0.65, 0, 0.35, 1)' };
                             const pop = { ...move, easing: 'cubic-bezier(0.34, 1.45, 0.64, 1)' };
-                            const { bar, circle } = this.$refs;
+                            const { bar, backdrop, circle } = this.$refs;
                             const icons = this.$refs.items.querySelectorAll('svg');
                             const labels = this.$refs.items.querySelectorAll('[data-label]');
                             const maskAt = (x) => ({ maskPosition: `0 0, ${x - 40}px 0`, webkitMaskPosition: `0 0, ${x - 40}px 0` });
                             const maskDepth = (h) => ({ maskSize: `100% 100%, 80px ${h}px`, webkitMaskSize: `100% 100%, 80px ${h}px` });
 
                             [bar, circle, ...icons, ...labels].forEach(el => el.getAnimations().forEach(a => a.cancel()));
+                            backdrop.getAnimations({ subtree: false }).forEach(a => a.cancel());
 
                             if (prev >= 0 && next >= 0) {
                                 circle.animate([{ transform: `translateX(${fromX - toX}px)` }, { transform: 'none' }], move);
-                                bar.animate([maskAt(fromX), maskAt(toX)], move);
+                                [bar, backdrop].forEach(el => el.animate([maskAt(fromX), maskAt(toX)], move));
                             } else if (next >= 0) {
                                 circle.animate([{ scale: 0 }, { scale: 1 }], pop);
-                                bar.animate([maskDepth(0), maskDepth(32)], move);
+                                [bar, backdrop].forEach(el => el.animate([maskDepth(0), maskDepth(32)], move));
                             } else if (prev >= 0) {
                                 circle.animate([{ scale: 1 }, { scale: 0 }], move);
-                                bar.animate([maskDepth(32), maskDepth(0)], move);
+                                [bar, backdrop].forEach(el => el.animate([maskDepth(32), maskDepth(0)], move));
                             }
 
                             if (prev >= 0) {
-                                icons[prev].animate([{ translate: '0 -2rem' }, { translate: '0 0' }], move);
-                                labels[prev].animate([{ opacity: 1 }, { opacity: 0 }], { ...move, duration: move.duration / 3 });
+                                icons[prev].animate([{ translate: '0 -1.5rem' }, { translate: '0 0' }], move);
                             }
                             if (next >= 0) {
                                 {{-- The icon waits for the circle to arrive, then pops up into it; rising at once would leave it floating above the bar on its own. --}}
-                                icons[next].animate([{ translate: '0 0' }, { translate: '0 -2rem' }], { ...pop, duration: move.duration * 0.65, delay: move.duration * 0.5, fill: 'backwards' });
-                                labels[next].animate([{ opacity: 0, translate: '0 4px' }, { opacity: 1, translate: '0 0' }], { ...move, duration: move.duration * 0.5, delay: move.duration * 0.6, fill: 'backwards' });
+                                icons[next].animate([{ translate: '0 0' }, { translate: '0 -1.5rem' }], { ...pop, duration: move.duration * 0.65, delay: move.duration * 0.5, fill: 'backwards' });
+                                labels[next].animate([{ scale: 1 }, { scale: 1.08 }, { scale: 1 }], { duration: move.duration * 0.6, delay: move.duration * 0.55, easing: 'ease-out' });
                             }
                         },
                     }"
@@ -760,8 +813,12 @@
                     style="--notch-x: -100px; height: calc(4rem + env(safe-area-inset-bottom));"
                     aria-label="Shortcuts"
                 >
-                    <div x-ref="bar" class="notch-bar absolute inset-0 bg-zinc-900"></div>
-                    <div x-ref="circle" class="notch-circle absolute left-0 top-0 size-12 rounded-full bg-brand shadow-lg shadow-brand/30"></div>
+                    <div x-ref="backdrop" class="notch-bar notch-backdrop pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+                        <span class="-left-10 -top-6 h-28 w-56 bg-brand-lime/30" style="--drift: 16s; --dx: 70px; --dy: 6px;"></span>
+                        <span class="-right-10 -top-2 h-28 w-56 bg-brand/15" style="--drift: 20s; --dx: -70px; --dy: -6px;"></span>
+                    </div>
+                    <div x-ref="bar" class="notch-bar notch-glass absolute inset-0"></div>
+                    <div x-ref="circle" class="notch-circle absolute left-0 top-0 size-12 rounded-full bg-brand"></div>
 
                     <div x-ref="items" class="relative flex h-16">
                         @foreach ($mobileNav as $index => $item)
@@ -769,18 +826,19 @@
                                 href="{{ route($item['route']) }}"
                                 wire:navigate
                                 @click="go({{ $index }})"
-                                class="relative flex flex-1 items-center justify-center"
+                                class="relative flex flex-1 flex-col items-center pt-3"
                                 :aria-current="active === {{ $index }} ? 'page' : null"
                             >
+                                {{-- Icon centers sit 24px down, so the active one rises 1.5rem to land in the circle; labels share one baseline below the notch and stay put. --}}
                                 <x-nav-icon
                                     :name="$item['icon']"
                                     class="size-6 transition-colors duration-300"
-                                    x-bind:class="active === {{ $index }} ? '-translate-y-8 text-white' : 'text-zinc-400'"
+                                    x-bind:class="active === {{ $index }} ? '-translate-y-6 text-white' : 'text-zinc-700'"
                                 />
                                 <span
                                     data-label
-                                    class="absolute bottom-1.5 text-[11px] font-medium text-brand-lime"
-                                    :class="active === {{ $index }} ? 'opacity-100' : 'opacity-0'"
+                                    class="mt-1 text-[11px] leading-3.5 transition-colors duration-300"
+                                    :class="active === {{ $index }} ? 'font-semibold text-brand' : 'font-medium text-zinc-700'"
                                 >{{ $item['label'] }}</span>
                             </a>
                         @endforeach
@@ -791,8 +849,12 @@
             <div
                 x-show="sidebarOpen"
                 x-cloak
+                x-transition:enter="transition-opacity duration-300"
+                x-transition:enter-start="opacity-0"
+                x-transition:leave="transition-opacity duration-300"
+                x-transition:leave-end="opacity-0"
                 @click="sidebarOpen = false"
-                class="fixed inset-0 z-20 bg-zinc-900/50 lg:hidden"
+                class="fixed inset-0 z-20 bg-zinc-900/25 backdrop-blur-sm lg:hidden"
             ></div>
 
             {{-- Main column --}}

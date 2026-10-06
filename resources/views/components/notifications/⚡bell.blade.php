@@ -45,16 +45,23 @@ new class extends Component
         open: false,
         dragY: 0,
         startY: null,
-        toggle() { this.open = ! this.open; this.dragY = 0; },
+        dismissing: false,
+        toggle() { this.open = ! this.open; this.dragY = 0; this.dismissing = false; },
         dragStart(e) { this.startY = e.touches[0].clientY; },
         dragMove(e) {
             if (this.startY === null) return;
             this.dragY = Math.min(0, e.touches[0].clientY - this.startY);
         },
+        {{-- A swipe past the threshold finishes the slide-up from wherever the finger let go (same 300ms
+             curve as opening), and only then hides the sheet — rather than snapping back down first and
+             replaying the close from the top. A short drag springs back. --}}
         dragEnd() {
-            if (this.dragY < -60) this.open = false;
+            const swipedAway = this.dragY < -60;
             this.startY = null;
-            this.dragY = 0;
+            if (! swipedAway) { this.dragY = 0; return; }
+            this.dismissing = true;
+            {{-- dismissing stays true (holding the sheet off-screen) through x-show's own leave; toggle() resets it on the next open. --}}
+            setTimeout(() => { this.open = false; }, 300);
         },
     }"
     x-effect="document.body.classList.toggle('overflow-hidden', open && window.innerWidth < 640)"
@@ -116,11 +123,12 @@ new class extends Component
                 x-transition:enter="transition-opacity duration-300 ease-out"
                 x-transition:enter-start="opacity-0"
                 x-transition:enter-end="opacity-100"
-                x-transition:leave="transition-opacity duration-200 ease-in"
+                x-transition:leave="transition-opacity duration-300 ease-out"
                 x-transition:leave-start="opacity-100"
                 x-transition:leave-end="opacity-0"
                 @click="open = false"
-                class="fixed inset-0 z-50 bg-zinc-900/25 backdrop-blur-sm"
+                :class="dismissing ? 'opacity-0' : ''"
+                class="fixed inset-0 z-50 bg-zinc-900/25 backdrop-blur-sm transition-opacity duration-300"
             ></div>
 
             <div
@@ -129,11 +137,13 @@ new class extends Component
                 x-transition:enter="transition duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
                 x-transition:enter-start="-translate-y-full"
                 x-transition:enter-end="translate-y-0"
-                x-transition:leave="transition duration-200 ease-in"
+                x-transition:leave="transition duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
                 x-transition:leave-start="translate-y-0"
                 x-transition:leave-end="-translate-y-full"
-                :style="dragY ? `transform: translateY(${dragY}px); transition: none` : ''"
-                class="fixed inset-x-0 top-0 z-50 flex max-h-[85vh] flex-col rounded-b-3xl border-b border-white/60 bg-white/70 pt-[env(safe-area-inset-top)] shadow-2xl shadow-zinc-900/20 backdrop-blur-xl backdrop-saturate-150"
+                :style="dismissing
+                    ? 'transform: translateY(-100%); transition: transform 300ms cubic-bezier(0.32, 0.72, 0, 1)'
+                    : (startY !== null ? `transform: translateY(${dragY}px); transition: none` : '')"
+                class="fixed inset-x-0 top-0 z-50 flex transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] max-h-[85vh] flex-col rounded-b-3xl border-b border-white/60 bg-white/70 pt-[env(safe-area-inset-top)] shadow-2xl shadow-zinc-900/20 backdrop-blur-xl backdrop-saturate-150"
                 role="dialog"
                 aria-label="Notifications"
             >
