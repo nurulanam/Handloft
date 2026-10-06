@@ -15,3 +15,82 @@
     --color-brand: #10512a;
     --color-brand-lime: #bfef1e;
 }
+
+/* Modern range slider: a thick rounded track filled in brand green up to the
+   value (--fill, a percentage set from Alpine), and a large white thumb with a
+   soft shadow that grows a lime focus halo while dragged. */
+.range-modern {
+    --fill: 50%;
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100%;
+    height: 1.75rem;
+    background: transparent;
+    cursor: pointer;
+    touch-action: pan-y;
+}
+
+.range-modern:focus {
+    outline: none;
+}
+
+.range-modern::-webkit-slider-runnable-track {
+    height: 0.5rem;
+    border-radius: 9999px;
+    background: linear-gradient(to right, var(--color-brand) 0%, #2f8a3e var(--fill), var(--color-zinc-200) var(--fill));
+}
+
+.range-modern::-moz-range-track {
+    height: 0.5rem;
+    border-radius: 9999px;
+    background: var(--color-zinc-200);
+}
+
+.range-modern::-moz-range-progress {
+    height: 0.5rem;
+    border-radius: 9999px;
+    background: linear-gradient(to right, var(--color-brand), #2f8a3e);
+}
+
+.range-modern::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 1.375rem;
+    height: 1.375rem;
+    margin-top: -0.4375rem;
+    border-radius: 9999px;
+    background: #fff;
+    border: 2px solid var(--color-brand);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.2), 0 0 0 0 rgb(191 239 30 / 0.5);
+    transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.range-modern::-moz-range-thumb {
+    width: 1.125rem;
+    height: 1.125rem;
+    border-radius: 9999px;
+    background: #fff;
+    border: 2px solid var(--color-brand);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.2), 0 0 0 0 rgb(191 239 30 / 0.5);
+    transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.range-modern:hover::-webkit-slider-thumb {
+    transform: scale(1.08);
+}
+
+.range-modern:hover::-moz-range-thumb {
+    transform: scale(1.08);
+}
+
+.range-modern:active::-webkit-slider-thumb,
+.range-modern:focus-visible::-webkit-slider-thumb {
+    transform: scale(1.12);
+    box-shadow: 0 2px 6px rgb(0 0 0 / 0.2), 0 0 0 6px rgb(191 239 30 / 0.45);
+}
+
+.range-modern:active::-moz-range-thumb,
+.range-modern:focus-visible::-moz-range-thumb {
+    transform: scale(1.12);
+    box-shadow: 0 2px 6px rgb(0 0 0 / 0.2), 0 0 0 6px rgb(191 239 30 / 0.45);
+}

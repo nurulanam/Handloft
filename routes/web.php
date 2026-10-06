@@ -44,3 +44,7 @@ Route::middleware('auth')->group(function () {
 
     Route::livewire('/settings', 'settings')->name('settings');
 });
+
+// Unknown URLs land here instead of 404ing before the middleware runs, so the
+// session is loaded and the 404 page can show signed-in users the app shell.
+Route::fallback(fn () => abort(404));

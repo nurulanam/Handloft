@@ -77,7 +77,7 @@ new #[Layout('layouts.app')] #[Title('Create Project')] class extends Component
             <h1 class="text-xl font-semibold text-zinc-900 sm:text-2xl">Create Project</h1>
         </div>
 
-        <div class="flex items-center gap-3">
+        <div class="hidden items-center gap-3 sm:flex">
             <a href="{{ route('projects.index') }}" wire:navigate class="text-sm font-medium text-zinc-600 hover:text-zinc-900">Cancel</a>
             <button type="submit" form="create-project-form" class="whitespace-nowrap rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90" wire:loading.attr="disabled">
                 Create Project
@@ -165,7 +165,7 @@ new #[Layout('layouts.app')] #[Title('Create Project')] class extends Component
                 </div>
             </div>
         </div>
-        {{-- Phones: the header actions scroll away on a long form, so repeat them where the form ends. --}}
+        {{-- Phones: the actions live here, where the form ends, instead of in the header. --}}
         <div class="mt-6 flex gap-3 sm:hidden">
             <a href="{{ route('projects.index') }}" wire:navigate class="flex-1 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-center text-sm font-medium text-zinc-700 hover:bg-zinc-50">Cancel</a>
             <button type="submit" class="flex-1 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand/90" wire:loading.attr="disabled">Create Project</button>

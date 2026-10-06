@@ -485,57 +485,7 @@
                 class="fixed inset-0 z-60 flex flex-col items-center justify-center gap-6"
                 style="background-color: rgba(255, 255, 255, {{ $__loadingScreen->loading_screen_opacity / 100 }}); backdrop-filter: blur({{ $__loadingScreen->loading_screen_blur }}px); -webkit-backdrop-filter: blur({{ $__loadingScreen->loading_screen_blur }}px);"
             >
-                @if ($__loadingScreen->loading_screen_style === 'spinner')
-                    <div class="size-16 animate-spin rounded-full border-4 border-brand/20 border-t-brand-lime"></div>
-                @elseif ($__loadingScreen->loading_screen_style === 'bars')
-                    <div class="bars-loader">
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                    </div>
-                @elseif ($__loadingScreen->loading_screen_style === 'hand')
-                    <div class="hand-loader">
-                        <div class="hand-finger hand-finger-1">
-                            <div class="hand-finger-item">
-                                <span></span>
-                                <i></i>
-                            </div>
-                        </div>
-                        <div class="hand-finger hand-finger-2">
-                            <div class="hand-finger-item">
-                                <span></span>
-                                <i></i>
-                            </div>
-                        </div>
-                        <div class="hand-finger hand-finger-3">
-                            <div class="hand-finger-item">
-                                <span></span>
-                                <i></i>
-                            </div>
-                        </div>
-                        <div class="hand-finger hand-finger-4">
-                            <div class="hand-finger-item">
-                                <span></span>
-                                <i></i>
-                            </div>
-                        </div>
-                        <div class="hand-last-finger">
-                            <div class="hand-last-finger-item">
-                                <i></i>
-                            </div>
-                        </div>
-                    </div>
-                @else
-                    <div class="jampe-loader">
-                        <div class="jampe-box"></div>
-                        <div class="jampe-box"></div>
-                        <div class="jampe-box"></div>
-                        <div class="jampe-box"></div>
-                        <div class="jampe-box"></div>
-                    </div>
-                @endif
+                <x-loading-animation :name="$__loadingScreen->loading_screen_style" />
                 <div class="flex items-center gap-2.5 text-xl font-semibold text-zinc-900">
                     <x-logo-mark class="size-9 shrink-0" />
                     {{ config('app.name') }}
@@ -546,16 +496,19 @@
         <div class="flex min-h-screen">
             {{-- Sidebar --}}
             {{-- Phones: a frosted-glass drawer that slides in from the left, matching the notification
-                 sheet's glass and easing, and follows the finger for swipe-to-close. Desktop keeps the dark rail. --}}
+                 sheet's glass and easing, and follows the finger for swipe-to-close. Desktop keeps the dark rail.
+                 The closed/expanded state is in the static classes so the first paint (before Alpine boots, on
+                 every load and wire:navigate) is already right; Alpine only adds the open/collapsed overrides. --}}
             <aside
-                class="sidebar-notch fixed inset-y-0 left-0 z-30 w-72 overflow-x-hidden overflow-y-auto rounded-r-3xl border-r border-white/60 bg-white/70 text-zinc-700 backdrop-blur-xl backdrop-saturate-150 transition-[translate,width,box-shadow] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] lg:translate-x-0 lg:rounded-none lg:border-0 lg:bg-zinc-900 lg:text-zinc-300 lg:shadow-none lg:backdrop-blur-none lg:backdrop-saturate-100 lg:ease-in-out"
-                :class="[sidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full', sidebarCollapsed ? 'lg:w-20' : 'lg:w-64']"
+                class="sidebar-notch fixed inset-y-0 left-0 z-30 w-72 overflow-x-hidden overflow-y-auto rounded-r-3xl border-r border-white/60 bg-white/70 text-zinc-700 backdrop-blur-xl backdrop-saturate-150 -translate-x-full transition-[translate,width,box-shadow] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] lg:w-64 lg:translate-x-0 lg:rounded-none lg:border-0 lg:bg-zinc-900 lg:text-zinc-300 lg:shadow-none lg:backdrop-blur-none lg:backdrop-saturate-100 lg:ease-in-out"
+                :class="[sidebarOpen && 'translate-x-0! shadow-2xl', sidebarCollapsed && 'lg:w-20!']"
                 :style="drag?.on ? { transform: `translateX(${drag.dx}px)`, transition: 'none' } : {}"
                 @scroll="flyout.show = false"
                 @touchstart.passive="dragStart($event)"
                 @touchmove.passive="dragMove($event)"
                 @touchend="dragEnd()"
                 @touchcancel="dragEnd()"
+                @click="$event.target.closest('a[href]') && (sidebarOpen = false)"
             >
                 <div class="flex h-16 items-center gap-2.5 px-6 text-lg font-semibold text-zinc-900 lg:text-white" :class="sidebarCollapsed ? 'lg:justify-center lg:gap-0 lg:px-0' : ''">
                     <x-logo-mark class="size-8 shrink-0" />
