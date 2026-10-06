@@ -44,4 +44,17 @@ class NotFoundPageTest extends TestCase
             ->assertSee('Go to sign in')
             ->assertDontSee('aria-label="Shortcuts"', false);
     }
+
+    public function test_a_signed_in_user_without_access_sees_the_forbidden_page_inside_the_app_shell(): void
+    {
+        $user = User::factory()->create(['status' => 'active']);
+        $user->assignRole(RoleModel::findOrCreate(Role::TeamMember->value));
+
+        $this->actingAs($user)
+            ->get(route('settings'))
+            ->assertForbidden()
+            ->assertSee('You don&#039;t have access to this', false)
+            ->assertSee('Back to dashboard')
+            ->assertSee('aria-label="Shortcuts"', false);
+    }
 }

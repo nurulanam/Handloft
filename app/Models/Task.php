@@ -6,6 +6,8 @@ use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -91,6 +93,29 @@ class Task extends Model
     public function currentAssignee(): ?User
     {
         return $this->currentAssignment?->assignedTo;
+    }
+
+    /**
+     * Tasks the user may see (the query twin of TaskPolicy::view()): everything
+     * for a view-all-tasks holder, otherwise tasks they report, are assigned,
+     * review, or have assigned to someone — so whoever creates a task can still
+     * follow it after handing it off, even when they named someone else as Reporter.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function visibleTo(Builder $query, User $user): void
+    {
+        if ($user->can('view-all-tasks')) {
+            return;
+        }
+
+        $query->where(function (Builder $q) use ($user) {
+            $q->where('created_by', $user->id)
+                ->orWhere('qa_id', $user->id)
+                ->orWhereHas('currentAssignment', fn (Builder $a) => $a->where('assigned_to', $user->id))
+                ->orWhereHas('assignments', fn (Builder $a) => $a->where('assigned_by', $user->id));
+        });
     }
 
     /**

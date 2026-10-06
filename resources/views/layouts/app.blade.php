@@ -3,6 +3,8 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="csrf-token" content="{{ csrf_token() }}">
+        <meta name="user-id" content="{{ auth()->id() }}">
 
         <title>{{ $title ?? config('app.name') }}</title>
 
@@ -217,6 +219,11 @@
 
             @media (prefers-reduced-motion: reduce) {
                 .notch-backdrop span { animation: none; }
+            }
+
+            .notch-shade {
+                filter: blur(5px);
+                translate: 0 -2px;
             }
 
             .notch-glass {
@@ -724,24 +731,24 @@
                             const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
                             const move = { duration: reduce ? 0 : 450, easing: 'cubic-bezier(0.65, 0, 0.35, 1)' };
                             const pop = { ...move, easing: 'cubic-bezier(0.34, 1.45, 0.64, 1)' };
-                            const { bar, backdrop, circle } = this.$refs;
+                            const { bar, backdrop, shade, circle } = this.$refs;
                             const icons = this.$refs.items.querySelectorAll('svg');
                             const labels = this.$refs.items.querySelectorAll('[data-label]');
                             const maskAt = (x) => ({ maskPosition: `0 0, ${x - 40}px 0`, webkitMaskPosition: `0 0, ${x - 40}px 0` });
                             const maskDepth = (h) => ({ maskSize: `100% 100%, 80px ${h}px`, webkitMaskSize: `100% 100%, 80px ${h}px` });
 
-                            [bar, circle, ...icons, ...labels].forEach(el => el.getAnimations().forEach(a => a.cancel()));
+                            [bar, shade, circle, ...icons, ...labels].forEach(el => el.getAnimations().forEach(a => a.cancel()));
                             backdrop.getAnimations({ subtree: false }).forEach(a => a.cancel());
 
                             if (prev >= 0 && next >= 0) {
                                 circle.animate([{ transform: `translateX(${fromX - toX}px)` }, { transform: 'none' }], move);
-                                [bar, backdrop].forEach(el => el.animate([maskAt(fromX), maskAt(toX)], move));
+                                [bar, backdrop, shade].forEach(el => el.animate([maskAt(fromX), maskAt(toX)], move));
                             } else if (next >= 0) {
                                 circle.animate([{ scale: 0 }, { scale: 1 }], pop);
-                                [bar, backdrop].forEach(el => el.animate([maskDepth(0), maskDepth(32)], move));
+                                [bar, backdrop, shade].forEach(el => el.animate([maskDepth(0), maskDepth(32)], move));
                             } else if (prev >= 0) {
                                 circle.animate([{ scale: 1 }, { scale: 0 }], move);
-                                [bar, backdrop].forEach(el => el.animate([maskDepth(32), maskDepth(0)], move));
+                                [bar, backdrop, shade].forEach(el => el.animate([maskDepth(32), maskDepth(0)], move));
                             }
 
                             if (prev >= 0) {
@@ -766,6 +773,13 @@
                     style="--notch-x: -100px; height: calc(4rem + env(safe-area-inset-bottom));"
                     aria-label="Shortcuts"
                 >
+                    {{-- A blurred, slightly raised copy of the bar's shape behind the glass: a soft shadow that traces the
+                         top edge and the notch curve, and deepens the glass a touch so the cut-out reads clearly. The blur
+                         sits on the wrapper so it softens the already-notched shape (a filter on the masked layer itself
+                         would be cut off by its own mask). --}}
+                    <div class="notch-shade pointer-events-none absolute inset-0" aria-hidden="true">
+                        <div x-ref="shade" class="notch-bar absolute inset-0 bg-zinc-900/15"></div>
+                    </div>
                     <div x-ref="backdrop" class="notch-bar notch-backdrop pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
                         <span class="-left-10 -top-6 h-28 w-56 bg-brand-lime/30" style="--drift: 16s; --dx: 70px; --dy: 6px;"></span>
                         <span class="-right-10 -top-2 h-28 w-56 bg-brand/15" style="--drift: 20s; --dx: -70px; --dy: -6px;"></span>
@@ -880,54 +894,98 @@
         </div>
 
         {{-- Toast notifications: any Livewire component can trigger one with
-             $this->dispatch('notify', message: '...', type: 'error'|'success'). --}}
+             $this->dispatch('notify', message: '...', type: 'success'|'error'|'info'|'star'|'unstar').
+             Phones: a dark Dynamic Island pill that drops from the top and widens open, matching the live
+             notification notch (tap it, or its close button, to dismiss). sm and up: a crisp card at the top
+             right with a solid status icon, title, message and countdown bar; hovering pauses the countdown.
+             Each plays its exit before removal; newest on top; at most three stack. --}}
         <div
-            x-data="{ toasts: [] }"
-            x-on:notify.window="
-                const id = Date.now() + Math.random();
-                toasts.push({ id, message: $event.detail.message, type: $event.detail.type ?? 'info' });
-                setTimeout(() => { toasts = toasts.filter((t) => t.id !== id) }, 5000);
-            "
-            class="pointer-events-none fixed inset-x-4 top-4 z-50 flex flex-col items-end gap-2 sm:inset-x-auto sm:right-4"
+            x-data="{
+                toasts: [],
+                titles: { success: 'Done', error: 'Something went wrong', info: 'Heads up', star: 'Added to Starred', unstar: 'Removed from Starred' },
+                add(detail) {
+                    this.toasts.unshift({ id: Date.now() + Math.random(), message: detail.message, type: detail.type ?? 'info', show: false, remaining: 4000, started: Date.now(), timer: null });
+                    const toast = this.toasts[0];
+                    this.$nextTick(() => { toast.show = true; });
+                    toast.timer = setTimeout(() => this.dismiss(toast), toast.remaining);
+                    this.toasts.filter((t) => t.show).slice(2).forEach((t) => this.dismiss(t));
+                },
+                {{-- Pause/resume only with a real pointer: a tap fires mouseenter with no mouseleave, which would freeze it. --}}
+                pause(toast) {
+                    if (! matchMedia('(hover: hover)').matches) return;
+                    clearTimeout(toast.timer);
+                    toast.remaining -= Date.now() - toast.started;
+                },
+                resume(toast) {
+                    if (! matchMedia('(hover: hover)').matches || ! toast.show) return;
+                    toast.started = Date.now();
+                    toast.timer = setTimeout(() => this.dismiss(toast), Math.max(toast.remaining, 800));
+                },
+                dismiss(toast) {
+                    clearTimeout(toast.timer);
+                    toast.show = false;
+                    setTimeout(() => { this.toasts = this.toasts.filter((t) => t.id !== toast.id); }, 250);
+                },
+            }"
+            x-on:notify.window="add($event.detail)"
+            class="pointer-events-none fixed inset-x-0 top-[max(0.625rem,env(safe-area-inset-top))] z-60 flex flex-col items-center gap-2 px-3 sm:inset-x-auto sm:right-5 sm:top-5 sm:items-end sm:gap-2.5 sm:px-0"
+            aria-live="polite"
         >
             <template x-for="toast in toasts" :key="toast.id">
                 <div
-                    x-show="true"
-                    x-transition:enter="transition ease-out duration-300"
-                    x-transition:enter-start="opacity-0 translate-y-2 sm:translate-x-4 sm:translate-y-0"
-                    x-transition:enter-end="opacity-100 translate-y-0 sm:translate-x-0"
-                    x-transition:leave="transition ease-in duration-200"
-                    x-transition:leave-start="opacity-100"
-                    x-transition:leave-end="opacity-0"
-                    class="pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-lg border bg-white p-4 shadow-lg"
-                    :class="toast.type === 'error' ? 'border-red-200' : (toast.type === 'success' ? 'border-brand/30' : 'border-zinc-200')"
+                    x-show="toast.show"
+                    x-transition:enter="transition duration-300 ease-[cubic-bezier(0.34,1.4,0.64,1)] sm:ease-[cubic-bezier(0.32,0.72,0,1)]"
+                    x-transition:enter-start="-translate-y-4 scale-75 opacity-0 sm:translate-x-8 sm:translate-y-0 sm:scale-95"
+                    x-transition:enter-end="translate-x-0 translate-y-0 scale-100 opacity-100"
+                    x-transition:leave="transition duration-250 ease-in"
+                    x-transition:leave-start="scale-100 opacity-100"
+                    x-transition:leave-end="-translate-y-3 scale-75 opacity-0 sm:translate-x-8 sm:translate-y-0 sm:scale-95"
+                    @click="window.innerWidth < 640 && dismiss(toast)"
+                    @mouseenter="pause(toast)"
+                    @mouseleave="resume(toast)"
+                    class="toast-island group pointer-events-auto relative flex w-[min(92vw,24rem)] items-center gap-3 overflow-hidden rounded-[1.75rem] bg-zinc-950 py-2.5 pl-2.5 pr-3 text-white shadow-2xl shadow-zinc-950/40 ring-1 ring-white/10 sm:w-[22rem] sm:rounded-2xl sm:bg-white/90 sm:py-3 sm:pl-3 sm:pr-2.5 sm:text-zinc-900 sm:shadow-[0_16px_40px_-12px_rgb(0_0_0/0.22),0_4px_10px_-4px_rgb(0_0_0/0.08)] sm:ring-zinc-900/[0.07] sm:backdrop-blur-xl"
+                    role="status"
                 >
                     <span
-                        class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full"
-                        :class="toast.type === 'error' ? 'bg-red-100 text-red-600' : (toast.type === 'success' ? 'bg-brand/10 text-brand' : 'bg-zinc-100 text-zinc-500')"
+                        class="flex size-10 shrink-0 items-center justify-center rounded-full sm:size-8"
+                        :class="{
+                            'bg-red-500/20 text-red-400 sm:bg-red-500 sm:text-white': toast.type === 'error',
+                            'bg-brand-lime text-brand sm:bg-brand sm:text-white': toast.type === 'success',
+                            'bg-amber-400 text-zinc-950 sm:text-white': toast.type === 'star',
+                            'bg-white/15 text-white sm:bg-zinc-100 sm:text-zinc-500': toast.type === 'info' || toast.type === 'unstar',
+                        }"
                     >
                         <template x-if="toast.type === 'error'">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5">
-                                <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.63-1.516 2.63H3.72c-1.347 0-2.189-1.463-1.516-2.63L8.485 2.495ZM10 5.5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5.5Zm0 8a1 1 0 100-2 1 1 0 000 2Z" clip-rule="evenodd" />
-                            </svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5 sm:size-4"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.63-1.516 2.63H3.72c-1.347 0-2.189-1.463-1.516-2.63L8.485 2.495ZM10 5.5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5.5Zm0 8a1 1 0 100-2 1 1 0 000 2Z" clip-rule="evenodd" /></svg>
                         </template>
                         <template x-if="toast.type === 'success'">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5">
-                                <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
-                            </svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5 sm:size-4"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
+                        </template>
+                        <template x-if="toast.type === 'star'">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5 sm:size-4"><path d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z" /></svg>
+                        </template>
+                        <template x-if="toast.type === 'unstar'">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5 sm:size-4"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/></svg>
                         </template>
                         <template x-if="toast.type === 'info'">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5">
-                                <path fill-rule="evenodd" d="M18 10A8 8 0 112 10a8 8 0 0116 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9zm1-4a1 1 0 100 2 1 1 0 000-2z" clip-rule="evenodd" />
-                            </svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5 sm:size-4"><path fill-rule="evenodd" d="M18 10A8 8 0 112 10a8 8 0 0116 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9zm1-4a1 1 0 100 2 1 1 0 000-2z" clip-rule="evenodd" /></svg>
                         </template>
                     </span>
-                    <p class="flex-1 pt-0.5 text-sm text-zinc-700" x-text="toast.message"></p>
-                    <button type="button" @click="toasts = toasts.filter((t) => t.id !== toast.id)" class="shrink-0 text-zinc-400 hover:text-zinc-600">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4">
-                            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-                        </svg>
+                    <span class="toast-island-body min-w-0 flex-1">
+                        <span
+                            class="block text-[11px] font-semibold uppercase tracking-wide sm:text-sm sm:normal-case sm:tracking-normal sm:text-zinc-900"
+                            :class="{ 'text-red-400': toast.type === 'error', 'text-amber-400': toast.type === 'star', 'text-brand-lime': toast.type === 'success', 'text-white/60': toast.type === 'info' || toast.type === 'unstar' }"
+                            x-text="titles[toast.type] ?? titles.info"
+                        ></span>
+                        <span class="line-clamp-2 block text-sm font-medium leading-snug text-white sm:text-[13px] sm:font-normal sm:text-zinc-500" x-text="toast.message"></span>
+                    </span>
+                    <button type="button" @click.stop="dismiss(toast)" class="-mr-1.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20 hover:text-white sm:mr-0 sm:size-7 sm:bg-transparent sm:text-zinc-400 sm:opacity-0 sm:transition-opacity sm:hover:bg-zinc-100 sm:hover:text-zinc-700 sm:focus-visible:opacity-100 sm:group-hover:opacity-100" title="Dismiss">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>
                     </button>
+                    <span
+                        class="toast-timer absolute inset-x-0 bottom-0 hidden h-[3px] origin-left sm:block"
+                        :class="{ 'bg-red-500': toast.type === 'error', 'bg-amber-400': toast.type === 'star', 'bg-brand': toast.type === 'success', 'bg-zinc-300': toast.type === 'info' || toast.type === 'unstar' }"
+                    ></span>
                 </div>
             </template>
         </div>

@@ -349,7 +349,8 @@ class CalendarTest extends TestCase
 
             $component->call('closeDayModal')
                 ->call('openDay', $qaDate->toDateString())
-                ->assertSee('QA');
+                ->assertSee('QA Testing')
+                ->assertDontSeeHtml('text-amber-700">QA</span>');
         } finally {
             Carbon::setTestNow();
         }

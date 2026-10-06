@@ -31,6 +31,39 @@ class TaskWorkflowTest extends TestCase
         return $user;
     }
 
+    public function test_a_team_member_can_open_a_task_they_logged_with_someone_else_as_reporter(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $admin = User::role(Role::SuperAdmin->value)->first();
+
+        Livewire::actingAs($rahim)
+            ->test('tasks.create')
+            ->set('title', 'Renew SSL certificate')
+            ->set('assigned_to', (string) $admin->id)
+            ->set('reporter_id', (string) $admin->id)
+            ->call('save');
+
+        $task = Task::where('title', 'Renew SSL certificate')->firstOrFail();
+        $this->assertSame($admin->id, $task->created_by);
+
+        $this->actingAs($rahim)->get(route('tasks.show', $task))->assertOk();
+
+        Livewire::actingAs($rahim)->test('tasks.index')->assertSee('Renew SSL certificate');
+        Livewire::actingAs($rahim)->test('calendar.index')->assertSee('Renew SSL certificate');
+    }
+
+    public function test_an_unrelated_team_member_still_cannot_see_the_task(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+        $admin = User::role(Role::SuperAdmin->value)->first();
+
+        $task = app(TaskWorkflowService::class)->createTask(['title' => 'Renew SSL certificate', 'created_by' => $admin->id], $rahim, $admin);
+
+        $this->actingAs($karim)->get(route('tasks.show', $task))->assertForbidden();
+        Livewire::actingAs($karim)->test('tasks.index')->assertDontSee('Renew SSL certificate');
+    }
+
     public function test_creating_a_task_records_creator_and_initial_assignment(): void
     {
         $rahim = $this->teamMember('Rahim');

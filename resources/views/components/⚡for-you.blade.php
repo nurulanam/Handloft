@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Concerns\TogglesStars;
 use App\Enums\TaskStatus;
 use App\Models\Task;
 use Illuminate\Support\Facades\Gate;
@@ -9,6 +10,8 @@ use Livewire\Component;
 
 new #[Layout('layouts.app')] #[Title('For You')] class extends Component
 {
+    use TogglesStars;
+
     private const PAGE_SIZE = 5;
 
     /** @var array<string, int> number of cards shown per status, keyed by TaskStatus::value */
@@ -25,7 +28,7 @@ new #[Layout('layouts.app')] #[Title('For You')] class extends Component
 
         Gate::authorize('view', $task);
 
-        auth()->user()->starredTasks()->toggle($task->id);
+        $this->toggleStarFor($task);
     }
 
     public function loadMore(string $status): void

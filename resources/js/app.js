@@ -116,3 +116,58 @@ function mountQuill(editorEl, inputEl, initialValue) {
 
     return quill;
 }
+
+/**
+ * Echo exposes an expressive API for subscribing to channels and listening
+ * for events that are broadcast by Laravel. Echo and event broadcasting
+ * allow your team to quickly build robust real-time web applications.
+ */
+
+import './echo';
+
+// Live notifications: Reverb pushes each new notification to the signed-in
+// user's private channel the moment it's sent; this announces it, and the bell
+// component reacts by fetching what's new, flashing the notch and refreshing
+// its badge. It (re)checks after every page change, not just on first load:
+// the app usually boots on the sign-in page and reaches the dashboard via
+// wire:navigate, which doesn't re-run scripts. It subscribes once per user and
+// leaves the channel again after logout.
+let liveUserId = null;
+
+function listenForLiveNotifications() {
+    const userId = document.querySelector('meta[name="user-id"]')?.content || null;
+
+    if (! window.Echo || userId === liveUserId) {
+        return;
+    }
+
+    if (liveUserId) {
+        window.Echo.leave(`App.Models.User.${liveUserId}`);
+    }
+
+    liveUserId = userId;
+
+    if (userId) {
+        window.Echo.private(`App.Models.User.${userId}`).notification(() => {
+            window.dispatchEvent(new CustomEvent('notification-received'));
+        });
+    }
+}
+
+document.addEventListener('livewire:navigated', listenForLiveNotifications);
+
+// After the live connection drops and comes back, check once for anything sent
+// while it was down (the push for it was missed); a healthy connection costs nothing.
+let liveWasConnected = false;
+
+window.Echo?.connector?.pusher?.connection?.bind('state_change', ({ current }) => {
+    if (current !== 'connected') {
+        return;
+    }
+
+    if (liveWasConnected) {
+        window.dispatchEvent(new CustomEvent('notification-received'));
+    }
+
+    liveWasConnected = true;
+});

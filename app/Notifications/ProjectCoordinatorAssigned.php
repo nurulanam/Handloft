@@ -4,20 +4,15 @@ namespace App\Notifications;
 
 use App\Models\Project;
 use App\Models\User;
+use App\Notifications\Concerns\BroadcastsInstantly;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 class ProjectCoordinatorAssigned extends Notification
 {
-    public function __construct(private readonly Project $project, private readonly User $assignedBy) {}
+    use BroadcastsInstantly;
 
-    /**
-     * @return array<int, string>
-     */
-    public function via(object $notifiable): array
-    {
-        return ['mail', 'database'];
-    }
+    public function __construct(private readonly Project $project, private readonly User $assignedBy) {}
 
     public function toMail(object $notifiable): MailMessage
     {

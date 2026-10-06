@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Concerns\TogglesStars;
 use App\Enums\TaskActivityType;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
@@ -20,7 +21,7 @@ use Livewire\WithFileUploads;
 
 new #[Layout('layouts.app')] #[Title('Task')] class extends Component
 {
-    use WithFileUploads;
+    use WithFileUploads, TogglesStars;
 
     public Task $task;
 
@@ -69,7 +70,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
 
     public function toggleStar(): void
     {
-        auth()->user()->starredTasks()->toggle($this->task->id);
+        $this->toggleStarFor($this->task);
     }
 
     /**

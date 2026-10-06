@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Support\MailSettings;
+use Illuminate\Foundation\DevCommands;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -21,5 +22,11 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         MailSettings::applyFromDatabase();
+
+        // `composer dev` also starts the Reverb WebSocket server, which pushes
+        // live notifications to the browser.
+        if ($this->app->runningInConsole()) {
+            DevCommands::artisan('reverb:start', 'reverb');
+        }
     }
 }

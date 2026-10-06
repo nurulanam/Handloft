@@ -51,6 +51,27 @@ class TaskStarAndForYouTest extends TestCase
         $this->assertFalse($karim->fresh()->starredTasks()->where('tasks.id', $task->id)->exists());
     }
 
+    public function test_starring_and_unstarring_confirm_with_a_toast_everywhere(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+        $task = app(TaskWorkflowService::class)->createTask(['title' => 'Website Audit'], $rahim, $karim);
+
+        Livewire::actingAs($karim)->test('tasks.show', ['task' => $task])
+            ->call('toggleStar')
+            ->assertDispatched('notify', message: 'Website Audit', type: 'star')
+            ->call('toggleStar')
+            ->assertDispatched('notify', message: 'Website Audit', type: 'unstar');
+
+        foreach (['tasks.index', 'for-you', 'starred'] as $component) {
+            Livewire::actingAs($karim)->test($component)
+                ->call('toggleStar', $task->id)
+                ->assertDispatched('notify', message: 'Website Audit', type: 'star');
+
+            $karim->starredTasks()->detach($task->id);
+        }
+    }
+
     public function test_starred_page_only_shows_the_current_users_starred_tasks(): void
     {
         $rahim = $this->teamMember('Rahim');

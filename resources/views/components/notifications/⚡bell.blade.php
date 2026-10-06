@@ -4,6 +4,46 @@ use Livewire\Component;
 
 new class extends Component
 {
+    /**
+     * Created-at of the newest notification already flashed (or present when
+     * the page loaded), so the notch only announces genuinely new ones. Kept
+     * in the session too, so a page change doesn't re-announce or skip any.
+     */
+    public string $flashedThrough = '';
+
+    public function mount(): void
+    {
+        $this->flashedThrough = session('notifications.flashed_through')
+            ?? auth()->user()->notifications()->latest()->first()?->created_at?->toDateTimeString()
+            ?? now()->toDateTimeString();
+    }
+
+    /**
+     * Runs the instant Reverb pushes a notification (and on a slow poll as a
+     * fallback): announces anything unread that arrived since the last flash.
+     */
+    public function checkForNew(): void
+    {
+        $new = auth()->user()->unreadNotifications()
+            ->where('created_at', '>', $this->flashedThrough)
+            ->latest()
+            ->get();
+
+        if ($new->isEmpty()) {
+            return;
+        }
+
+        $latest = $new->first();
+        $this->flashedThrough = $latest->created_at->toDateTimeString();
+        session(['notifications.flashed_through' => $this->flashedThrough]);
+
+        $this->dispatch('notification-flash',
+            id: $latest->id,
+            count: $new->count(),
+            message: $new->count() === 1 ? ($latest->data['message'] ?? 'You have a new notification') : $new->count().' new notifications',
+        );
+    }
+
     public function with(): array
     {
         $user = auth()->user();
@@ -43,6 +83,42 @@ new class extends Component
     class="relative"
     x-data="{
         open: false,
+        fallback: null,
+        {{-- Reverb pushes new notifications, so there's no polling while its connection is up. Only when it's
+             down (server stopped, network blip) does a light once-a-minute check run, and only for a visible tab. --}}
+        init() {
+            this.fallback = setInterval(() => {
+                const live = window.Echo?.connector?.pusher?.connection?.state === 'connected';
+                if (! live && document.visibilityState === 'visible') this.$wire.checkForNew();
+            }, 60000);
+        },
+        destroy() { clearInterval(this.fallback); },
+        island: null,
+        islandOpen: false,
+        islandTimer: null,
+        ring: false,
+        {{-- The notch: drops in as a small pill, then morphs open to show the message (Dynamic Island style). --}}
+        flash(detail) {
+            this.ring = false;
+            this.$nextTick(() => { this.ring = true; setTimeout(() => this.ring = false, 900); });
+            if (this.open) return;
+            clearTimeout(this.islandTimer);
+            this.island = detail;
+            this.islandOpen = false;
+            setTimeout(() => { this.islandOpen = true; }, 220);
+            this.islandTimer = setTimeout(() => this.hideIsland(), 5500);
+            navigator.vibrate?.(15);
+        },
+        hideIsland() {
+            clearTimeout(this.islandTimer);
+            this.islandOpen = false;
+            setTimeout(() => { if (! this.islandOpen) this.island = null; }, 250);
+        },
+        tapIsland() {
+            const detail = this.island;
+            this.hideIsland();
+            if (detail.count > 1) { this.toggle(); } else { this.$wire.openNotification(detail.id); }
+        },
         dragY: 0,
         startY: null,
         dismissing: false,
@@ -66,9 +142,10 @@ new class extends Component
     }"
     x-effect="document.body.classList.toggle('overflow-hidden', open && window.innerWidth < 640)"
     @keydown.escape.window="open = false"
-    wire:poll.30s
+    @notification-received.window="$wire.checkForNew()"
+    @notification-flash.window="flash($event.detail)"
 >
-    <button type="button" @click="toggle()" class="relative rounded-full p-2 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700" title="Notifications" :aria-expanded="open">
+    <button type="button" @click="toggle()" class="relative rounded-full p-2 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700" :class="ring && 'bell-ring'" title="Notifications" :aria-expanded="open">
         <span class="sr-only">Notifications</span>
         <x-nav-icon name="notifications" class="size-5" />
         @if ($unreadCount > 0)
@@ -209,6 +286,45 @@ new class extends Component
                     <span class="h-1.5 w-10 rounded-full bg-zinc-900/20"></span>
                 </div>
             </div>
+        </div>
+    @endteleport
+
+    {{-- Live notification notch: a dark pill that drops from the top edge and morphs open, then tucks away.
+         Tap opens the notification (or the list, when several arrived together). --}}
+    @teleport('body')
+        <div class="pointer-events-none fixed inset-x-0 top-0 z-70 flex justify-center pt-[max(0.625rem,env(safe-area-inset-top))]" aria-live="polite">
+            <button
+                type="button"
+                x-show="island"
+                x-cloak
+                @click="tapIsland()"
+                @mouseenter="clearTimeout(islandTimer)"
+                @mouseleave="islandTimer = setTimeout(() => hideIsland(), 2500)"
+                x-transition:enter="transition duration-300 ease-[cubic-bezier(0.34,1.4,0.64,1)]"
+                x-transition:enter-start="-translate-y-4 scale-50 opacity-0"
+                x-transition:enter-end="translate-y-0 scale-100 opacity-100"
+                x-transition:leave="transition duration-250 ease-in"
+                x-transition:leave-start="translate-y-0 scale-100 opacity-100"
+                x-transition:leave-end="-translate-y-4 scale-50 opacity-0"
+                class="pointer-events-auto flex items-center gap-3 overflow-hidden bg-zinc-950 text-left text-white shadow-2xl shadow-zinc-950/40 ring-1 ring-white/10 transition-[width,height,border-radius,padding] duration-500 ease-[cubic-bezier(0.34,1.3,0.64,1)]"
+                :class="islandOpen ? 'h-[4.5rem] w-[min(92vw,24rem)] rounded-[2.25rem] px-3' : 'h-9 w-28 rounded-[1.125rem] px-1.5'"
+            >
+                <span class="relative flex shrink-0 items-center justify-center rounded-full bg-brand-lime text-brand transition-all duration-500" :class="islandOpen ? 'size-11' : 'size-6'">
+                    <span x-show="! islandOpen" class="absolute inset-0 animate-ping rounded-full bg-brand-lime/60"></span>
+                    <x-nav-icon name="notifications" class="relative size-1/2" />
+                </span>
+                <span x-show="! islandOpen" class="flex-1 text-center text-xs font-semibold">New</span>
+                <span
+                    x-show="islandOpen"
+                    x-transition:enter="transition-opacity duration-300 delay-150"
+                    x-transition:enter-start="opacity-0"
+                    class="min-w-0 flex-1"
+                >
+                    <span class="block text-[11px] font-semibold uppercase tracking-wide text-brand-lime" x-text="island?.count > 1 ? 'Notifications' : 'New notification'"></span>
+                    <span class="line-clamp-2 block text-sm font-medium leading-snug" x-text="island?.message"></span>
+                </span>
+                <svg x-show="islandOpen" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="mr-1 size-4 shrink-0 text-white/40"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
+            </button>
         </div>
     @endteleport
 </div>

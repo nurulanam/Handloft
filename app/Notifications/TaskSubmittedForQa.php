@@ -4,20 +4,15 @@ namespace App\Notifications;
 
 use App\Models\Task;
 use App\Models\User;
+use App\Notifications\Concerns\BroadcastsInstantly;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 class TaskSubmittedForQa extends Notification
 {
-    public function __construct(private readonly Task $task, private readonly User $submittedBy) {}
+    use BroadcastsInstantly;
 
-    /**
-     * @return array<int, string>
-     */
-    public function via(object $notifiable): array
-    {
-        return ['mail', 'database'];
-    }
+    public function __construct(private readonly Task $task, private readonly User $submittedBy) {}
 
     public function toMail(object $notifiable): MailMessage
     {

@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Concerns\TogglesStars;
 use App\Models\Task;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
@@ -9,7 +10,7 @@ use Livewire\WithPagination;
 
 new #[Layout('layouts.app')] #[Title('Starred')] class extends Component
 {
-    use WithPagination;
+    use WithPagination, TogglesStars;
 
     public function mount(): void
     {
@@ -22,7 +23,7 @@ new #[Layout('layouts.app')] #[Title('Starred')] class extends Component
 
         Gate::authorize('view', $task);
 
-        auth()->user()->starredTasks()->toggle($task->id);
+        $this->toggleStarFor($task);
         $this->resetPage();
     }
 

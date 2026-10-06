@@ -140,7 +140,6 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
     public function with(): array
     {
         [$start, $end] = $this->rangeBounds();
-        $userId = auth()->id();
         $startDate = $start->toDateString();
         $endDate = $end->toDateString();
         $dateTypeLabel = $this->dateType === 'deadline' ? 'Deadline' : 'Created';
@@ -155,15 +154,7 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
             $taskQuery->whereDate('created_at', '>=', $startDate)->whereDate('created_at', '<=', $endDate);
         }
 
-        // Mirrors TaskPolicy::view() — everything for a view-all-tasks
-        // holder, otherwise only tasks the viewer is connected to.
-        if (! auth()->user()->can('view-all-tasks')) {
-            $taskQuery->where(function ($q) use ($userId) {
-                $q->where('created_by', $userId)
-                    ->orWhereHas('currentAssignment', fn ($q2) => $q2->where('assigned_to', $userId))
-                    ->orWhere('qa_id', $userId);
-            });
-        }
+        $taskQuery->visibleTo(auth()->user());
 
         $tasks = $taskQuery->get();
 
@@ -192,7 +183,6 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
             'status_label' => $task->status->label(),
             'date_type_label' => $dateTypeLabel,
             'is_overdue' => $this->dateType === 'deadline' && $task->isOverdue(),
-            'is_qa' => $task->status === \App\Enums\TaskStatus::QaTesting,
         ])->concat($projects->map(fn (Project $project) => [
             'date' => ($this->dateType === 'deadline' ? $project->deadline : $project->created_at)->toDateString(),
             'type' => 'project',
@@ -205,7 +195,6 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
             'is_overdue' => $this->dateType === 'deadline'
                 && $project->deadline->isPast()
                 && ! in_array($project->status, [ProjectStatus::Completed, ProjectStatus::Archived], true),
-            'is_qa' => false,
         ]))->sortBy('title')->values();
 
         $eventsByDate = $events->groupBy('date');
@@ -337,9 +326,6 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
                         <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-500">{{ $event['date_type_label'] }}</span>
                         @if ($event['is_overdue'])
                             <span class="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">Overdue</span>
-                        @endif
-                        @if ($event['is_qa'])
-                            <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">QA</span>
                         @endif
                         <span class="rounded-full px-2 py-0.5 text-xs font-medium {{ $event['classes'] }}">{{ $event['status_label'] }}</span>
                     </div>
@@ -506,9 +492,6 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
                                                 <span class="rounded-full px-2 py-0.5 text-[10px] font-medium {{ $event['classes'] }}">{{ $event['status_label'] }}</span>
                                                 @if ($event['is_overdue'])
                                                     <span class="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">Overdue</span>
-                                                @endif
-                                                @if ($event['is_qa'])
-                                                    <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">QA</span>
                                                 @endif
                                             </span>
                                         </span>

@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Concerns\TogglesStars;
 use App\Enums\TaskActivityType;
 use App\Enums\TaskStatus;
 use App\Models\Task;
@@ -14,7 +15,7 @@ use Livewire\WithPagination;
 
 new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
 {
-    use WithPagination;
+    use WithPagination, TogglesStars;
 
     #[Url]
     public string $tab = 'all';
@@ -167,7 +168,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
 
         Gate::authorize('view', $task);
 
-        auth()->user()->starredTasks()->toggle($task->id);
+        $this->toggleStarFor($task);
     }
 
     /**
@@ -211,14 +212,8 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                         ->orWhere(fn ($q2) => $q2->where('qa_id', $userId)->where('status', TaskStatus::QaTesting))
                         ->orWhere(fn ($q2) => $q2->where('created_by', $userId)->where('status', TaskStatus::ReadyToDeploy));
                 }),
-                // "All Tasks" means everything the viewer is allowed to see:
-                // literally everything for a view-all-tasks holder, otherwise
-                // just the tasks they're connected to (matches TaskPolicy::view()).
-                default => auth()->user()->can('view-all-tasks') ? $query : $query->where(function ($q) use ($userId) {
-                    $q->where('created_by', $userId)
-                        ->orWhereHas('currentAssignment', fn ($q2) => $q2->where('assigned_to', $userId))
-                        ->orWhere('qa_id', $userId);
-                }),
+                // "All Tasks" means everything the viewer is allowed to see.
+                default => $query->visibleTo(auth()->user()),
             };
         }
 

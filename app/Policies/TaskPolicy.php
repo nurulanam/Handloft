@@ -17,14 +17,17 @@ class TaskPolicy
     }
 
     /**
-     * Determine whether the user can view the model.
+     * Determine whether the user can view the model. Task::visibleTo() is the
+     * query version of this rule — keep the two in step.
      */
     public function view(User $user, Task $task): bool
     {
         return $user->can('view-all-tasks')
             || $task->created_by === $user->id
             || $task->currentAssignee()?->id === $user->id
-            || $task->qa_id === $user->id;
+            || $task->qa_id === $user->id
+            // Whoever assigned it (e.g. a team member who logged it with someone else as Reporter).
+            || $task->assignments()->where('assigned_by', $user->id)->exists();
     }
 
     /**
