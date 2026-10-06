@@ -76,39 +76,54 @@ new class extends Component
         @endif
     </button>
 
-    {{-- Desktop: a dropdown under the bell. --}}
-    <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-30 mt-2 hidden w-80 rounded-lg border border-zinc-200 bg-white py-2 shadow-lg sm:block">
-        <div class="flex items-center justify-between px-3 pb-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Notifications</p>
+    {{-- Desktop: a frosted-glass dropdown under the bell, styled like the phone sheet. --}}
+    <div
+        x-show="open"
+        x-cloak
+        @click.outside="open = false"
+        x-transition:enter="transition duration-200 ease-[cubic-bezier(0.32,0.72,0,1)]"
+        x-transition:enter-start="-translate-y-1 scale-95 opacity-0"
+        x-transition:enter-end="translate-y-0 scale-100 opacity-100"
+        x-transition:leave="transition duration-150 ease-in"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="-translate-y-1 scale-95 opacity-0"
+        class="absolute right-0 z-30 mt-2 hidden w-96 origin-top-right flex-col overflow-hidden rounded-2xl border border-white/60 bg-white/70 shadow-2xl shadow-zinc-900/20 backdrop-blur-xl backdrop-saturate-150 sm:flex"
+    >
+        <div class="flex items-center justify-between px-4 pb-2 pt-3.5">
+            <div>
+                <p class="text-sm font-semibold text-zinc-900">Notifications</p>
+                <p class="text-xs text-zinc-500">{{ $unreadCount > 0 ? $unreadCount.' unread' : 'All caught up' }}</p>
+            </div>
             @if ($unreadCount > 0)
-                <button type="button" wire:click="markAllAsRead" class="text-xs font-medium text-brand hover:underline">Mark all as read</button>
+                <button type="button" wire:click="markAllAsRead" class="rounded-full px-3 py-1.5 text-xs font-medium text-brand hover:bg-white/60">Mark all read</button>
             @endif
         </div>
 
-        <div class="max-h-96 divide-y divide-zinc-100 overflow-y-auto">
+        <div class="max-h-96 space-y-1.5 overflow-y-auto overscroll-contain px-2">
             @forelse ($recent as $notification)
                 <button
                     type="button"
                     wire:click="openNotification('{{ $notification->id }}')"
-                    class="block w-full px-3 py-2.5 text-left text-sm hover:bg-zinc-50 {{ $notification->read_at ? 'text-zinc-500' : 'text-zinc-900' }}"
+                    class="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors {{ $notification->read_at ? 'bg-white/40 hover:bg-white/70' : 'bg-white/85 shadow-sm hover:bg-white' }}"
                 >
-                    <div class="flex items-start gap-2">
+                    <span class="relative flex size-8 shrink-0 items-center justify-center rounded-full {{ $notification->read_at ? 'bg-zinc-900/5 text-zinc-500' : 'bg-brand/10 text-brand' }}">
+                        <x-nav-icon :name="isset($notification->data['task_id']) ? 'tasks' : 'projects'" class="size-4" />
                         @unless ($notification->read_at)
-                            <span class="mt-1.5 size-1.5 shrink-0 rounded-full bg-brand"></span>
+                            <span class="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-white bg-brand"></span>
                         @endunless
-                        <div class="min-w-0 flex-1">
-                            <p class="truncate">{{ $notification->data['message'] ?? '' }}</p>
-                            <p class="text-xs text-zinc-400">{{ $notification->created_at->diffForHumans() }}</p>
-                        </div>
-                    </div>
+                    </span>
+                    <span class="min-w-0 flex-1">
+                        <span class="line-clamp-2 block text-sm {{ $notification->read_at ? 'text-zinc-600' : 'font-medium text-zinc-900' }}">{{ $notification->data['message'] ?? '' }}</span>
+                        <span class="mt-0.5 block text-xs text-zinc-500">{{ $notification->created_at->diffForHumans() }}</span>
+                    </span>
                 </button>
             @empty
-                <p class="px-3 py-6 text-center text-sm text-zinc-400">No notifications yet.</p>
+                <p class="py-8 text-center text-sm text-zinc-500">No notifications yet.</p>
             @endforelse
         </div>
 
-        <div class="border-t border-zinc-100 px-3 pt-2">
-            <a href="{{ route('notifications.index') }}" wire:navigate class="block text-center text-xs font-medium text-brand hover:underline">View all</a>
+        <div class="p-2">
+            <a href="{{ route('notifications.index') }}" wire:navigate @click="open = false" class="block rounded-xl bg-zinc-900/5 py-2 text-center text-sm font-medium text-zinc-700 hover:bg-zinc-900/10">View all notifications</a>
         </div>
     </div>
 

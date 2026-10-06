@@ -889,15 +889,29 @@
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="hidden size-4 text-zinc-400 sm:block"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
                             </button>
 
-                            <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-30 mt-2 w-56 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
-                                <div class="border-b border-zinc-100 px-3 py-2.5">
-                                    <p class="truncate text-sm font-medium text-zinc-900">{{ auth()->user()->name }}</p>
-                                    <p class="truncate text-xs text-zinc-500">{{ auth()->user()->email }}</p>
+                            <div
+                                x-show="open"
+                                x-cloak
+                                @click.outside="open = false"
+                                x-transition:enter="transition duration-200 ease-[cubic-bezier(0.32,0.72,0,1)]"
+                                x-transition:enter-start="-translate-y-1 scale-95 opacity-0"
+                                x-transition:enter-end="translate-y-0 scale-100 opacity-100"
+                                x-transition:leave="transition duration-150 ease-in"
+                                x-transition:leave-start="opacity-100"
+                                x-transition:leave-end="-translate-y-1 scale-95 opacity-0"
+                                class="absolute right-0 z-30 mt-2 w-64 origin-top-right overflow-hidden rounded-2xl border border-white/60 bg-white/70 p-1.5 shadow-2xl shadow-zinc-900/20 backdrop-blur-xl backdrop-saturate-150"
+                            >
+                                <div class="flex items-center gap-3 rounded-xl bg-white/85 px-3 py-2.5 shadow-sm">
+                                    <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white">{{ \App\Support\Avatar::initials(auth()->user()->name) }}</span>
+                                    <span class="min-w-0">
+                                        <span class="block truncate text-sm font-medium text-zinc-900">{{ auth()->user()->name }}</span>
+                                        <span class="block truncate text-xs text-zinc-500">{{ auth()->user()->email }}</span>
+                                    </span>
                                 </div>
-                                <form method="POST" action="{{ route('logout') }}">
+                                <form method="POST" action="{{ route('logout') }}" class="mt-1.5">
                                     @csrf
-                                    <button type="submit" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4 text-zinc-400"><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></svg>
+                                    <button type="submit" class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium text-zinc-700 transition-colors hover:bg-red-500/10 hover:text-red-600">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></svg>
                                         Log out
                                     </button>
                                 </form>
