@@ -96,7 +96,7 @@ new #[Layout('layouts.guest')] #[Title('Log in')] class extends Component
                     autofocus
                     autocomplete="username"
                     placeholder="you@company.com"
-                    class="block w-full rounded-xl border border-zinc-300 bg-white/70 py-3 pl-10.5 pr-3.5 text-sm text-zinc-900 placeholder:text-zinc-500 transition focus:border-brand focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-lime/20 lg:py-2.5"
+                    class="block w-full rounded-xl border border-zinc-300 bg-surface/70 py-3 pl-10.5 pr-3.5 text-sm text-zinc-900 placeholder:text-zinc-500 transition focus:border-brand focus:bg-surface focus:outline-none focus:ring-4 focus:ring-brand-lime/20 lg:py-2.5"
                 >
             </div>
             @error('email')
@@ -115,7 +115,7 @@ new #[Layout('layouts.guest')] #[Title('Log in')] class extends Component
                     type="password"
                     autocomplete="current-password"
                     placeholder="••••••••"
-                    class="block w-full rounded-xl border border-zinc-300 bg-white/70 py-3 pl-10.5 pr-11 text-sm text-zinc-900 placeholder:text-zinc-500 transition focus:border-brand focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-lime/20 lg:py-2.5"
+                    class="block w-full rounded-xl border border-zinc-300 bg-surface/70 py-3 pl-10.5 pr-11 text-sm text-zinc-900 placeholder:text-zinc-500 transition focus:border-brand focus:bg-surface focus:outline-none focus:ring-4 focus:ring-brand-lime/20 lg:py-2.5"
                 >
                 <button type="button" @click="reveal = ! reveal" class="absolute inset-y-0 right-0 flex items-center px-3.5 text-zinc-500 hover:text-zinc-700" :title="reveal ? 'Hide password' : 'Show password'">
                     <svg x-show="! reveal" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4.5"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>

@@ -228,7 +228,7 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
         </div>
     </div>
 
-    <div class="rounded-lg border border-zinc-200 bg-white">
+    <div class="rounded-lg border border-zinc-200 bg-surface">
         @if ($canViewAll)
             <div class="border-b border-zinc-100 p-3 sm:p-4">
                 <div class="mb-2 flex items-baseline justify-between gap-3">
@@ -254,7 +254,7 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
         @endif
 
         <div class="flex flex-col gap-3 p-3 sm:flex-row sm:flex-wrap sm:items-center sm:p-4">
-            <div class="grid grid-cols-4 rounded-lg border border-zinc-300 bg-white p-0.5 sm:inline-flex">
+            <div class="grid grid-cols-4 rounded-lg border border-zinc-300 bg-surface p-0.5 sm:inline-flex">
                 @foreach (['today' => ['Today', 'Today'], 'week' => ['Week', 'This Week'], 'month' => ['Month', 'This Month'], 'custom' => ['Custom', 'Custom Range']] as $key => [$short, $label])
                     <button
                         type="button"
@@ -272,7 +272,7 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
                     @foreach (['from' => 'From', 'to' => 'To'] as $field => $label)
                         <label class="relative block">
                             <span class="pointer-events-none absolute left-3 top-1.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">{{ $label }}</span>
-                            <input wire:model.live="{{ $field }}" type="date" class="block w-full min-w-0 rounded-lg border border-zinc-300 bg-white px-3 pb-1.5 pt-5 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40 sm:w-40">
+                            <input wire:model.live="{{ $field }}" type="date" class="block w-full min-w-0 rounded-lg border border-zinc-300 bg-surface px-3 pb-1.5 pt-5 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40 sm:w-40">
                         </label>
                     @endforeach
                 </div>
@@ -291,7 +291,7 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
         {{-- Side-by-side comparison --}}
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             @foreach ($comparison as $row)
-                <div class="rounded-lg border border-zinc-200 bg-white p-4">
+                <div class="rounded-lg border border-zinc-200 bg-surface p-4">
                     <div class="flex items-center gap-2">
                         <span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white">{{ Avatar::initials($row['user']->name) }}</span>
                         <div class="min-w-0">
@@ -312,7 +312,7 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
         </div>
     @else
         {{-- Single-user detail table --}}
-        <div class="overflow-hidden rounded-lg border border-zinc-200 bg-white">
+        <div class="overflow-hidden rounded-lg border border-zinc-200 bg-surface">
             <table class="min-w-full divide-y divide-zinc-200">
                 <thead class="bg-zinc-50">
                     <tr>

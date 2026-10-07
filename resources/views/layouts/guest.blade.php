@@ -10,12 +10,20 @@
         <link rel="icon" href="/logo.svg" type="image/svg+xml">
         <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
+        {{-- Light/dark mode before the first paint (the choice is made from the account menu once signed in). --}}
+        <script>
+            (() => {
+                let mode = 'system';
+                try { mode = localStorage.getItem('colorMode') || 'system'; } catch {}
+                document.documentElement.classList.toggle('dark', mode === 'dark' || (mode === 'system' && matchMedia('(prefers-color-scheme: dark)').matches));
+            })();
+        </script>
         @vite(['resources/css/app.css', 'resources/js/app.js'])
 
         @livewireStyles
         {!! \App\Support\Theme::styleTag() !!}
     </head>
-    <body class="min-h-screen bg-white font-sans antialiased{{ \App\Support\Theme::isStatic() ? ' ui-static' : '' }}">
+    <body class="min-h-screen bg-surface font-sans antialiased{{ \App\Support\Theme::isStatic() ? ' ui-static' : '' }}">
         <div class="flex min-h-screen">
             {{-- Brand panel — hidden below lg so the form is never squeezed
                  on a phone or tablet; the small inline logo in the form
@@ -80,7 +88,7 @@
                     {{-- Bright, slowly drifting glows behind the glass sheet / card, so the frosting reads clearly. --}}
                     <div class="glow-drift absolute -bottom-10 -right-16 size-80 rounded-full bg-brand-lime/70 blur-3xl lg:hidden"></div>
                     <div class="glow-drift-alt absolute bottom-32 -left-20 size-72 rounded-full bg-emerald-300/60 blur-3xl lg:hidden"></div>
-                    <div class="glow-drift absolute bottom-0 left-1/3 size-56 rounded-full bg-white/40 blur-3xl [animation-delay:-5s] lg:hidden"></div>
+                    <div class="glow-drift absolute bottom-0 left-1/3 size-56 rounded-full bg-surface/40 blur-3xl [animation-delay:-5s] lg:hidden"></div>
 
                     {{-- Desktop: calm on a big screen. A faint dot grid and two very soft, low-saturation glows. --}}
                     <div class="absolute inset-0 hidden opacity-30 lg:block" style="background-image: radial-gradient(circle, #d4d4d8 1px, transparent 1px); background-size: 24px 24px;"></div>
@@ -103,7 +111,7 @@
                         <div class="relative flex items-center gap-3 rounded-2xl bg-white/12 pb-3 pl-3 pr-6 pt-4.5 shadow-lg shadow-black/10 ring-1 ring-white/20 backdrop-blur-md">
                             <span class="flex -space-x-2">
                                 <span class="flex size-8 items-center justify-center rounded-full bg-brand-lime text-[11px] font-bold text-brand ring-2 ring-[#1c5a33]">RA</span>
-                                <span class="flex size-8 items-center justify-center rounded-full bg-white text-[11px] font-bold text-brand ring-2 ring-[#1c5a33]">AN</span>
+                                <span class="flex size-8 items-center justify-center rounded-full bg-surface text-[11px] font-bold text-brand ring-2 ring-[#1c5a33]">AN</span>
                             </span>
                             <span class="text-xs leading-snug">
                                 <span class="block font-semibold text-white">AMD-24 handed to Anam</span>
@@ -117,7 +125,7 @@
                     </div>
                 </div>
 
-                <div class="auth-sheet relative -mt-8 w-full rounded-t-[2rem] border-t border-white/70 bg-white/72 px-6 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-8 shadow-[0_-16px_32px_-16px_rgb(0_0_0/0.35),inset_0_1px_0_rgb(255_255_255/0.8)] backdrop-blur-2xl backdrop-saturate-150 lg:mt-0 lg:max-w-md lg:rounded-3xl lg:border lg:border-zinc-900/5 lg:bg-white/85 lg:p-9 lg:shadow-xl lg:shadow-zinc-900/5">
+                <div class="auth-sheet relative -mt-8 w-full rounded-t-[2rem] border-t border-white/70 bg-surface/72 px-6 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-8 shadow-[0_-16px_32px_-16px_rgb(0_0_0/0.35),inset_0_1px_0_rgb(255_255_255/0.8)] backdrop-blur-2xl backdrop-saturate-150 lg:mt-0 lg:max-w-md lg:rounded-3xl lg:border lg:border-zinc-900/5 lg:bg-surface/85 lg:p-9 lg:shadow-xl lg:shadow-zinc-900/5">
                     {{ $slot }}
                 </div>
             </div>

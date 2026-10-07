@@ -96,7 +96,7 @@ new #[Layout('layouts.app')] #[Title('Notifications')] class extends Component
             <p class="hidden text-sm text-zinc-500 sm:block">Updates on projects and tasks connected to you.</p>
         </div>
 
-        <div class="inline-flex shrink-0 rounded-lg border border-zinc-300 bg-white p-0.5" role="group" aria-label="Show">
+        <div class="inline-flex shrink-0 rounded-lg border border-zinc-300 bg-surface p-0.5" role="group" aria-label="Show">
             @foreach (['all' => 'All', 'unread' => 'Unread'] as $key => $label)
                 <button
                     type="button"
@@ -113,7 +113,7 @@ new #[Layout('layouts.app')] #[Title('Notifications')] class extends Component
     </div>
 
     <div
-        class="overflow-hidden rounded-xl border border-zinc-200 bg-white"
+        class="overflow-hidden rounded-xl border border-zinc-200 bg-surface"
         x-data="{ pageIds: @js($notifications->pluck('id')->values()) }"
     >
         {{-- Toolbar: select-all, then the bulk actions once anything is ticked. --}}
@@ -137,7 +137,7 @@ new #[Layout('layouts.app')] #[Title('Notifications')] class extends Component
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg>
                             <span class="sm:hidden">Read</span><span class="hidden sm:inline">Mark read</span>
                         </button>
-                        <button type="button" wire:click="markSelected(false)" class="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-2.5 py-1.5 text-xs font-semibold sm:px-3 text-zinc-700 hover:bg-zinc-50">
+                        <button type="button" wire:click="markSelected(false)" class="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-surface px-2.5 py-1.5 text-xs font-semibold sm:px-3 text-zinc-700 hover:bg-zinc-50">
                             <span class="size-2 rounded-full bg-brand"></span>
                             <span class="sm:hidden">Unread</span><span class="hidden sm:inline">Mark unread</span>
                         </button>

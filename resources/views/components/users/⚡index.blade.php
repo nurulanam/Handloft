@@ -145,7 +145,7 @@ new #[Layout('layouts.app')] #[Title('Team')] class extends Component
             <button
                 type="button"
                 wire:click="$set('{{ $chipStatus ? 'status' : 'role' }}', '{{ $on ? '' : ($chipStatus ?? $chipRole) }}')"
-                class="flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-sm transition {{ $on ? 'border-brand bg-brand/5 text-brand' : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300' }}"
+                class="flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-sm transition {{ $on ? 'border-brand bg-brand/5 text-brand' : 'border-zinc-200 bg-surface text-zinc-600 hover:border-zinc-300' }}"
             >
                 <span class="size-2 rounded-full {{ $dot }}"></span>
                 {{ $chipLabel }}
@@ -155,23 +155,23 @@ new #[Layout('layouts.app')] #[Title('Team')] class extends Component
     </div>
 
     {{-- Toolbar --}}
-    <div class="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-3 sm:flex-row sm:items-center">
+    <div class="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-surface p-3 sm:flex-row sm:items-center">
         <div class="relative flex-1">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-            <input wire:model.live.debounce.300ms="search" type="search" placeholder="Search name, email, ID or department…" class="block w-full rounded-lg border border-zinc-300 bg-zinc-50/60 py-2 pl-9 pr-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+            <input wire:model.live.debounce.300ms="search" type="search" placeholder="Search name, email, ID or department…" class="block w-full rounded-lg border border-zinc-300 bg-zinc-50/60 py-2 pl-9 pr-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-brand focus:bg-surface focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
         </div>
         <div class="flex items-center gap-2">
-            <select wire:model.live="role" class="flex-1 rounded-lg border border-zinc-300 bg-white py-2 pl-3 pr-8 text-sm text-zinc-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40 sm:flex-none" aria-label="Role">
+            <select wire:model.live="role" class="flex-1 rounded-lg border border-zinc-300 bg-surface py-2 pl-3 pr-8 text-sm text-zinc-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40 sm:flex-none" aria-label="Role">
                 <option value="">All roles</option>
                 <option value="{{ \App\Enums\Role::Manager->value }}">Managers</option>
                 <option value="{{ \App\Enums\Role::TeamMember->value }}">Team members</option>
             </select>
-            <select wire:model.live="status" class="flex-1 rounded-lg border border-zinc-300 bg-white py-2 pl-3 pr-8 text-sm text-zinc-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40 sm:flex-none" aria-label="Status">
+            <select wire:model.live="status" class="flex-1 rounded-lg border border-zinc-300 bg-surface py-2 pl-3 pr-8 text-sm text-zinc-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40 sm:flex-none" aria-label="Status">
                 <option value="">Any status</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
             </select>
-            <div class="hidden rounded-lg border border-zinc-300 bg-white p-0.5 sm:inline-flex" role="group" aria-label="Layout">
+            <div class="hidden rounded-lg border border-zinc-300 bg-surface p-0.5 sm:inline-flex" role="group" aria-label="Layout">
                 @foreach (['grid' => '<rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/>', 'list' => '<path d="M3 12h18M3 6h18M3 18h18"/>'] as $key => $glyph)
                     <button type="button" wire:click="$set('view', '{{ $key }}')" class="rounded-md p-1.5 {{ $view === $key ? 'bg-brand text-white' : 'text-zinc-500 hover:bg-zinc-50' }}" title="{{ ucfirst($key) }} view">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4">{!! $glyph !!}</svg>
@@ -182,7 +182,7 @@ new #[Layout('layouts.app')] #[Title('Team')] class extends Component
     </div>
 
     @if ($users->isEmpty())
-        <div class="rounded-xl border border-dashed border-zinc-300 bg-white px-4 py-14 text-center">
+        <div class="rounded-xl border border-dashed border-zinc-300 bg-surface px-4 py-14 text-center">
             <span class="mx-auto flex size-12 items-center justify-center rounded-full bg-zinc-100 text-zinc-400"><x-nav-icon name="team" class="size-5" /></span>
             <p class="mt-3 text-sm font-medium text-zinc-900">{{ $filtering ? 'No one matches those filters' : 'No team members yet' }}</p>
             @if ($filtering)
@@ -193,7 +193,7 @@ new #[Layout('layouts.app')] #[Title('Team')] class extends Component
         </div>
     @elseif ($view === 'list')
         {{-- List view (sm and up); phones always get cards. --}}
-        <div class="hidden overflow-hidden rounded-xl border border-zinc-200 bg-white sm:block">
+        <div class="hidden overflow-hidden rounded-xl border border-zinc-200 bg-surface sm:block">
             <table class="min-w-full divide-y divide-zinc-100">
                 <thead class="bg-zinc-50/80">
                     <tr class="text-left text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
@@ -248,14 +248,14 @@ new #[Layout('layouts.app')] #[Title('Team')] class extends Component
     @if ($users->isNotEmpty())
         <div class="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-4 {{ $view === 'list' ? 'sm:hidden' : '' }}">
             @foreach ($users as $user)
-                <div wire:key="card-{{ $user->id }}" class="group relative flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white transition hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-lg hover:shadow-zinc-900/5">
+                <div wire:key="card-{{ $user->id }}" class="group relative flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-surface transition hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-lg hover:shadow-zinc-900/5">
                     {{-- A calm tinted header (no bright lime), grey for inactive members. --}}
                     <div class="h-10 sm:h-14 {{ $user->isActive() ? 'bg-linear-to-br from-brand/15 via-emerald-50 to-zinc-50' : 'bg-linear-to-br from-zinc-200 to-zinc-50' }}"></div>
                     <div class="flex flex-1 flex-col px-3 pb-3 sm:px-4 sm:pb-4">
                         <div class="-mt-6 flex items-end justify-between sm:-mt-7">
                             <div class="relative">
-                                <x-user-avatar :user="$user" class="size-12 rounded-xl text-sm shadow-md ring-4 ring-white sm:size-14 sm:rounded-2xl sm:text-base" />
-                                <span class="absolute -bottom-0.5 -right-0.5 size-3 rounded-full ring-2 ring-white sm:size-3.5 {{ $user->isActive() ? 'bg-brand' : 'bg-zinc-300' }}" title="{{ ucfirst($user->status) }}"></span>
+                                <x-user-avatar :user="$user" class="size-12 rounded-xl text-sm shadow-md ring-4 ring-surface sm:size-14 sm:rounded-2xl sm:text-base" />
+                                <span class="absolute -bottom-0.5 -right-0.5 size-3 rounded-full ring-2 ring-surface sm:size-3.5 {{ $user->isActive() ? 'bg-brand' : 'bg-zinc-300' }}" title="{{ ucfirst($user->status) }}"></span>
                             </div>
                             <span class="hidden rounded-full px-2 py-0.5 text-[11px] font-semibold sm:inline {{ $roleTone($user) }}">{{ $roleLabel($user) }}</span>
                         </div>

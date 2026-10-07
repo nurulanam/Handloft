@@ -103,7 +103,7 @@ new #[Layout('layouts.app')] #[Title('For You')] class extends Component
     @endphp
 
     @if ($filledSections->isEmpty())
-        <div class="flex flex-col items-center rounded-lg border border-zinc-200 bg-white px-6 py-12 text-center">
+        <div class="flex flex-col items-center rounded-lg border border-zinc-200 bg-surface px-6 py-12 text-center">
             <span class="flex size-12 items-center justify-center rounded-full bg-brand/10 text-brand">
                 <x-nav-icon name="tasks" class="size-6" />
             </span>
@@ -114,7 +114,7 @@ new #[Layout('layouts.app')] #[Title('For You')] class extends Component
     {{-- Only sections with work in them get a card; empty ones are summed up in one line below instead of each taking a card to say "nothing here". --}}
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         @foreach ($filledSections as $section)
-            <div class="flex flex-col rounded-lg border border-zinc-200 bg-white">
+            <div class="flex flex-col rounded-lg border border-zinc-200 bg-surface">
                 <div class="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
                     <span class="inline-flex items-center gap-2 text-sm font-semibold text-zinc-900">
                         {{ $section['status']->label() }}

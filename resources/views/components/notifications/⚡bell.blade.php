@@ -175,7 +175,7 @@ new class extends Component
         x-transition:leave="transition duration-150 ease-in"
         x-transition:leave-start="opacity-100"
         x-transition:leave-end="-translate-y-1 scale-95 opacity-0"
-        class="absolute right-0 z-30 mt-2 hidden w-96 origin-top-right flex-col overflow-hidden rounded-2xl border border-white/60 bg-white/70 shadow-2xl shadow-zinc-900/20 backdrop-blur-xl backdrop-saturate-150 sm:flex"
+        class="absolute right-0 z-30 mt-2 hidden w-96 origin-top-right flex-col overflow-hidden rounded-2xl border border-white/60 bg-surface/70 shadow-2xl shadow-zinc-900/20 backdrop-blur-xl backdrop-saturate-150 sm:flex"
     >
         <div class="flex items-center justify-between px-4 pb-2 pt-3.5">
             <div>
@@ -183,13 +183,13 @@ new class extends Component
                 <p class="text-xs text-zinc-500">{{ $unreadCount > 0 ? $unreadCount.' unread' : 'All caught up' }}</p>
             </div>
             @if ($unreadCount > 0)
-                <button type="button" wire:click="markAllAsRead" class="rounded-full px-3 py-1.5 text-xs font-medium text-brand hover:bg-white/60">Mark all read</button>
+                <button type="button" wire:click="markAllAsRead" class="rounded-full px-3 py-1.5 text-xs font-medium text-brand hover:bg-surface/60">Mark all read</button>
             @endif
         </div>
 
         <div class="max-h-96 space-y-1.5 overflow-y-auto overscroll-contain px-2">
             @forelse ($recent as $notification)
-                <div wire:key="bell-{{ $notification->id }}" class="group flex items-start gap-1 rounded-xl py-2.5 pl-3 pr-1.5 transition-colors {{ $notification->read_at ? 'bg-white/40 hover:bg-white/70' : 'bg-white/85 shadow-sm hover:bg-white' }}">
+                <div wire:key="bell-{{ $notification->id }}" class="group flex items-start gap-1 rounded-xl py-2.5 pl-3 pr-1.5 transition-colors {{ $notification->read_at ? 'bg-surface/40 hover:bg-surface/70' : 'bg-surface/85 shadow-sm hover:bg-surface' }}">
                 <button
                     type="button"
                     wire:click="openNotification('{{ $notification->id }}')"
@@ -209,7 +209,7 @@ new class extends Component
                     <button
                         type="button"
                         wire:click="toggleRead('{{ $notification->id }}')"
-                        class="flex size-7 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white hover:text-brand opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                        class="flex size-7 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-surface hover:text-brand opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
                         title="{{ $notification->read_at ? 'Mark as unread' : 'Mark as read' }}"
                     >
                         <span class="sr-only">{{ $notification->read_at ? 'Mark as unread' : 'Mark as read' }}</span>
@@ -261,7 +261,7 @@ new class extends Component
                 :style="dismissing
                     ? 'transform: translateY(-100%); transition: transform 300ms cubic-bezier(0.32, 0.72, 0, 1)'
                     : (startY !== null ? `transform: translateY(${dragY}px); transition: none` : '')"
-                class="fixed inset-x-0 top-0 z-50 flex transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] max-h-[85vh] flex-col rounded-b-3xl border-b border-white/60 bg-white/70 pt-[env(safe-area-inset-top)] shadow-2xl shadow-zinc-900/20 backdrop-blur-xl backdrop-saturate-150"
+                class="fixed inset-x-0 top-0 z-50 flex transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] max-h-[85vh] flex-col rounded-b-3xl border-b border-white/60 bg-surface/70 pt-[env(safe-area-inset-top)] shadow-2xl shadow-zinc-900/20 backdrop-blur-xl backdrop-saturate-150"
                 role="dialog"
                 aria-label="Notifications"
             >
@@ -272,9 +272,9 @@ new class extends Component
                     </div>
                     <div class="flex items-center gap-1">
                         @if ($unreadCount > 0)
-                            <button type="button" wire:click="markAllAsRead" class="rounded-full px-3 py-1.5 text-xs font-medium text-brand hover:bg-white/60">Mark all read</button>
+                            <button type="button" wire:click="markAllAsRead" class="rounded-full px-3 py-1.5 text-xs font-medium text-brand hover:bg-surface/60">Mark all read</button>
                         @endif
-                        <button type="button" @click="open = false" class="rounded-full p-2 text-zinc-500 hover:bg-white/60" title="Close">
+                        <button type="button" @click="open = false" class="rounded-full p-2 text-zinc-500 hover:bg-surface/60" title="Close">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>
                         </button>
                     </div>
@@ -282,7 +282,7 @@ new class extends Component
 
                 <div class="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-3">
                     @forelse ($recent as $notification)
-                        <div wire:key="sheet-{{ $notification->id }}" class="flex items-start gap-1 rounded-2xl py-3 pl-3 pr-1.5 transition-colors {{ $notification->read_at ? 'bg-white/40' : 'bg-white/85 shadow-sm' }}">
+                        <div wire:key="sheet-{{ $notification->id }}" class="flex items-start gap-1 rounded-2xl py-3 pl-3 pr-1.5 transition-colors {{ $notification->read_at ? 'bg-surface/40' : 'bg-surface/85 shadow-sm' }}">
                         <button
                             type="button"
                             wire:click="openNotification('{{ $notification->id }}')"
@@ -302,7 +302,7 @@ new class extends Component
                             <button
                         type="button"
                         wire:click="toggleRead('{{ $notification->id }}')"
-                        class="flex size-9 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white hover:text-brand "
+                        class="flex size-9 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-surface hover:text-brand "
                         title="{{ $notification->read_at ? 'Mark as unread' : 'Mark as read' }}"
                     >
                         <span class="sr-only">{{ $notification->read_at ? 'Mark as unread' : 'Mark as read' }}</span>
@@ -347,7 +347,7 @@ new class extends Component
                 x-transition:leave="transition duration-250 ease-in"
                 x-transition:leave-start="translate-y-0 scale-100 opacity-100"
                 x-transition:leave-end="-translate-y-4 scale-50 opacity-0"
-                class="pointer-events-auto flex items-center gap-3 overflow-hidden bg-zinc-950 text-left text-white shadow-2xl shadow-zinc-950/40 ring-1 ring-white/10 transition-[width,height,border-radius,padding] duration-500 ease-[cubic-bezier(0.34,1.3,0.64,1)]"
+                class="pointer-events-auto flex items-center gap-3 overflow-hidden bg-ink-950 text-left text-white shadow-2xl shadow-zinc-950/40 ring-1 ring-white/10 transition-[width,height,border-radius,padding] duration-500 ease-[cubic-bezier(0.34,1.3,0.64,1)]"
                 :class="islandOpen ? 'h-[4.5rem] w-[min(92vw,24rem)] rounded-[2.25rem] px-3' : 'h-9 w-28 rounded-[1.125rem] px-1.5'"
             >
                 <span class="relative flex shrink-0 items-center justify-center rounded-full bg-brand-lime text-brand transition-all duration-500" :class="islandOpen ? 'size-11' : 'size-6'">

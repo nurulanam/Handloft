@@ -161,7 +161,7 @@ new #[Layout('layouts.app')] #[Title('User')] class extends Component
 
     <form id="user-form" wire:submit="save">
         {{-- Profile header --}}
-        <div class="rounded-lg border border-zinc-200 bg-white p-4 sm:p-6">
+        <div class="rounded-lg border border-zinc-200 bg-surface p-4 sm:p-6">
             <div class="flex items-center gap-4">
                 <div class="relative shrink-0">
                     @if ($photo)
@@ -174,7 +174,7 @@ new #[Layout('layouts.app')] #[Title('User')] class extends Component
                         </div>
                     @endif
 
-                    <label class="absolute -bottom-1 -right-1 flex size-8 cursor-pointer items-center justify-center rounded-full border-2 border-white bg-zinc-900 text-white hover:bg-zinc-700" title="Change photo">
+                    <label class="absolute -bottom-1 -right-1 flex size-8 cursor-pointer items-center justify-center rounded-full border-2 border-white bg-ink-900 text-white hover:bg-ink-700" title="Change photo">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg>
                         <input wire:model="photo" type="file" accept="image/*" class="sr-only">
                     </label>
@@ -193,25 +193,25 @@ new #[Layout('layouts.app')] #[Title('User')] class extends Component
 
         <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
             {{-- Account --}}
-            <div class="space-y-4 rounded-lg border border-zinc-200 bg-white p-5 lg:col-span-2">
+            <div class="space-y-4 rounded-lg border border-zinc-200 bg-surface p-5 lg:col-span-2">
                 <h2 class="text-sm font-semibold text-zinc-900">Account</h2>
 
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                         <label class="block text-sm font-medium text-zinc-700">Full Name</label>
-                        <input wire:model.live.debounce.400ms="name" type="text" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                        <input wire:model.live.debounce.400ms="name" type="text" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-surface px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
                         @error('name') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
                         <label class="block text-sm font-medium text-zinc-700">Email</label>
-                        <input wire:model="email" type="email" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                        <input wire:model="email" type="email" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-surface px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
                         @error('email') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
                         <label class="block text-sm font-medium text-zinc-700">Phone</label>
-                        <input wire:model="phone" type="text" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                        <input wire:model="phone" type="text" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-surface px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
                         @error('phone') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                     </div>
 
@@ -219,19 +219,19 @@ new #[Layout('layouts.app')] #[Title('User')] class extends Component
 
                     <div>
                         <label class="block text-sm font-medium text-zinc-700">Password {{ $user ? '(leave blank to keep current)' : '' }}</label>
-                        <input wire:model="password" type="password" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                        <input wire:model="password" type="password" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-surface px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
                         @error('password') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
                         <label class="block text-sm font-medium text-zinc-700">Confirm Password</label>
-                        <input wire:model="password_confirmation" type="password" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                        <input wire:model="password_confirmation" type="password" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-surface px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
                     </div>
                 </div>
             </div>
 
             {{-- Details --}}
-            <div class="space-y-4 rounded-lg border border-zinc-200 bg-white p-5">
+            <div class="space-y-4 rounded-lg border border-zinc-200 bg-surface p-5">
                 <h2 class="text-sm font-semibold text-zinc-900">Details</h2>
 
                 <div>
@@ -242,7 +242,7 @@ new #[Layout('layouts.app')] #[Title('User')] class extends Component
                         @endif
                     </label>
                     <div class="mt-1 flex items-center gap-2">
-                        <input wire:model.live="user_id" type="text" class="block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 font-mono text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                        <input wire:model.live="user_id" type="text" class="block w-full rounded-lg border border-zinc-300 bg-surface px-3 py-2 font-mono text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
                         <button type="button" wire:click="regenerateUserId" title="Generate a new ID" class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-zinc-300 text-zinc-500 hover:bg-zinc-50 hover:text-brand">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4">
                                 <path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0V5.36l-.31-.31A7 7 0 002.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0112.888 6.11l.311.31h-2.433a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z" clip-rule="evenodd" />
@@ -255,7 +255,7 @@ new #[Layout('layouts.app')] #[Title('User')] class extends Component
 
                 <div>
                     <label class="block text-sm font-medium text-zinc-700">Role</label>
-                    <select wire:model="role" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                    <select wire:model="role" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-surface px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
                         <option value="">Select a role</option>
                         @foreach (Role::cases() as $roleOption)
                             <option value="{{ $roleOption->value }}">{{ $roleOption->label() }}</option>
@@ -266,19 +266,19 @@ new #[Layout('layouts.app')] #[Title('User')] class extends Component
 
                 <div>
                     <label class="block text-sm font-medium text-zinc-700">Department/Team</label>
-                    <input wire:model="department" type="text" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                    <input wire:model="department" type="text" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-surface px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
                     @error('department') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                 </div>
 
                 <div>
                     <label class="block text-sm font-medium text-zinc-700">Joining Date</label>
-                    <input wire:model="joining_date" type="date" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                    <input wire:model="joining_date" type="date" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-surface px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
                     @error('joining_date') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                 </div>
 
                 <div>
                     <label class="block text-sm font-medium text-zinc-700">Status</label>
-                    <select wire:model="status" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                    <select wire:model="status" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-surface px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
                     </select>
@@ -287,7 +287,7 @@ new #[Layout('layouts.app')] #[Title('User')] class extends Component
         </div>
         {{-- Phones: the actions live here, where the form ends, instead of in the header. --}}
         <div class="mt-6 flex gap-3 sm:hidden">
-            <a href="{{ route('users.index') }}" wire:navigate class="flex-1 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-center text-sm font-medium text-zinc-700 hover:bg-zinc-50">Cancel</a>
+            <a href="{{ route('users.index') }}" wire:navigate class="flex-1 rounded-lg border border-zinc-300 bg-surface px-4 py-2.5 text-center text-sm font-medium text-zinc-700 hover:bg-zinc-50">Cancel</a>
             <button type="submit" class="flex-1 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand/90" wire:loading.attr="disabled">{{ $user ? 'Save Changes' : 'Create User' }}</button>
         </div>
     </form>

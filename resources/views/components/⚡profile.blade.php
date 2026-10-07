@@ -117,7 +117,7 @@ new #[Layout('layouts.app')] #[Title('My profile')] class extends Component
 ?>
 
 @php
-    $input = 'block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40';
+    $input = 'block w-full rounded-lg border border-zinc-300 bg-surface px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40';
     $label = 'block text-sm font-medium text-zinc-700';
 @endphp
 
@@ -129,15 +129,15 @@ new #[Layout('layouts.app')] #[Title('My profile')] class extends Component
 
     {{-- Identity card. The photo is changed right here: the camera button on the avatar picks one, which opens the
          cropper (position + zoom) before it's uploaded and saved. --}}
-    <div x-data="photoCropper" class="relative overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+    <div x-data="photoCropper" class="relative overflow-hidden rounded-2xl border border-zinc-200 bg-surface">
         <div class="h-20 bg-brand sm:h-24" style="background-image: radial-gradient(circle at 85% 20%, rgb(191 239 30 / 0.35), transparent 45%), radial-gradient(circle, rgb(255 255 255 / 0.12) 1px, transparent 1px); background-size: auto, 18px 18px;"></div>
         <div class="flex flex-col gap-3 px-4 pb-5 sm:flex-row sm:items-start sm:gap-5 sm:px-6">
             <div class="relative -mt-10 shrink-0 self-start sm:-mt-12">
-                <x-user-avatar :user="$user" class="size-20 rounded-2xl text-2xl shadow-lg ring-4 ring-white sm:size-24" />
-                <span wire:loading.flex wire:target="photo" class="absolute inset-0 hidden items-center justify-center rounded-2xl bg-zinc-900/50 ring-4 ring-white">
+                <x-user-avatar :user="$user" class="size-20 rounded-2xl text-2xl shadow-lg ring-4 ring-surface sm:size-24" />
+                <span wire:loading.flex wire:target="photo" class="absolute inset-0 hidden items-center justify-center rounded-2xl bg-zinc-900/50 ring-4 ring-surface">
                     <svg class="size-6 animate-spin text-white" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".3" stroke-width="3"/><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
                 </span>
-                <label class="absolute -bottom-1.5 -right-1.5 flex size-9 cursor-pointer items-center justify-center rounded-full bg-white text-zinc-700 shadow-md ring-1 ring-zinc-900/10 transition hover:bg-brand hover:text-white" title="{{ $photoUrl ? 'Change photo' : 'Upload photo' }}">
+                <label class="absolute -bottom-1.5 -right-1.5 flex size-9 cursor-pointer items-center justify-center rounded-full bg-surface text-zinc-700 shadow-md ring-1 ring-zinc-900/10 transition hover:bg-brand hover:text-white" title="{{ $photoUrl ? 'Change photo' : 'Upload photo' }}">
                     <span class="sr-only">{{ $photoUrl ? 'Change photo' : 'Upload photo' }}</span>
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
                     <input type="file" accept="image/*" @change="pick($event)" class="sr-only">
@@ -170,7 +170,7 @@ new #[Layout('layouts.app')] #[Title('My profile')] class extends Component
                         x-transition:leave="transition duration-250 ease-in"
                         x-transition:leave-start="translate-y-0 sm:scale-100 sm:opacity-100"
                         x-transition:leave-end="translate-y-full sm:translate-y-4 sm:scale-95 sm:opacity-0"
-                        class="pointer-events-auto w-full rounded-t-[2rem] border-t border-white/60 bg-white/85 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl shadow-zinc-900/25 backdrop-blur-xl backdrop-saturate-150 sm:max-w-sm sm:rounded-3xl sm:border sm:p-6"
+                        class="pointer-events-auto w-full rounded-t-[2rem] border-t border-white/60 bg-surface/85 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl shadow-zinc-900/25 backdrop-blur-xl backdrop-saturate-150 sm:max-w-sm sm:rounded-3xl sm:border sm:p-6"
                     >
                         <div class="flex justify-center pb-2 sm:hidden"><span class="h-1.5 w-10 rounded-full bg-zinc-900/20"></span></div>
                         <h2 class="text-lg font-semibold text-zinc-900">Crop your photo</h2>
@@ -183,7 +183,7 @@ new #[Layout('layouts.app')] #[Title('My profile')] class extends Component
                             @pointerup="up($event)"
                             @pointercancel="up($event)"
                             @wheel.prevent="wheel($event)"
-                            class="relative mx-auto mt-4 aspect-square w-full max-w-72 touch-none select-none overflow-hidden rounded-2xl bg-zinc-900"
+                            class="relative mx-auto mt-4 aspect-square w-full max-w-72 touch-none select-none overflow-hidden rounded-2xl bg-ink-900"
                             :class="dragging ? 'cursor-grabbing' : 'cursor-grab'"
                         >
                             <template x-if="img">
@@ -228,7 +228,7 @@ new #[Layout('layouts.app')] #[Title('My profile')] class extends Component
     <div class="grid gap-4 sm:gap-6 lg:grid-cols-3 lg:items-start">
         <div class="space-y-4 sm:space-y-6 lg:col-span-2">
             {{-- Personal details --}}
-            <form wire:submit="saveDetails" class="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+            <form wire:submit="saveDetails" class="overflow-hidden rounded-xl border border-zinc-200 bg-surface">
                 <div class="border-b border-zinc-100 px-4 py-4 sm:px-6">
                     <h2 class="text-base font-semibold text-zinc-900">Personal details</h2>
                     <p class="text-sm text-zinc-500">How you appear to your team.</p>
@@ -260,7 +260,7 @@ new #[Layout('layouts.app')] #[Title('My profile')] class extends Component
             </form>
 
             {{-- Password --}}
-            <form wire:submit="savePassword" x-data="{ reveal: false }" class="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+            <form wire:submit="savePassword" x-data="{ reveal: false }" class="overflow-hidden rounded-xl border border-zinc-200 bg-surface">
                 <div class="flex items-start justify-between gap-4 border-b border-zinc-100 px-4 py-4 sm:px-6">
                     <div>
                         <h2 class="text-base font-semibold text-zinc-900">Change password</h2>
@@ -293,7 +293,7 @@ new #[Layout('layouts.app')] #[Title('My profile')] class extends Component
         </div>
 
         {{-- Read-only work details --}}
-        <div class="overflow-hidden rounded-xl border border-zinc-200 bg-white lg:sticky lg:top-20">
+        <div class="overflow-hidden rounded-xl border border-zinc-200 bg-surface lg:sticky lg:top-20">
             <div class="border-b border-zinc-100 px-4 py-4 sm:px-6">
                 <h2 class="text-base font-semibold text-zinc-900">Work details</h2>
                 <p class="flex items-center gap-1.5 text-sm text-zinc-500">

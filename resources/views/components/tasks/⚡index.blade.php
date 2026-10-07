@@ -379,7 +379,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                             <div
                                 x-on:mousedown.prevent="startDrag({{ $task->id }}, $event)"
                                 :class="draggingId === {{ $task->id }} && moved ? 'opacity-40' : ''"
-                                class="cursor-grab select-none rounded-lg border border-zinc-200 bg-white p-3 hover:border-brand/40 active:cursor-grabbing {{ $this->connectionAccentClass($task, auth()->user()) }}"
+                                class="cursor-grab select-none rounded-lg border border-zinc-200 bg-surface p-3 hover:border-brand/40 active:cursor-grabbing {{ $this->connectionAccentClass($task, auth()->user()) }}"
                             >
                                 <div class="mb-1 flex items-center justify-between gap-1">
                                     <div class="flex flex-wrap items-center gap-1">
@@ -401,13 +401,13 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                                 @if ($task->isConnectedTo(auth()->user()))
                                     <div class="mt-1.5 flex flex-wrap gap-1">
                                         @if ($task->isReportedBy(auth()->user()))
-                                            <span class="rounded-full bg-zinc-800 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">Reporter</span>
+                                            <span class="rounded-full bg-ink-800 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">Reporter</span>
                                         @endif
                                         @if ($task->isAssignedTo(auth()->user()))
-                                            <span class="rounded-full bg-zinc-800 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">Assignee</span>
+                                            <span class="rounded-full bg-ink-800 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">Assignee</span>
                                         @endif
                                         @if ($task->isReviewedBy(auth()->user()))
-                                            <span class="rounded-full bg-zinc-800 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">QA</span>
+                                            <span class="rounded-full bg-ink-800 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">QA</span>
                                         @endif
                                     </div>
                                 @endif
@@ -430,7 +430,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
         {{-- Submit for QA Testing modal (opened by dropping a card on the QA Testing column) --}}
         @if ($submittingTaskId)
             <div class="fixed inset-0 z-40 flex items-center justify-center bg-zinc-900/50 px-4">
-                <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
+                <div class="w-full max-w-md rounded-lg bg-surface p-6 shadow-lg">
                     <h3 class="text-lg font-semibold text-zinc-900">Submit for QA Testing</h3>
 
                     <p class="mt-4 text-sm text-zinc-500">
@@ -439,7 +439,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
 
                     <div class="mt-4">
                         <label class="block text-sm font-medium text-zinc-700">Note (Optional)</label>
-                        <textarea wire:model="submission_note" rows="2" autofocus class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40"></textarea>
+                        <textarea wire:model="submission_note" rows="2" autofocus class="mt-1 block w-full rounded-lg border border-zinc-300 bg-surface px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40"></textarea>
                     </div>
 
                     <div class="mt-6 flex justify-end gap-3">
@@ -454,7 +454,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
         @endif
     @else
         {{-- Phones: one card per task — the seven-column table can't fit. --}}
-        <div class="divide-y divide-zinc-100 overflow-hidden rounded-lg border border-zinc-200 bg-white sm:hidden">
+        <div class="divide-y divide-zinc-100 overflow-hidden rounded-lg border border-zinc-200 bg-surface sm:hidden">
             @forelse ($tasks as $task)
                 <div class="flex gap-3 px-4 py-3 {{ $this->connectionAccentClass($task, auth()->user()) }}">
                     <a href="{{ route('tasks.show', $task) }}" wire:navigate class="min-w-0 flex-1">
@@ -485,7 +485,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
             @endforelse
         </div>
 
-        <div class="hidden overflow-x-auto rounded-lg border border-zinc-200 bg-white sm:block">
+        <div class="hidden overflow-x-auto rounded-lg border border-zinc-200 bg-surface sm:block">
             <table class="min-w-full divide-y divide-zinc-200">
                 <thead class="bg-zinc-50">
                     <tr>

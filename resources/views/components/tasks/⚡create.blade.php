@@ -156,7 +156,7 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
                 <div class="order-2">
                     <label class="block text-sm font-medium text-zinc-700">Description</label>
                     <div wire:ignore x-data="quillEditor(@js($description))" class="mt-1">
-                        <div x-ref="editor" class="min-h-40 rounded-b-lg border sm:min-h-64 border-zinc-300 bg-white text-sm [&_.ql-toolbar]:rounded-t-lg [&_.ql-toolbar]:border-zinc-300"></div>
+                        <div x-ref="editor" class="min-h-40 rounded-b-lg border sm:min-h-64 border-zinc-300 bg-surface text-sm [&_.ql-toolbar]:rounded-t-lg [&_.ql-toolbar]:border-zinc-300"></div>
                         <input type="hidden" x-ref="input" wire:model="description">
                     </div>
                     @error('description') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
@@ -164,7 +164,7 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
 
                 <div class="order-4">
                     <label class="block text-sm font-medium text-zinc-700">Attachments</label>
-                    <label class="mt-1 inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-600 hover:border-brand hover:text-brand">
+                    <label class="mt-1 inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-zinc-300 bg-surface px-3 py-1.5 text-sm text-zinc-600 hover:border-brand hover:text-brand">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/></svg>
                         Add files
                         <input wire:model="attachments" type="file" multiple class="sr-only">
@@ -193,7 +193,7 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
 
                 <div class="order-5">
                     <label class="block text-sm font-medium text-zinc-700">Notes</label>
-                    <textarea wire:model="notes" rows="3" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40"></textarea>
+                    <textarea wire:model="notes" rows="3" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-surface px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40"></textarea>
                     @error('notes') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                 </div>
             </div>
@@ -207,7 +207,7 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
                     </span>
                 </div>
 
-                <div class="order-3 rounded-lg border border-zinc-200 bg-white" x-data="{ open: true }">
+                <div class="order-3 rounded-lg border border-zinc-200 bg-surface" x-data="{ open: true }">
                     <button type="button" @click="open = ! open" class="flex w-full items-center gap-1.5 px-4 py-3 text-left">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5 text-zinc-400 transition-transform" :class="open ? 'rotate-90' : ''">
                             <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
@@ -228,7 +228,7 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
                                     <span class="text-sm" :class="value ? 'text-zinc-900' : 'text-zinc-400'" x-text="label"></span>
                                 </button>
 
-                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-surface py-1 shadow-lg">
                                     @foreach ($users as $option)
                                         <button type="button" wire:click="$set('assigned_to', {{ $option->id }})" @click="choose('{{ $option->id }}', @js($option->name))" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50">
                                             <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-brand text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($option->name) }}</span>
@@ -247,15 +247,15 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
                             <div class="relative" x-data="dropdownMenu(@js($reporter_id), @js(optional($users->firstWhere('id', $reporter_id))->name ?? 'Select reporter'))">
                                 <button type="button" @click="open = ! open" class="flex items-center gap-2 hover:opacity-75">
                                     <template x-if="value">
-                                        <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-[10px] font-semibold text-white" x-text="initialsOf(label)"></span>
+                                        <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-ink-700 text-[10px] font-semibold text-white" x-text="initialsOf(label)"></span>
                                     </template>
                                     <span class="text-sm" :class="value ? 'text-zinc-900' : 'text-zinc-400'" x-text="label"></span>
                                 </button>
 
-                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-surface py-1 shadow-lg">
                                     @foreach ($users as $option)
                                         <button type="button" wire:click="$set('reporter_id', {{ $option->id }})" @click="choose('{{ $option->id }}', @js($option->name))" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50">
-                                            <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($option->name) }}</span>
+                                            <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-ink-700 text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($option->name) }}</span>
                                             {{ $option->name }}
                                         </button>
                                     @endforeach
@@ -271,16 +271,16 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
                             <div class="relative" x-data="dropdownMenu(@js($qa_id), @js(optional($users->firstWhere('id', $qa_id))->name ?? 'Add reviewer'))">
                                 <button type="button" @click="open = ! open" class="flex items-center gap-2 hover:opacity-75">
                                     <template x-if="value">
-                                        <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-[10px] font-semibold text-white" x-text="initialsOf(label)"></span>
+                                        <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-ink-700 text-[10px] font-semibold text-white" x-text="initialsOf(label)"></span>
                                     </template>
                                     <span class="text-sm" :class="value ? 'text-zinc-900' : 'text-zinc-400'" x-text="label"></span>
                                 </button>
 
-                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-surface py-1 shadow-lg">
                                     <button type="button" wire:click="$set('qa_id', '')" @click="choose('', 'Add reviewer')" class="block w-full px-3 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-50">None</button>
                                     @foreach ($users as $option)
                                         <button type="button" wire:click="$set('qa_id', {{ $option->id }})" @click="choose('{{ $option->id }}', @js($option->name))" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50">
-                                            <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($option->name) }}</span>
+                                            <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-ink-700 text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($option->name) }}</span>
                                             {{ $option->name }}
                                         </button>
                                     @endforeach
@@ -300,7 +300,7 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
                                     <span x-text="label"></span>
                                 </button>
 
-                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 w-40 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 w-40 rounded-lg border border-zinc-200 bg-surface py-1 shadow-lg">
                                     @foreach (TaskPriority::cases() as $option)
                                         <button type="button" wire:click="$set('priority', '{{ $option->value }}')" @click="choose('{{ $option->value }}', @js($option->label()))" class="flex w-full items-center gap-1.5 px-3 py-2 text-left text-sm hover:bg-zinc-50">
                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5 {{ $option->colorClass() }}">
@@ -343,7 +343,7 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
                             <div class="relative" x-data="dropdownMenu(@js($task_category_id), @js(optional($categories->firstWhere('id', $task_category_id))->name ?? 'None'))">
                                 <button type="button" @click="open = ! open" class="text-sm hover:text-brand" :class="value ? 'text-zinc-900' : 'text-zinc-400'" x-text="label"></button>
 
-                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-zinc-200 bg-surface py-1 shadow-lg">
                                     <button type="button" wire:click="$set('task_category_id', '')" @click="choose('', 'None')" class="block w-full px-3 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-50">None</button>
                                     @foreach ($categories as $category)
                                         <button type="button" wire:click="$set('task_category_id', {{ $category->id }})" @click="choose('{{ $category->id }}', @js($category->name))" class="block w-full px-3 py-2 text-left text-sm hover:bg-zinc-50">
@@ -361,7 +361,7 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
                             <div class="relative" x-data="dropdownMenu(@js($project_id), @js(optional($projects->firstWhere('id', $project_id))->name ?? 'None'))">
                                 <button type="button" @click="open = ! open" class="text-sm hover:text-brand" :class="value ? 'text-zinc-900' : 'text-zinc-400'" x-text="label"></button>
 
-                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 w-48 max-h-60 overflow-y-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 w-48 max-h-60 overflow-y-auto rounded-lg border border-zinc-200 bg-surface py-1 shadow-lg">
                                     <button type="button" wire:click="$set('project_id', '')" @click="choose('', 'None')" class="block w-full px-3 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-50">None</button>
                                     @foreach ($projects as $option)
                                         <button type="button" wire:click="$set('project_id', {{ $option->id }})" @click="choose('{{ $option->id }}', @js($option->name))" class="block w-full px-3 py-2 text-left text-sm hover:bg-zinc-50">
@@ -377,7 +377,7 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
         </div>
         {{-- Phones: the actions live here, where the form ends, instead of in the header. --}}
         <div class="mt-6 flex gap-3 sm:hidden">
-            <a href="{{ route('tasks.index') }}" wire:navigate class="flex-1 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-center text-sm font-medium text-zinc-700 hover:bg-zinc-50">Cancel</a>
+            <a href="{{ route('tasks.index') }}" wire:navigate class="flex-1 rounded-lg border border-zinc-300 bg-surface px-4 py-2.5 text-center text-sm font-medium text-zinc-700 hover:bg-zinc-50">Cancel</a>
             <button type="submit" class="flex-1 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand/90" wire:loading.attr="disabled">Create Task</button>
         </div>
     </form>

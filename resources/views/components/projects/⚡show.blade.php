@@ -70,7 +70,7 @@ new #[Layout('layouts.app')] #[Title('Project')] class extends Component
 ?>
 
 <div class="space-y-6">
-    <div class="rounded-lg border border-zinc-200 bg-white p-5">
+    <div class="rounded-lg border border-zinc-200 bg-surface p-5">
         <div class="flex items-start justify-between gap-4">
             <div>
                 <h1 class="text-2xl font-semibold text-zinc-900">{{ $project->name }}</h1>
@@ -82,7 +82,7 @@ new #[Layout('layouts.app')] #[Title('Project')] class extends Component
                     <div class="relative" x-data="dropdownMenu()">
                         @if ($project->coordinator)
                             <button type="button" @click="open = ! open" @disabled(! $canEdit) class="flex items-center gap-1.5 {{ $canEdit ? 'hover:opacity-75' : '' }}">
-                                <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($project->coordinator->name) }}</span>
+                                <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-ink-700 text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($project->coordinator->name) }}</span>
                                 <span class="text-zinc-900">{{ $project->coordinator->name }}</span>
                             </button>
                         @else
@@ -92,11 +92,11 @@ new #[Layout('layouts.app')] #[Title('Project')] class extends Component
                         @endif
 
                         @if ($canEdit)
-                            <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute left-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                            <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute left-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-surface py-1 shadow-lg">
                                 <button type="button" wire:click="saveCoordinator(null)" @click="open = false" class="block w-full px-3 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-50">None</button>
                                 @foreach ($users as $option)
                                     <button type="button" wire:click="saveCoordinator({{ $option->id }})" @click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50">
-                                        <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($option->name) }}</span>
+                                        <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-ink-700 text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($option->name) }}</span>
                                         {{ $option->name }}
                                     </button>
                                 @endforeach
@@ -122,7 +122,7 @@ new #[Layout('layouts.app')] #[Title('Project')] class extends Component
                 </button>
 
                 @if ($canEdit)
-                    <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 w-40 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                    <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 w-40 rounded-lg border border-zinc-200 bg-surface py-1 shadow-lg">
                         @foreach (ProjectStatus::cases() as $option)
                             <button type="button" wire:click="saveStatus('{{ $option->value }}')" @click="open = false" class="block w-full px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50">
                                 {{ $option->label() }}
@@ -152,7 +152,7 @@ new #[Layout('layouts.app')] #[Title('Project')] class extends Component
         </div>
     </div>
 
-    <div class="rounded-lg border border-zinc-200 bg-white p-5">
+    <div class="rounded-lg border border-zinc-200 bg-surface p-5">
         <livewire:tasks.index :project-id="$project->id" :key="'project-tasks-'.$project->id" />
     </div>
 </div>

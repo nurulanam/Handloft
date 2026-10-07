@@ -127,16 +127,45 @@ class WorkScheduleAndAppearanceTest extends TestCase
 
         // On <body>, so wire:navigate (which swaps the body) carries the new theme to the next page.
         $this->actingAs($admin)->get(route('dashboard'))
-            ->assertSee('style="--color-brand: #0b4f6c; --color-brand-lime: #5eead4;"', false)
+            ->assertSee('style="--brand-base: #0b4f6c; --brand-accent: #5eead4;"', false)
             ->assertSee('ui-static', false);
 
         Livewire::actingAs($admin)->test('settings')->set('theme', 'neon')->call('saveAppearance')->assertHasErrors(['theme']);
     }
 
+    public function test_picking_a_style_or_theme_applies_it_without_a_save_step(): void
+    {
+        $admin = $this->admin();
+
+        Livewire::actingAs($admin)->test('settings')
+            ->set('theme', 'plum')
+            ->assertDispatched('appearance-saved', look: ['brand' => '#6b21a8', 'accent' => '#f0abfc', 'static' => false]);
+
+        $this->assertSame('plum', AppSetting::current()->theme);
+
+        Livewire::actingAs($admin)->test('settings')->set('ui_style', 'static');
+
+        $this->assertSame('static', AppSetting::current()->ui_style);
+    }
+
     public function test_the_default_theme_renders_the_forest_colours(): void
     {
         $this->actingAs($this->admin())->get(route('dashboard'))
-            ->assertSee('style="--color-brand: #10512a; --color-brand-lime: #bfef1e;"', false)
+            ->assertSee('style="--brand-base: #10512a; --brand-accent: #bfef1e;"', false)
             ->assertDontSee(' ui-static', false);
+    }
+
+    public function test_every_page_offers_light_dark_and_system_modes_but_the_print_report_stays_light(): void
+    {
+        $admin = $this->admin();
+
+        $this->actingAs($admin)->get(route('dashboard'))
+            ->assertSee("classList.toggle('dark'", false)
+            ->assertSee('aria-label="Colour mode"', false)
+            ->assertSeeInOrder(['Light', 'Dark', 'System']);
+
+        $this->actingAs($admin)->get(route('reports.print'))
+            ->assertOk()
+            ->assertDontSee("classList.toggle('dark'", false);
     }
 }

@@ -102,7 +102,7 @@ new #[Layout('layouts.app')] #[Title('Create Project')] class extends Component
                 <div>
                     <label class="block text-sm font-medium text-zinc-700">Description</label>
                     <div wire:ignore x-data="quillEditor(@js($description))" class="mt-1">
-                        <div x-ref="editor" class="min-h-40 rounded-b-lg border sm:min-h-64 border-zinc-300 bg-white text-sm [&_.ql-toolbar]:rounded-t-lg [&_.ql-toolbar]:border-zinc-300"></div>
+                        <div x-ref="editor" class="min-h-40 rounded-b-lg border sm:min-h-64 border-zinc-300 bg-surface text-sm [&_.ql-toolbar]:rounded-t-lg [&_.ql-toolbar]:border-zinc-300"></div>
                         <input type="hidden" x-ref="input" wire:model="description">
                     </div>
                     @error('description') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
@@ -111,7 +111,7 @@ new #[Layout('layouts.app')] #[Title('Create Project')] class extends Component
 
             {{-- Right: Details --}}
             <div class="space-y-4 lg:sticky lg:top-20 lg:self-start">
-                <div class="rounded-lg border border-zinc-200 bg-white p-4">
+                <div class="rounded-lg border border-zinc-200 bg-surface p-4">
                     <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Details</h3>
 
                     <div class="mt-3 divide-y divide-zinc-100">
@@ -122,16 +122,16 @@ new #[Layout('layouts.app')] #[Title('Create Project')] class extends Component
                             <div class="relative" x-data="dropdownMenu(@js($coordinator_id), @js(optional($users->firstWhere('id', $coordinator_id))->name ?? 'Assign coordinator'))">
                                 <button type="button" @click="open = ! open" class="flex items-center gap-2 hover:opacity-75">
                                     <template x-if="value">
-                                        <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-[10px] font-semibold text-white" x-text="initialsOf(label)"></span>
+                                        <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-ink-700 text-[10px] font-semibold text-white" x-text="initialsOf(label)"></span>
                                     </template>
                                     <span class="text-sm" :class="value ? 'text-zinc-900' : 'text-zinc-400'" x-text="label"></span>
                                 </button>
 
-                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-surface py-1 shadow-lg">
                                     <button type="button" wire:click="$set('coordinator_id', '')" @click="choose('', 'Assign coordinator')" class="block w-full px-3 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-50">None</button>
                                     @foreach ($users as $option)
                                         <button type="button" wire:click="$set('coordinator_id', {{ $option->id }})" @click="choose('{{ $option->id }}', @js($option->name))" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50">
-                                            <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-zinc-700 text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($option->name) }}</span>
+                                            <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-ink-700 text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($option->name) }}</span>
                                             {{ $option->name }}
                                         </button>
                                     @endforeach
@@ -167,7 +167,7 @@ new #[Layout('layouts.app')] #[Title('Create Project')] class extends Component
         </div>
         {{-- Phones: the actions live here, where the form ends, instead of in the header. --}}
         <div class="mt-6 flex gap-3 sm:hidden">
-            <a href="{{ route('projects.index') }}" wire:navigate class="flex-1 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-center text-sm font-medium text-zinc-700 hover:bg-zinc-50">Cancel</a>
+            <a href="{{ route('projects.index') }}" wire:navigate class="flex-1 rounded-lg border border-zinc-300 bg-surface px-4 py-2.5 text-center text-sm font-medium text-zinc-700 hover:bg-zinc-50">Cancel</a>
             <button type="submit" class="flex-1 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand/90" wire:loading.attr="disabled">Create Project</button>
         </div>
     </form>

@@ -99,6 +99,20 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
         $this->daily_hours_target = WorkSchedule::dailyTarget() !== null ? rtrim(rtrim(number_format(WorkSchedule::dailyTarget(), 2), '0'), '.') : '';
     }
 
+    /**
+     * Picking a visual style or theme colour applies it straight away, for everyone; there is no
+     * separate save step, so what the page shows is always what every other page will show.
+     */
+    public function updatedUiStyle(): void
+    {
+        $this->saveAppearance();
+    }
+
+    public function updatedTheme(): void
+    {
+        $this->saveAppearance();
+    }
+
     public function saveAppearance(): void
     {
         abort_unless(auth()->user()->can('manage-settings'), 403);
@@ -306,10 +320,10 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
 };
 ?>
 @php
-    $input = 'block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40';
+    $input = 'block w-full rounded-lg border border-zinc-300 bg-surface px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40';
     $label = 'block text-sm font-medium text-zinc-700';
     $primary = 'inline-flex w-full items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand/90 disabled:opacity-60 sm:w-auto sm:py-2';
-    $secondary = 'inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-60 sm:w-auto sm:py-2';
+    $secondary = 'inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-surface px-4 py-2.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-60 sm:w-auto sm:py-2';
     $tabs = [
         'appearance' => ['Appearance', 'Look', 'Glass or static, theme colours', '<path d="m14.622 17.897-10.68-2.913"/><path d="M18.376 2.622a1 1 0 1 1 3.002 3.002L17.36 9.643a.5.5 0 0 0 0 .707l.944.944a2.41 2.41 0 0 1 0 3.408l-.944.944a.5.5 0 0 1-.707 0L8.354 7.348a.5.5 0 0 1 0-.707l.944-.944a2.41 2.41 0 0 1 3.408 0l.944.944a.5.5 0 0 0 .707 0z"/><path d="M9 8c-1.804 2.71-3.97 3.46-6.583 3.948a.507.507 0 0 0-.302.819l7.32 8.883a1 1 0 0 0 1.185.204C12.735 20.405 16 16.792 16 15"/>'],
         'schedule' => ['Work Schedule', 'Schedule', 'Days off, week start, hours', '<path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.3V14"/><circle cx="16" cy="16" r="6"/>'],
@@ -328,7 +342,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
 
     <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-8">
         {{-- Section nav: a 3-up icon tab bar on phones, a described side menu from lg up. --}}
-        <nav class="grid shrink-0 grid-cols-5 gap-1 rounded-xl border border-zinc-200 bg-white p-1 lg:sticky lg:top-20 lg:flex lg:w-64 lg:flex-col lg:gap-1 lg:p-2" aria-label="Settings sections">
+        <nav class="grid shrink-0 grid-cols-5 gap-1 rounded-xl border border-zinc-200 bg-surface p-1 lg:sticky lg:top-20 lg:flex lg:w-64 lg:flex-col lg:gap-1 lg:p-2" aria-label="Settings sections">
             @foreach ($tabs as $key => [$name, $short, $hint, $icon])
                 <button
                     type="button"
@@ -360,7 +374,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
             @if ($tab === 'appearance')
                 <form
                     wire:submit="saveAppearance"
-                    class="overflow-hidden rounded-xl border border-zinc-200 bg-white"
+                    class="overflow-hidden rounded-xl border border-zinc-200 bg-surface"
                     x-data="{ presets: @js(\App\Support\Theme::PRESETS) }"
                     x-effect="
                         const t = presets[$wire.theme] ?? presets.forest;
@@ -369,7 +383,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                 >
                     <div class="border-b border-zinc-100 px-4 py-4 sm:px-6">
                         <h2 class="text-base font-semibold text-zinc-900">Appearance</h2>
-                        <p class="text-sm text-zinc-500">Changes preview instantly on this page; save to apply them for everyone.</p>
+                        <p class="text-sm text-zinc-500">Changes apply instantly, for everyone.</p>
                     </div>
 
                     <div class="space-y-6 px-4 py-5 sm:px-6">
@@ -377,23 +391,23 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                             <p class="text-sm font-semibold text-zinc-900">Visual style</p>
                             <div class="mt-3 grid gap-3 sm:grid-cols-2">
                                 @foreach ([
-                                    'glass' => ['Liquid glass', 'Frosted, translucent panels with soft colour behind them.'],
-                                    'static' => ['Static', 'Solid panels, no blur or drifting — calmer and lighter on older devices.'],
+                                    'glass' => ['Liquid glass', 'Frosted, translucent cards, bars and menus over soft drifting colour, on every screen size.'],
+                                    'static' => ['Static', 'Solid panels, no blur or moving colour. Calmer and lighter on older devices.'],
                                 ] as $key => [$styleName, $styleHint])
                                     <label class="group relative cursor-pointer">
                                         <input type="radio" wire:model.live="ui_style" value="{{ $key }}" class="peer sr-only">
                                         <span class="block rounded-2xl border-2 border-zinc-200 p-3 transition peer-checked:border-brand peer-focus-visible:ring-2 peer-focus-visible:ring-brand-lime/50">
                                             {{-- Mini preview --}}
-                                            <span class="relative block h-24 overflow-hidden rounded-xl {{ $key === 'glass' ? 'bg-brand' : 'bg-zinc-100' }}">
+                                            <span class="style-demo relative block h-24 overflow-hidden rounded-xl {{ $key === 'glass' ? 'bg-brand' : 'bg-zinc-100' }}">
                                                 @if ($key === 'glass')
                                                     <span class="absolute -left-4 top-2 size-20 rounded-full bg-brand-lime/70 blur-xl"></span>
                                                     <span class="absolute right-2 top-8 size-16 rounded-full bg-emerald-300/70 blur-xl"></span>
-                                                    <span class="absolute inset-x-4 bottom-3 top-6 rounded-xl border border-white/50 bg-white/40 backdrop-blur-md"></span>
+                                                    <span class="absolute inset-x-4 bottom-3 top-6 rounded-xl border border-white/50 bg-surface/40 backdrop-blur-md"></span>
                                                 @else
-                                                    <span class="absolute inset-x-4 bottom-3 top-6 rounded-xl border border-zinc-200 bg-white shadow-sm"></span>
+                                                    <span class="absolute inset-x-4 bottom-3 top-6 rounded-xl border border-zinc-200 bg-surface shadow-sm"></span>
                                                 @endif
-                                                <span class="absolute left-7 top-9 h-2 w-16 rounded-full {{ $key === 'glass' ? 'bg-white/80' : 'bg-zinc-200' }}"></span>
-                                                <span class="absolute left-7 top-13 h-2 w-24 rounded-full {{ $key === 'glass' ? 'bg-white/60' : 'bg-zinc-100' }}"></span>
+                                                <span class="absolute left-7 top-9 h-2 w-16 rounded-full {{ $key === 'glass' ? 'bg-surface/80' : 'bg-zinc-200' }}"></span>
+                                                <span class="absolute left-7 top-13 h-2 w-24 rounded-full {{ $key === 'glass' ? 'bg-surface/60' : 'bg-zinc-100' }}"></span>
                                             </span>
                                             <span class="mt-3 flex items-center justify-between gap-2">
                                                 <span class="text-sm font-semibold text-zinc-900">{{ $styleName }}</span>
@@ -417,7 +431,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                                         <input type="radio" wire:model.live="theme" value="{{ $key }}" class="peer sr-only">
                                         <span class="flex items-center gap-3 rounded-2xl border-2 border-zinc-200 p-3 transition peer-checked:border-[var(--swatch)] peer-focus-visible:ring-2 peer-focus-visible:ring-brand-lime/50" style="--swatch: {{ $preset['brand'] }}">
                                             <span class="relative size-10 shrink-0 rounded-xl" style="background-color: {{ $preset['brand'] }}">
-                                                <span class="absolute -bottom-1 -right-1 size-4 rounded-full ring-2 ring-white" style="background-color: {{ $preset['accent'] }}"></span>
+                                                <span class="absolute -bottom-1 -right-1 size-4 rounded-full ring-2 ring-surface" style="background-color: {{ $preset['accent'] }}"></span>
                                             </span>
                                             <span class="min-w-0 flex-1">
                                                 <span class="block text-sm font-semibold text-zinc-900">{{ $preset['name'] }}</span>
@@ -431,9 +445,6 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                         </div>
                     </div>
 
-                    <div class="flex justify-end border-t border-zinc-100 bg-zinc-50/70 px-4 py-3 sm:px-6">
-                        <button type="submit" class="{{ $primary }}" wire:loading.attr="disabled" wire:target="saveAppearance">Save appearance</button>
-                    </div>
                 </form>
             @elseif ($tab === 'schedule')
                 @php
@@ -441,7 +452,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                     $workingPerWeek = 7 - $offSelected->unique()->count();
                     $targetValue = is_numeric($daily_hours_target) ? (float) $daily_hours_target : null;
                 @endphp
-                <form wire:submit="saveSchedule" class="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+                <form wire:submit="saveSchedule" class="overflow-hidden rounded-xl border border-zinc-200 bg-surface">
                     <div class="border-b border-zinc-100 px-4 py-4 sm:px-6">
                         <h2 class="text-base font-semibold text-zinc-900">Work schedule</h2>
                         <p class="text-sm text-zinc-500">Used by the calendar, dashboard, work history and reports.</p>
@@ -481,7 +492,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                                 <p class="text-xs text-zinc-500">The first column of the calendar, and where "this week" begins.</p>
                             </div>
                             <div class="lg:col-span-2">
-                                <div class="grid grid-cols-3 rounded-lg border border-zinc-300 bg-white p-0.5 sm:inline-grid sm:w-80">
+                                <div class="grid grid-cols-3 rounded-lg border border-zinc-300 bg-surface p-0.5 sm:inline-grid sm:w-80">
                                     @foreach (['6' => 'Saturday', '0' => 'Sunday', '1' => 'Monday'] as $value => $startLabel)
                                         <label class="cursor-pointer">
                                             <input type="radio" wire:model.live="week_starts_on" value="{{ $value }}" class="peer sr-only">
@@ -522,7 +533,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                     </div>
                 </form>
             @elseif ($tab === 'loading-screen')
-                <form wire:submit="saveLoadingScreen" x-data class="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+                <form wire:submit="saveLoadingScreen" x-data class="overflow-hidden rounded-xl border border-zinc-200 bg-surface">
                     <div class="flex items-start justify-between gap-4 border-b border-zinc-100 px-4 py-4 sm:px-6">
                         <div>
                             <h2 class="text-base font-semibold text-zinc-900">Loading screen</h2>
@@ -532,7 +543,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                             <span class="sr-only">Show loading screen after login</span>
                             <input wire:model="show_loading_screen" type="checkbox" class="peer sr-only">
                             <span class="h-7 w-12 rounded-full bg-zinc-200 transition-colors peer-checked:bg-brand peer-focus-visible:ring-2 peer-focus-visible:ring-brand-lime/50"></span>
-                            <span class="absolute left-1 top-1 size-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5"></span>
+                            <span class="absolute left-1 top-1 size-5 rounded-full bg-surface shadow-sm transition-transform peer-checked:translate-x-5"></span>
                         </label>
                     </div>
 
@@ -542,10 +553,10 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                             <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">Preview</p>
                             <div class="relative aspect-[4/3] overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50">
                                 <div class="absolute inset-0 flex" aria-hidden="true">
-                                    <div class="w-1/5 bg-zinc-900 p-2"><div class="size-4 rounded bg-brand-lime"></div><div class="mt-3 space-y-1.5"><div class="h-1.5 rounded bg-brand"></div><div class="h-1.5 w-3/4 rounded bg-zinc-700"></div><div class="h-1.5 w-2/3 rounded bg-zinc-700"></div><div class="h-1.5 w-3/4 rounded bg-zinc-700"></div></div></div>
+                                    <div class="w-1/5 bg-ink-900 p-2"><div class="size-4 rounded bg-brand-lime"></div><div class="mt-3 space-y-1.5"><div class="h-1.5 rounded bg-brand"></div><div class="h-1.5 w-3/4 rounded bg-ink-700"></div><div class="h-1.5 w-2/3 rounded bg-ink-700"></div><div class="h-1.5 w-3/4 rounded bg-ink-700"></div></div></div>
                                     <div class="flex-1 space-y-2 p-3">
-                                        <div class="grid grid-cols-3 gap-2"><div class="h-8 rounded-md bg-white shadow-sm"></div><div class="h-8 rounded-md bg-white shadow-sm"></div><div class="h-8 rounded-md bg-brand-lime/60"></div></div>
-                                        <div class="flex h-[55%] items-end gap-1.5 rounded-md bg-white p-2 shadow-sm">
+                                        <div class="grid grid-cols-3 gap-2"><div class="h-8 rounded-md bg-surface shadow-sm"></div><div class="h-8 rounded-md bg-surface shadow-sm"></div><div class="h-8 rounded-md bg-brand-lime/60"></div></div>
+                                        <div class="flex h-[55%] items-end gap-1.5 rounded-md bg-surface p-2 shadow-sm">
                                             @foreach ([40, 70, 30, 90, 55, 80, 45, 65] as $bar)
                                                 <div class="flex-1 rounded-t-sm bg-brand" style="height: {{ $bar }}%"></div>
                                             @endforeach
@@ -575,7 +586,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                             ] as $field => [$fieldLabel, $fieldHint, $min, $max, $step, $unit, $fieldIcon])
                                 <div class="rounded-xl border border-zinc-200 bg-zinc-50/60 px-4 pb-2 pt-3.5">
                                     <div class="flex items-center gap-3">
-                                        <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white text-brand shadow-sm ring-1 ring-zinc-900/5">
+                                        <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-surface text-brand shadow-sm ring-1 ring-zinc-900/5">
                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4.5">{!! $fieldIcon !!}</svg>
                                         </span>
                                         <div class="min-w-0 flex-1">
@@ -638,7 +649,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                     </div>
                 </form>
             @elseif ($tab === 'smtp')
-                <form wire:submit="saveSmtp" x-data="{ reveal: false }" class="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+                <form wire:submit="saveSmtp" x-data="{ reveal: false }" class="overflow-hidden rounded-xl border border-zinc-200 bg-surface">
                     <div class="flex items-start justify-between gap-4 border-b border-zinc-100 px-4 py-4 sm:px-6">
                         <div>
                             <h2 class="text-base font-semibold text-zinc-900">SMTP server</h2>
@@ -674,7 +685,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                                 </div>
                                 <div class="col-span-3">
                                     <span class="{{ $label }}">Encryption</span>
-                                    <div class="mt-1 grid grid-cols-3 rounded-lg border border-zinc-300 bg-white p-0.5 sm:inline-grid sm:w-72">
+                                    <div class="mt-1 grid grid-cols-3 rounded-lg border border-zinc-300 bg-surface p-0.5 sm:inline-grid sm:w-72">
                                         @foreach (['tls' => 'TLS', 'ssl' => 'SSL', 'none' => 'None'] as $value => $encryptionLabel)
                                             <label class="cursor-pointer">
                                                 <input wire:model="mail_encryption" type="radio" name="mail_encryption" value="{{ $value }}" class="peer sr-only">
@@ -738,7 +749,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                     </div>
                 </form>
 
-                <div class="rounded-xl border border-zinc-200 bg-white px-4 py-5 sm:px-6">
+                <div class="rounded-xl border border-zinc-200 bg-surface px-4 py-5 sm:px-6">
                     <h2 class="text-base font-semibold text-zinc-900">Send a test email</h2>
                     <p class="text-sm text-zinc-500">Uses the settings above, saved or not.</p>
                     <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start">
@@ -756,7 +767,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                 </div>
             @elseif ($tab === 'mail-template')
                 <div class="grid gap-4 sm:gap-6 xl:grid-cols-2 xl:items-start">
-                    <form wire:submit="saveMailTemplate" class="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+                    <form wire:submit="saveMailTemplate" class="overflow-hidden rounded-xl border border-zinc-200 bg-surface">
                         <div class="border-b border-zinc-100 px-4 py-4 sm:px-6">
                             <h2 class="text-base font-semibold text-zinc-900">Email template</h2>
                             <p class="text-sm text-zinc-500">Shared by every notification email.</p>
@@ -812,7 +823,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                     {{-- Live preview: a rough mock of the email in an inbox, not a full render, so it updates instantly. --}}
                     <div class="space-y-4 sm:space-y-6 xl:sticky xl:top-20">
                         <div class="overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100">
-                            <div class="flex items-center gap-3 border-b border-zinc-200 bg-white px-4 py-3">
+                            <div class="flex items-center gap-3 border-b border-zinc-200 bg-surface px-4 py-3">
                                 <span class="flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold" style="background-color: {{ $mail_brand_color }}; color: {{ $mail_button_text_color }}">{{ \App\Support\Avatar::initials($mail_from_name ?: config('app.name')) }}</span>
                                 <div class="min-w-0">
                                     <p class="truncate text-sm font-semibold text-zinc-900">{{ $mail_from_name ?: config('app.name') }}</p>
@@ -821,7 +832,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                                 <span class="ml-auto shrink-0 text-xs text-zinc-400">Preview</span>
                             </div>
                             <div class="p-4 sm:p-6">
-                                <div class="mx-auto max-w-sm rounded-lg bg-white shadow-sm">
+                                <div class="mx-auto max-w-sm rounded-lg bg-surface shadow-sm">
                                     <div class="px-6 py-5 text-center">
                                         <span class="text-base font-bold" style="color: {{ $mail_brand_color }}">{{ config('app.name') }}</span>
                                     </div>
@@ -840,7 +851,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                             </div>
                         </div>
 
-                        <div class="rounded-xl border border-zinc-200 bg-white px-4 py-5 sm:px-6">
+                        <div class="rounded-xl border border-zinc-200 bg-surface px-4 py-5 sm:px-6">
                             <h2 class="text-base font-semibold text-zinc-900">Send a real preview</h2>
                             <p class="text-sm text-zinc-500">Saves the template, then emails you a real sample.</p>
                             <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start">

@@ -8,6 +8,28 @@
 
         <title>{{ $title ?? config('app.name') }}</title>
 
+        {{-- Runs before the first paint: light/dark mode (per person, from localStorage; "system" follows
+             the OS and keeps following it) and the collapsed desktop sidebar, so neither flickers in.
+             wire:navigate copies the new page's <html> attributes over the current ones, which would drop
+             these classes, so they're re-applied in the same frame as every page swap (link clicks and
+             back/forward alike), before anything is painted. --}}
+        <script>
+            (() => {
+                const root = document.documentElement;
+                const read = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
+                const system = matchMedia('(prefers-color-scheme: dark)');
+                window.applyColorMode = (mode = read('colorMode') || 'system') => root.classList.toggle('dark', mode === 'dark' || (mode === 'system' && system.matches));
+                const applyRootClasses = () => {
+                    window.applyColorMode();
+                    root.classList.toggle('sidebar-collapsed', read('sidebarCollapsed') === 'true');
+                };
+                applyRootClasses();
+                system.addEventListener('change', () => window.applyColorMode());
+                document.addEventListener('livewire:navigating', (e) => e.detail?.onSwap?.(applyRootClasses));
+                document.addEventListener('livewire:navigated', applyRootClasses);
+            })();
+        </script>
+
         <link rel="icon" href="/favicon.ico" sizes="any">
         <link rel="icon" href="/logo.svg" type="image/svg+xml">
         <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -21,8 +43,8 @@
              rendered with, so the latest saved appearance is re-applied after each navigation. --}}
         <script>
             window.applyAppearance = (look) => {
-                document.body.style.setProperty('--color-brand', look.brand);
-                document.body.style.setProperty('--color-brand-lime', look.accent);
+                document.body.style.setProperty('--brand-base', look.brand);
+                document.body.style.setProperty('--brand-accent', look.accent);
                 document.body.classList.toggle('ui-static', look.static);
             };
             window.addEventListener('appearance-saved', (e) => (window.savedAppearance = e.detail.look));
@@ -240,7 +262,7 @@
             }
 
             .notch-glass {
-                background-color: rgb(255 255 255 / 0.45);
+                background-color: color-mix(in oklab, var(--color-surface) 45%, transparent);
                 -webkit-backdrop-filter: blur(18px) saturate(1.6);
                 backdrop-filter: blur(18px) saturate(1.6);
             }
@@ -480,6 +502,7 @@
                 this.sidebarCollapsed = ! this.sidebarCollapsed;
                 this.flyout.show = false;
                 localStorage.setItem('sidebarCollapsed', this.sidebarCollapsed);
+                document.documentElement.classList.toggle('sidebar-collapsed', this.sidebarCollapsed);
             },
             showFlyout(el, label) {
                 if (! this.sidebarCollapsed || window.innerWidth < 1024) return;
@@ -520,8 +543,16 @@
                  sheet's glass and easing, and follows the finger for swipe-to-close. Desktop keeps the dark rail.
                  The closed/expanded state is in the static classes so the first paint (before Alpine boots, on
                  every load and wire:navigate) is already right; Alpine only adds the open/collapsed overrides. --}}
+            {{-- Liquid glass backdrop: soft, slowly drifting glows in the theme colours behind every page,
+                 so the frosted panels have colour to blur. Hidden in the Static style (see app.css). --}}
+            <div class="glass-ambient pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
+                <div class="glow-drift absolute -right-24 -top-32 size-[34rem] rounded-full bg-brand-lime/12 blur-3xl [animation-duration:28s]"></div>
+                <div class="glow-drift-alt absolute -bottom-40 left-[10%] size-[38rem] rounded-full bg-brand/7 blur-3xl [animation-duration:34s]"></div>
+                <div class="glow-drift absolute left-[45%] top-[35%] size-[26rem] rounded-full bg-brand-lime/8 blur-3xl [animation-delay:-12s] [animation-duration:40s]"></div>
+            </div>
+
             <aside
-                class="sidebar-notch fixed inset-y-0 left-0 z-30 w-72 overflow-x-hidden overflow-y-auto rounded-r-3xl border-r border-white/60 bg-white/70 text-zinc-700 backdrop-blur-xl backdrop-saturate-150 -translate-x-full transition-[translate,width,box-shadow] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] lg:w-64 lg:translate-x-0 lg:rounded-none lg:border-0 lg:bg-zinc-900 lg:text-zinc-300 lg:shadow-none lg:backdrop-blur-none lg:backdrop-saturate-100 lg:ease-in-out"
+                class="sidebar-notch fixed inset-y-0 left-0 z-30 w-72 overflow-x-hidden overflow-y-auto rounded-r-3xl border-r border-white/60 bg-surface/70 text-zinc-700 backdrop-blur-xl backdrop-saturate-150 -translate-x-full transition-[translate,width,box-shadow] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] lg:w-64 lg:translate-x-0 lg:rounded-none lg:border-0 lg:bg-ink-900 lg:text-ink-300 lg:shadow-none lg:backdrop-blur-none lg:backdrop-saturate-100 lg:ease-in-out lg:glass:border-r lg:glass:border-white/70 lg:glass:bg-surface/60 lg:glass:text-zinc-700 lg:glass:shadow-[8px_0_30px_-12px_rgb(24_24_27/0.12)] lg:glass:backdrop-blur-xl lg:glass:backdrop-saturate-150"
                 :class="[sidebarOpen && 'translate-x-0! shadow-2xl', sidebarCollapsed && 'lg:w-20!']"
                 :style="drag?.on ? { transform: `translateX(${drag.dx}px)`, transition: 'none' } : {}"
                 @scroll="flyout.show = false"
@@ -531,10 +562,10 @@
                 @touchcancel="dragEnd()"
                 @click="$event.target.closest('a[href]') && (sidebarOpen = false)"
             >
-                <div class="flex h-16 items-center gap-2.5 px-6 text-lg font-semibold text-zinc-900 lg:text-white" :class="sidebarCollapsed ? 'lg:justify-center lg:gap-0 lg:px-0' : ''">
+                <div class="flex h-16 items-center gap-2.5 px-6 text-lg font-semibold text-zinc-900 lg:text-white lg:glass:text-zinc-900" :class="sidebarCollapsed ? 'lg:justify-center lg:gap-0 lg:px-0' : ''">
                     <x-logo-mark class="size-8 shrink-0" />
                     <span class="overflow-hidden whitespace-nowrap transition-all duration-200" :class="sidebarCollapsed ? 'lg:w-0 lg:opacity-0' : 'w-auto opacity-100'">{{ config('app.name') }}</span>
-                    <button type="button" @click="sidebarOpen = false" class="-mr-3 ml-auto rounded-full p-2 text-zinc-500 hover:bg-white/60 active:bg-zinc-900/5 lg:hidden" title="Close menu">
+                    <button type="button" @click="sidebarOpen = false" class="-mr-3 ml-auto rounded-full p-2 text-zinc-500 hover:bg-surface/60 active:bg-zinc-900/5 lg:hidden" title="Close menu">
                         <span class="sr-only">Close menu</span>
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>
                     </button>
@@ -589,8 +620,8 @@
                          member) is dropped along with its heading. The collapsed desktop rail shows a divider instead. --}}
                     @foreach ($navigation as $item)
                         @if (! empty($item['heading']))
-                            <p class="px-3 pb-1 pt-5 text-[11px] font-semibold uppercase tracking-wider text-zinc-400 lg:text-zinc-500" :class="sidebarCollapsed ? 'lg:hidden' : ''">{{ $item['heading'] }}</p>
-                            <div class="mx-3 my-3 hidden border-t border-zinc-800" :class="sidebarCollapsed ? 'lg:block' : ''"></div>
+                            <p class="px-3 pb-1 pt-5 text-[11px] font-semibold uppercase tracking-wider text-zinc-400 lg:text-ink-500" :class="sidebarCollapsed ? 'lg:hidden' : ''">{{ $item['heading'] }}</p>
+                            <div class="mx-3 my-3 hidden border-t border-ink-800 lg:glass:border-zinc-900/10" :class="sidebarCollapsed ? 'lg:block' : ''"></div>
                             @continue
                         @endif
 
@@ -610,7 +641,7 @@
                                     @mouseenter="showFlyout($el, @js($item['label']))"
                                     @mouseleave="flyout.show = false"
                                     @click="sidebarCollapsed ? Livewire.navigate('{{ route($visibleChildren->first()['route']) }}') : (open = ! open)"
-                                    class="flex w-full items-center gap-2.5 overflow-hidden rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors duration-200 ease-in-out {{ $childActive ? 'bg-brand text-white shadow-sm shadow-brand/20 lg:shadow-none' : 'text-zinc-600 hover:bg-zinc-900/5 hover:text-zinc-900 lg:text-zinc-400 lg:hover:bg-zinc-800 lg:hover:text-white' }}"
+                                    class="flex w-full items-center gap-2.5 overflow-hidden rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors duration-200 ease-in-out {{ $childActive ? 'bg-brand text-white shadow-sm shadow-brand/20 lg:shadow-none lg:glass:shadow-sm' : 'text-zinc-600 hover:bg-zinc-900/5 hover:text-zinc-900 lg:text-ink-400 lg:hover:bg-ink-800 lg:hover:text-white lg:glass:text-zinc-600 lg:glass:hover:bg-zinc-900/5 lg:glass:hover:text-zinc-900' }}"
                                     :class="sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''"
                                 >
                                     <x-nav-icon :name="$item['icon']" class="size-4.5 shrink-0" />
@@ -633,12 +664,12 @@
                                     :style="{ height: height }"
                                     :class="sidebarCollapsed ? 'lg:hidden' : ''"
                                 >
-                                    <div x-ref="submenuPanel" class="ml-4 mt-1 space-y-0.5 border-l border-zinc-900/10 pl-4 lg:border-zinc-800">
+                                    <div x-ref="submenuPanel" class="ml-4 mt-1 space-y-0.5 border-l border-zinc-900/10 pl-4 lg:border-ink-800 lg:glass:border-zinc-900/10">
                                         @foreach ($visibleChildren as $child)
                                             <a
                                                 href="{{ route($child['route']) }}"
                                                 wire:navigate
-                                                class="block rounded-lg px-3 py-1.5 text-sm transition {{ request()->routeIs($child['route']) ? 'font-semibold text-brand lg:font-medium lg:text-white' : 'text-zinc-500 hover:text-zinc-900 lg:text-zinc-400 lg:hover:text-white' }}"
+                                                class="block rounded-lg px-3 py-1.5 text-sm transition {{ request()->routeIs($child['route']) ? 'font-semibold text-brand lg:font-medium lg:text-white lg:glass:font-semibold lg:glass:text-brand' : 'text-zinc-500 hover:text-zinc-900 lg:text-ink-400 lg:hover:text-white lg:glass:text-zinc-500 lg:glass:hover:text-zinc-900' }}"
                                             >
                                                 {{ $child['label'] }}
                                             </a>
@@ -648,7 +679,7 @@
                             </div>
                         @elseif (! empty($item['disabled']))
                             <span
-                                class="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-zinc-400 lg:text-zinc-500"
+                                class="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-zinc-400 lg:text-ink-500"
                                 :class="sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''"
                                 @mouseenter="showFlyout($el, @js($item['label'].' · Soon'))"
                                 @mouseleave="flyout.show = false"
@@ -657,7 +688,7 @@
                                     <x-nav-icon :name="$item['icon']" class="size-4.5 shrink-0" />
                                     <span class="whitespace-nowrap transition-all duration-200" :class="sidebarCollapsed ? 'lg:hidden' : ''">{{ $item['label'] }}</span>
                                 </span>
-                                <span class="rounded bg-zinc-900/5 px-1.5 py-0.5 text-[10px] lg:bg-zinc-800 uppercase tracking-wide" :class="sidebarCollapsed ? 'lg:hidden' : ''">Soon</span>
+                                <span class="rounded bg-zinc-900/5 px-1.5 py-0.5 text-[10px] lg:bg-ink-800 lg:glass:bg-zinc-900/5 uppercase tracking-wide" :class="sidebarCollapsed ? 'lg:hidden' : ''">Soon</span>
                             </span>
                         @else
                             <a
@@ -665,7 +696,7 @@
                                 wire:navigate
                                 @mouseenter="showFlyout($el, @js($item['label']))"
                                 @mouseleave="flyout.show = false"
-                                class="flex items-center gap-2.5 overflow-hidden rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200 ease-in-out {{ request()->routeIs($item['route'], \Illuminate\Support\Str::before($item['route'], '.').'.*') ? 'bg-brand text-white shadow-sm shadow-brand/20 lg:shadow-none' : 'text-zinc-600 hover:bg-zinc-900/5 hover:text-zinc-900 lg:text-zinc-400 lg:hover:bg-zinc-800 lg:hover:text-white' }}"
+                                class="flex items-center gap-2.5 overflow-hidden rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200 ease-in-out {{ request()->routeIs($item['route'], \Illuminate\Support\Str::before($item['route'], '.').'.*') ? 'bg-brand text-white shadow-sm shadow-brand/20 lg:shadow-none lg:glass:shadow-sm' : 'text-zinc-600 hover:bg-zinc-900/5 hover:text-zinc-900 lg:text-ink-400 lg:hover:bg-ink-800 lg:hover:text-white lg:glass:text-zinc-600 lg:glass:hover:bg-zinc-900/5 lg:glass:hover:text-zinc-900' }}"
                                 :class="sidebarCollapsed ? 'lg:justify-center lg:px-0' : ''"
                             >
                                 <x-nav-icon :name="$item['icon']" class="size-4.5 shrink-0" />
@@ -676,14 +707,13 @@
                 </nav>
             </aside>
 
-            {{-- Collapse toggle: a dark circular handle seated in the
+            {{-- Collapse toggle: a circular handle (dark; white glass in the Liquid glass style) seated in the
                  sidebar's notch (see .sidebar-notch), sliding along with the
                  edge as it collapses/expands. --}}
             <button
                 type="button"
                 @click="toggleCollapsed()"
-                class="fixed bottom-6 z-40 hidden size-9 -translate-x-1/2 items-center justify-center rounded-full bg-zinc-900 text-zinc-300 transition-[left,background-color,color] duration-300 ease-in-out hover:bg-brand hover:text-white lg:flex"
-                :style="{ left: (sidebarCollapsed ? 80 : 256) + 'px' }"
+                class="sidebar-toggle fixed bottom-6 z-40 hidden size-9 -translate-x-1/2 items-center justify-center rounded-full bg-ink-900 text-ink-300 transition-[left,background-color,color] duration-300 ease-in-out hover:bg-brand hover:text-white lg:flex glass:bg-surface/80 glass:text-zinc-600 glass:shadow-md glass:shadow-zinc-900/10 glass:ring-1 glass:ring-zinc-900/5 glass:backdrop-blur-xl glass:hover:bg-brand glass:hover:text-white"
                 title="Toggle sidebar"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4 transition-transform duration-300" :class="sidebarCollapsed ? 'rotate-180' : ''">
@@ -693,7 +723,7 @@
             </button>
 
             {{-- Collapsed-sidebar label: a tab that grows out of the sidebar
-                 edge beside the hovered nav item. Lives outside the <aside>
+                 edge beside the hovered nav item, in the sidebar's colour (--flyout-bg). Lives outside the <aside>
                  because the aside clips its overflow (and its notch mask
                  would clip it too). The two 10px shoulder pieces are filled
                  everywhere except a quarter circle, giving the concave curve
@@ -707,13 +737,13 @@
                 x-transition:leave="transition ease-in duration-100"
                 x-transition:leave-start="opacity-100"
                 x-transition:leave-end="opacity-0"
-                class="pointer-events-none fixed left-20 z-40 hidden -translate-y-1/2 lg:block"
+                class="pointer-events-none fixed left-20 z-40 hidden -translate-y-1/2 [--flyout-bg:#18181b] lg:block glass:[--flyout-bg:var(--color-surface)]"
                 :style="{ top: flyout.top + 'px' }"
             >
                 <div class="relative">
-                    <span class="absolute bottom-full left-0 size-2.5" style="background: radial-gradient(circle at 100% 0, transparent 10px, #18181b 10.5px);"></span>
-                    <span class="block whitespace-nowrap rounded-r-lg bg-zinc-900 py-2 pl-3 pr-4 text-sm font-medium text-white" x-text="flyout.label"></span>
-                    <span class="absolute left-0 top-full size-2.5" style="background: radial-gradient(circle at 100% 100%, transparent 10px, #18181b 10.5px);"></span>
+                    <span class="absolute bottom-full left-0 size-2.5" style="background: radial-gradient(circle at 100% 0, transparent 10px, var(--flyout-bg) 10.5px);"></span>
+                    <span class="block whitespace-nowrap rounded-r-lg bg-(--flyout-bg) py-2 pl-3 pr-4 text-sm font-medium text-white glass:text-zinc-900 glass:shadow-[6px_4px_16px_-6px_rgb(24_24_27/0.15)]" x-text="flyout.label"></span>
+                    <span class="absolute left-0 top-full size-2.5" style="background: radial-gradient(circle at 100% 100%, transparent 10px, var(--flyout-bg) 10.5px);"></span>
                 </div>
             </div>
 
@@ -865,8 +895,8 @@
             ></div>
 
             {{-- Main column --}}
-            <div class="flex min-w-0 flex-1 flex-col" :class="sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'">
-                <header class="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-zinc-200 bg-white px-4 sm:px-6">
+            <div class="app-content flex min-w-0 flex-1 flex-col">
+                <header class="app-header sticky top-0 z-10 flex h-16 items-center justify-between border-b border-zinc-200 bg-surface px-4 sm:px-6">
                     <button
                         type="button"
                         class="rounded-lg p-2 text-zinc-500 hover:bg-zinc-100 lg:hidden"
@@ -906,19 +936,44 @@
                                 x-transition:leave="transition duration-150 ease-in"
                                 x-transition:leave-start="opacity-100"
                                 x-transition:leave-end="-translate-y-1 scale-95 opacity-0"
-                                class="absolute right-0 z-30 mt-2 w-64 origin-top-right overflow-hidden rounded-2xl border border-white/60 bg-white/70 p-1.5 shadow-2xl shadow-zinc-900/20 backdrop-blur-xl backdrop-saturate-150"
+                                class="absolute right-0 z-30 mt-2 w-64 origin-top-right overflow-hidden rounded-2xl border border-white/60 bg-surface/70 p-1.5 shadow-2xl shadow-zinc-900/20 backdrop-blur-xl backdrop-saturate-150"
                             >
-                                <div class="flex items-center gap-3 rounded-xl bg-white/85 px-3 py-2.5 shadow-sm">
+                                <div class="flex items-center gap-3 rounded-xl bg-surface/85 px-3 py-2.5 shadow-sm">
                                     <x-user-avatar :user="auth()->user()" class="size-9 rounded-full text-xs" />
                                     <span class="min-w-0">
                                         <span class="block truncate text-sm font-medium text-zinc-900">{{ auth()->user()->name }}</span>
                                         <span class="block truncate text-xs text-zinc-500">{{ auth()->user()->email }}</span>
                                     </span>
                                 </div>
-                                <a href="{{ route('profile') }}" wire:navigate @click="open = false" class="mt-1.5 flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors {{ request()->routeIs('profile') ? 'bg-brand/10 text-brand' : 'text-zinc-700 hover:bg-white/80' }}">
+                                <a href="{{ route('profile') }}" wire:navigate @click="open = false" class="mt-1.5 flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors {{ request()->routeIs('profile') ? 'bg-brand/10 text-brand' : 'text-zinc-700 hover:bg-surface/80' }}">
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
                                     My profile
                                 </a>
+                                {{-- Light / Dark / System, per person on this device. --}}
+                                <div
+                                    x-data="{ mode: (() => { try { return localStorage.getItem('colorMode') || 'system'; } catch { return 'system'; } })() }"
+                                    class="mx-1 my-1.5 grid grid-cols-3 gap-0.5 rounded-xl bg-zinc-900/10 p-0.5 shadow-inner shadow-zinc-900/5 ring-1 ring-inset ring-zinc-900/10 backdrop-blur-md"
+                                    role="radiogroup"
+                                    aria-label="Colour mode"
+                                >
+                                    @foreach ([
+                                        'light' => ['Light', '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>'],
+                                        'dark' => ['Dark', '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>'],
+                                        'system' => ['System', '<rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>'],
+                                    ] as $modeKey => [$modeLabel, $modeIcon])
+                                        <button
+                                            type="button"
+                                            role="radio"
+                                            :aria-checked="mode === '{{ $modeKey }}'"
+                                            @click="mode = '{{ $modeKey }}'; try { localStorage.setItem('colorMode', mode); } catch {} applyColorMode(mode)"
+                                            class="flex items-center justify-center gap-1 rounded-[0.6rem] px-2 py-1.5 text-xs font-medium transition-colors"
+                                            :class="mode === '{{ $modeKey }}' ? 'bg-surface text-zinc-900 shadow-sm ring-1 ring-zinc-900/10' : 'text-zinc-600 hover:bg-surface/50 hover:text-zinc-900'"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5">{!! $modeIcon !!}</svg>
+                                            {{ $modeLabel }}
+                                        </button>
+                                    @endforeach
+                                </div>
                                 <button type="button" @click="open = false; $dispatch('confirm-logout')" class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium text-zinc-700 transition-colors hover:bg-red-500/10 hover:text-red-600">
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></svg>
                                     Log out
@@ -928,7 +983,7 @@
                     </div>
                 </header>
 
-                <main class="flex-1 p-4 pb-24 sm:p-6 lg:pb-6">
+                <main class="app-main flex-1 p-4 pb-24 sm:p-6 lg:pb-6">
                     {{ $slot }}
                 </main>
             </div>
@@ -977,7 +1032,7 @@
                     x-transition:leave-start="translate-y-0 sm:scale-100 sm:opacity-100"
                     x-transition:leave-end="translate-y-full sm:translate-y-4 sm:scale-95 sm:opacity-0"
                     :style="startY !== null ? `transform: translateY(${dragY}px); transition: none` : ''"
-                    class="pointer-events-auto w-full rounded-t-[2rem] border-t border-white/60 bg-white/75 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 shadow-2xl shadow-zinc-900/25 backdrop-blur-xl backdrop-saturate-150 sm:max-w-sm sm:rounded-3xl sm:border sm:p-6"
+                    class="pointer-events-auto w-full rounded-t-[2rem] border-t border-white/60 bg-surface/75 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 shadow-2xl shadow-zinc-900/25 backdrop-blur-xl backdrop-saturate-150 sm:max-w-sm sm:rounded-3xl sm:border sm:p-6"
                     role="alertdialog"
                     aria-modal="true"
                     aria-labelledby="logout-title"
@@ -995,7 +1050,7 @@
                         <p class="mt-1 text-sm text-zinc-500">You'll need to sign in again to get back to {{ config('app.name') }}.</p>
                     </div>
 
-                    <div class="mt-4 flex items-center gap-3 rounded-2xl bg-white/80 px-3 py-2.5 shadow-sm">
+                    <div class="mt-4 flex items-center gap-3 rounded-2xl bg-surface/80 px-3 py-2.5 shadow-sm">
                         <x-user-avatar :user="auth()->user()" class="size-9 rounded-full text-xs" />
                         <span class="min-w-0 text-left">
                             <span class="block truncate text-sm font-medium text-zinc-900">{{ auth()->user()->name }}</span>
@@ -1064,7 +1119,7 @@
                     @click="window.innerWidth < 640 && dismiss(toast)"
                     @mouseenter="pause(toast)"
                     @mouseleave="resume(toast)"
-                    class="toast-island group pointer-events-auto relative flex w-[min(92vw,24rem)] items-center gap-3 overflow-hidden rounded-[1.75rem] bg-zinc-950 py-2.5 pl-2.5 pr-3 text-white shadow-2xl shadow-zinc-950/40 ring-1 ring-white/10 sm:w-[22rem] sm:rounded-2xl sm:bg-white/90 sm:py-3 sm:pl-3 sm:pr-2.5 sm:text-zinc-900 sm:shadow-[0_16px_40px_-12px_rgb(0_0_0/0.22),0_4px_10px_-4px_rgb(0_0_0/0.08)] sm:ring-zinc-900/[0.07] sm:backdrop-blur-xl"
+                    class="toast-island group pointer-events-auto relative flex w-[min(92vw,24rem)] items-center gap-3 overflow-hidden rounded-[1.75rem] bg-ink-950 py-2.5 pl-2.5 pr-3 text-white shadow-2xl shadow-zinc-950/40 ring-1 ring-white/10 sm:w-[22rem] sm:rounded-2xl sm:bg-surface/90 sm:py-3 sm:pl-3 sm:pr-2.5 sm:text-zinc-900 sm:shadow-[0_16px_40px_-12px_rgb(0_0_0/0.22),0_4px_10px_-4px_rgb(0_0_0/0.08)] sm:ring-zinc-900/[0.07] sm:backdrop-blur-xl"
                     role="status"
                 >
                     <span

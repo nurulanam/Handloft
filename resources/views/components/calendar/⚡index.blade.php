@@ -246,7 +246,7 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
             </p>
         </div>
 
-        <div class="inline-flex shrink-0 rounded-lg border border-zinc-300 bg-white p-0.5" role="group" aria-label="Show by">
+        <div class="inline-flex shrink-0 rounded-lg border border-zinc-300 bg-surface p-0.5" role="group" aria-label="Show by">
             @foreach (['created' => 'Created', 'deadline' => 'Deadline'] as $key => $label)
                 <button
                     type="button"
@@ -259,7 +259,7 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
         </div>
     </div>
 
-    <div class="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-4">
+    <div class="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-surface p-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-4">
         <div class="flex items-center gap-1">
             <button type="button" wire:click="previous" class="rounded-lg p-2 text-zinc-500 hover:bg-zinc-100" title="Previous">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4"><path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" /></svg>
@@ -290,7 +290,7 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
         </div>
 
         <div class="flex items-center gap-2">
-            <div class="grid flex-1 grid-cols-3 rounded-lg border border-zinc-300 bg-white p-0.5 sm:inline-flex sm:flex-none">
+            <div class="grid flex-1 grid-cols-3 rounded-lg border border-zinc-300 bg-surface p-0.5 sm:inline-flex sm:flex-none">
                 @foreach (['month' => 'Month', 'week' => 'Week', 'day' => 'Day'] as $key => $label)
                     <button
                         type="button"
@@ -302,12 +302,12 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
                 @endforeach
             </div>
 
-            <select wire:change="setMonth($event.target.value)" class="hidden rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40 sm:block" aria-label="Month">
+            <select wire:change="setMonth($event.target.value)" class="hidden rounded-lg border border-zinc-300 bg-surface px-2 py-1.5 text-sm text-zinc-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40 sm:block" aria-label="Month">
                 @foreach ($monthOptions as $value => $label)
                     <option value="{{ $value }}" @selected($anchor->month === $value)>{{ $label }}</option>
                 @endforeach
             </select>
-            <select wire:change="setYear($event.target.value)" class="hidden rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40 sm:block" aria-label="Year">
+            <select wire:change="setYear($event.target.value)" class="hidden rounded-lg border border-zinc-300 bg-surface px-2 py-1.5 text-sm text-zinc-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40 sm:block" aria-label="Year">
                 @foreach ($yearOptions as $year)
                     <option value="{{ $year }}" @selected($anchor->year === $year)>{{ $year }}</option>
                 @endforeach
@@ -316,7 +316,7 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
     </div>
 
     @if ($view === 'day')
-        <div class="rounded-lg border border-zinc-200 bg-white p-5">
+        <div class="rounded-lg border border-zinc-200 bg-surface p-5">
             @forelse ($dayEvents as $event)
                 <a href="{{ $event['url'] }}" wire:navigate class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-100 px-3 py-2.5 hover:border-brand/40 {{ ! $loop->last ? 'mb-2' : '' }}">
                     <div class="flex min-w-0 items-center gap-2">
@@ -343,7 +343,7 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
             <div class="space-y-2 sm:hidden">
                 @foreach ($days as $day)
                     @php $agendaEvents = $eventsByDate->get($day->toDateString(), collect()); @endphp
-                    <div class="rounded-lg border bg-white {{ $day->isToday() ? 'border-brand' : 'border-zinc-200' }}">
+                    <div class="rounded-lg border bg-surface {{ $day->isToday() ? 'border-brand' : 'border-zinc-200' }}">
                         <div class="flex items-center justify-between px-3 py-2 {{ $agendaEvents->isNotEmpty() ? 'border-b border-zinc-100' : '' }}">
                             <span class="text-sm font-semibold {{ $day->isToday() ? 'text-brand' : 'text-zinc-900' }}">{{ $day->format('D, d M') }}</span>
                             @if ($day->isToday())
@@ -364,7 +364,7 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
             </div>
         @endif
 
-        <div class="overflow-hidden rounded-lg border border-zinc-200 bg-white {{ $view === 'week' ? 'hidden sm:block' : '' }}">
+        <div class="overflow-hidden rounded-lg border border-zinc-200 bg-surface {{ $view === 'week' ? 'hidden sm:block' : '' }}">
             <div class="grid grid-cols-7 border-b border-zinc-200 bg-zinc-50">
                 @foreach (WorkSchedule::weekdays() as $weekday)
                     <div class="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500 {{ $weekday['off'] ? 'text-zinc-400' : '' }}" title="{{ $weekday['off'] ? 'Day off' : '' }}">{{ $weekday['short'] }}</div>
@@ -381,7 +381,7 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
                     @endphp
                     <div
                         wire:click="openDay('{{ $day->toDateString() }}')"
-                        class="min-h-16 cursor-pointer border-b border-r border-zinc-100 p-1 hover:bg-zinc-50 sm:min-h-28 sm:p-1.5 {{ ! $isCurrentMonth ? 'bg-zinc-50' : (WorkSchedule::isOffDay($day) ? 'bg-zinc-50/70' : 'bg-white') }} {{ $isToday ? 'ring-2 ring-inset ring-brand' : '' }}"
+                        class="min-h-16 cursor-pointer border-b border-r border-zinc-100 p-1 hover:bg-zinc-50 sm:min-h-28 sm:p-1.5 {{ ! $isCurrentMonth ? 'bg-zinc-50' : (WorkSchedule::isOffDay($day) ? 'bg-zinc-50/70' : 'bg-surface') }} {{ $isToday ? 'ring-2 ring-inset ring-brand' : '' }}"
                         title="Show everything on {{ $day->format('d M Y') }}"
                     >
                         <span class="inline-flex size-6 items-center justify-center rounded-full text-xs font-medium {{ $isToday ? 'bg-brand text-white' : ($isCurrentMonth ? 'text-zinc-700' : 'text-zinc-300') }}">
@@ -456,7 +456,7 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
                 x-transition:leave="transition duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] sm:duration-250"
                 x-transition:leave-start="translate-y-0 sm:scale-100 sm:opacity-100"
                 x-transition:leave-end="translate-y-full sm:translate-y-4 sm:scale-95 sm:opacity-0"
-                class="relative flex h-dvh w-full flex-col overflow-hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] sm:h-auto sm:max-h-[80vh] sm:max-w-lg sm:rounded-3xl sm:border sm:border-white/60 bg-white/70 shadow-2xl shadow-zinc-900/20 backdrop-blur-xl backdrop-saturate-150"
+                class="relative flex h-dvh w-full flex-col overflow-hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] sm:h-auto sm:max-h-[80vh] sm:max-w-lg sm:rounded-3xl sm:border sm:border-white/60 bg-surface/70 shadow-2xl shadow-zinc-900/20 backdrop-blur-xl backdrop-saturate-150"
             >
                 @php $modalCount = $modalProjects->count() + $modalTasks->count(); @endphp
                 <div class="flex items-center justify-between border-b border-zinc-900/5 px-5 pb-3 pt-4 sm:border-0">
@@ -464,7 +464,7 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
                         <h3 class="text-lg font-semibold text-zinc-900">{{ Carbon::parse($modalDate)->format('l, d F') }}</h3>
                         <p class="text-xs text-zinc-500">{{ $modalCount === 0 ? 'Nothing scheduled' : $modalCount.' '.\Illuminate\Support\Str::plural('item', $modalCount).' · '.($dateType === 'deadline' ? 'by deadline' : 'by created date') }}</p>
                     </div>
-                    <button type="button" @click="close()" class="rounded-full p-2 text-zinc-500 hover:bg-white/60" title="Close">
+                    <button type="button" @click="close()" class="rounded-full p-2 text-zinc-500 hover:bg-surface/60" title="Close">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>
                     </button>
                 </div>
@@ -480,7 +480,7 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
                             <h4 class="px-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">{{ $heading }}</h4>
                             <div class="mt-2 space-y-2">
                                 @foreach ($group as $event)
-                                    <a href="{{ $event['url'] }}" wire:navigate class="flex items-center gap-3 rounded-2xl bg-white/85 px-3 py-3 shadow-sm transition-colors hover:bg-white active:bg-white">
+                                    <a href="{{ $event['url'] }}" wire:navigate class="flex items-center gap-3 rounded-2xl bg-surface/85 px-3 py-3 shadow-sm transition-colors hover:bg-surface active:bg-surface">
                                         <span class="flex size-9 shrink-0 items-center justify-center rounded-full {{ $event['type'] === 'project' ? 'bg-sky-100 text-sky-600' : 'bg-violet-100 text-violet-600' }}">
                                             <x-nav-icon :name="$event['type'] === 'project' ? 'projects' : 'tasks'" class="size-4" />
                                         </span>

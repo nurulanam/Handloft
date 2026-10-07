@@ -45,7 +45,7 @@ new #[Layout('layouts.app')] #[Title('Starred')] class extends Component
         <p class="hidden text-sm text-zinc-500 sm:block">Tasks you've starred for quick access.</p>
     </div>
 
-    <div class="overflow-hidden rounded-lg border border-zinc-200 bg-white">
+    <div class="overflow-hidden rounded-lg border border-zinc-200 bg-surface">
         <div class="divide-y divide-zinc-100">
             @forelse ($tasks as $task)
                 <div class="flex items-center gap-3 px-4 py-3 hover:bg-zinc-50">

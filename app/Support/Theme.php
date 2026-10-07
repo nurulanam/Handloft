@@ -32,7 +32,8 @@ final class Theme
     }
 
     /**
-     * Inline CSS for the app layout's <body>. The colours live on <body> rather than in a <head> <style>,
+     * Inline CSS for the app layout's <body>: the theme's base colours, which app.css turns into
+     * --color-brand / --color-brand-lime (lifted for dark mode). The colours live on <body> rather than in a <head> <style>,
      * because wire:navigate swaps the body on every page change but keeps <head> styles it has already
      * seen, so a theme saved in Settings shows on the very next page without a full reload.
      */
@@ -40,7 +41,7 @@ final class Theme
     {
         $theme = self::current();
 
-        return '--color-brand: '.$theme['brand'].'; --color-brand-lime: '.$theme['accent'].';';
+        return '--brand-base: '.$theme['brand'].'; --brand-accent: '.$theme['accent'].';';
     }
 
     /**
@@ -54,6 +55,6 @@ final class Theme
             return '';
         }
 
-        return '<style>:root{--color-brand:'.$theme['brand'].';--color-brand-lime:'.$theme['accent'].';}</style>';
+        return '<style>:root{--brand-base:'.$theme['brand'].';--brand-accent:'.$theme['accent'].';--color-brand:'.$theme['brand'].';--color-brand-lime:'.$theme['accent'].';}</style>';
     }
 }

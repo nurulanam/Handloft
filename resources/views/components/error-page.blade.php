@@ -27,7 +27,7 @@
                 <p class="mx-auto mt-2 max-w-sm text-sm text-zinc-500">{{ $message }}</p>
 
                 <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-center">
-                    <button type="button" onclick="history.length > 1 ? history.back() : (location.href = '{{ route('dashboard') }}')" class="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-50">
+                    <button type="button" onclick="history.length > 1 ? history.back() : (location.href = '{{ route('dashboard') }}')" class="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-surface px-4 py-2.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-50">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
                         Go back
                     </button>
@@ -37,7 +37,7 @@
                     </a>
                 </div>
 
-                <div class="mt-8 rounded-2xl border border-zinc-200 bg-white p-2">
+                <div class="mt-8 rounded-2xl border border-zinc-200 bg-surface p-2">
                     <p class="px-2 pb-1 pt-1.5 text-left text-xs font-semibold uppercase tracking-wide text-zinc-400">Or jump to</p>
                     <div class="grid grid-cols-3 gap-1">
                         @foreach ([['For You', 'for-you', 'for-you'], ['Tasks', 'tasks.index', 'tasks'], ['Projects', 'projects.index', 'projects']] as [$linkLabel, $linkRoute, $linkIcon])

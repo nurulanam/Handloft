@@ -196,7 +196,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
                 x-transition:enter="transition duration-150 ease-out"
                 x-transition:enter-start="-translate-y-1 scale-95 opacity-0"
                 x-transition:enter-end="translate-y-0 scale-100 opacity-100"
-                class="absolute right-0 z-30 mt-2 w-72 origin-top-right overflow-hidden rounded-2xl border border-white/70 bg-white/85 p-1.5 shadow-2xl shadow-zinc-900/15 backdrop-blur-xl"
+                class="absolute right-0 z-30 mt-2 w-72 origin-top-right overflow-hidden rounded-2xl border border-white/70 bg-surface/85 p-1.5 shadow-2xl shadow-zinc-900/15 backdrop-blur-xl"
             >
                 <p class="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{{ $sectionLabel }} · {{ $range->label() }}</p>
                 @if ($canExport)
@@ -205,7 +205,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
                         ['xlsx', $exportSection, 'Excel', $personReport ? 'Summary, daily hours, logs, completed tasks' : 'This tab as an .xlsx workbook', 'bg-emerald-100 text-emerald-700'],
                         ['xlsx', 'all', 'Excel — full report', 'Every section, one sheet each', 'bg-emerald-100 text-emerald-700'],
                     ] as [$format, $section, $label, $hint, $tone])
-                        <a href="{{ route('reports.export', ['section' => $section, 'format' => $format] + $exportQuery) }}" @click="open = false" class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-white">
+                        <a href="{{ route('reports.export', ['section' => $section, 'format' => $format] + $exportQuery) }}" @click="open = false" class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-surface">
                             <span class="flex size-8 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold uppercase {{ $tone }}">{{ $format === 'xlsx' ? 'XLS' : 'CSV' }}</span>
                             <span><span class="block text-sm font-medium text-zinc-900">{{ $label }}</span><span class="block text-xs text-zinc-500">{{ $hint }}</span></span>
                         </a>
@@ -213,7 +213,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
                     <div class="my-1 border-t border-zinc-900/5"></div>
                 @endif
                 @foreach ([[$exportSection, $personReport ? 'Print '.$personReport['user']->name."'s report" : 'Print this tab'], ['all', 'Print full report']] as [$section, $label])
-                    <a href="{{ route('reports.print', ['section' => $section, 'autoprint' => 1] + $exportQuery) }}" target="_blank" rel="noopener" @click="open = false" class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-white">
+                    <a href="{{ route('reports.print', ['section' => $section, 'autoprint' => 1] + $exportQuery) }}" target="_blank" rel="noopener" @click="open = false" class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-surface">
                         <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-700">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>
                         </span>
@@ -225,8 +225,8 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
     </div>
 
     {{-- Period bar --}}
-    <div class="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-3 lg:flex-row lg:items-center lg:justify-between">
-        <div class="grid grid-cols-5 rounded-lg border border-zinc-300 bg-white p-0.5 lg:inline-flex">
+    <div class="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-surface p-3 lg:flex-row lg:items-center lg:justify-between">
+        <div class="grid grid-cols-5 rounded-lg border border-zinc-300 bg-surface p-0.5 lg:inline-flex">
             @foreach ($periods as $key => $label)
                 <button type="button" wire:click="setPeriod('{{ $key }}')" class="rounded-md px-3 py-1.5 text-sm font-medium {{ $period === $key ? 'bg-brand text-white' : 'text-zinc-600 hover:bg-zinc-50' }}">{{ $label }}</button>
             @endforeach
@@ -237,7 +237,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
                 @foreach (['from' => 'From', 'to' => 'To'] as $field => $label)
                     <label class="relative block">
                         <span class="pointer-events-none absolute left-3 top-1.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">{{ $label }}</span>
-                        <input wire:model.live="{{ $field }}" type="date" class="block w-full rounded-lg border border-zinc-300 bg-white px-3 pb-1.5 pt-5 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40 lg:w-40">
+                        <input wire:model.live="{{ $field }}" type="date" class="block w-full rounded-lg border border-zinc-300 bg-surface px-3 pb-1.5 pt-5 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40 lg:w-40">
                     </label>
                 @endforeach
             </div>
@@ -276,7 +276,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
                 ['Hours logged', $h($k['hours']), $delta($k['hours'], $p['hours']), $k['contributors'].' '.\Illuminate\Support\Str::plural('contributor', $k['contributors']), true],
                 ['On-time completion', $k['onTimeRate'] !== null ? $k['onTimeRate'].'%' : '—', $delta($k['onTimeRate'], $p['onTimeRate']), $k['completedWithDeadline'] > 0 ? 'of '.$k['completedWithDeadline'].' with a deadline' : 'no deadlines due', true],
             ] as [$label, $value, $change, $hint])
-                <div class="rounded-xl border border-zinc-200 bg-white p-4 sm:p-5">
+                <div class="rounded-xl border border-zinc-200 bg-surface p-4 sm:p-5">
                     <p class="text-xs font-medium text-zinc-500">{{ $label }}</p>
                     <p class="mt-1 text-2xl font-semibold tabular-nums text-zinc-900">{{ $value }}</p>
                     <p class="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs">
@@ -288,12 +288,12 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
         </div>
 
         <div class="mt-3 flex flex-wrap gap-2 text-sm sm:mt-4">
-            <span class="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-zinc-600">Open now <b class="ml-1 tabular-nums text-zinc-900">{{ $overview['openNow'] }}</b></span>
-            <span class="rounded-xl border px-3 py-1.5 {{ $overview['overdueNow'] > 0 ? 'border-red-200 bg-red-50 text-red-700' : 'border-zinc-200 bg-white text-zinc-600' }}">Overdue now <b class="ml-1 tabular-nums">{{ $overview['overdueNow'] }}</b></span>
+            <span class="rounded-xl border border-zinc-200 bg-surface px-3 py-1.5 text-zinc-600">Open now <b class="ml-1 tabular-nums text-zinc-900">{{ $overview['openNow'] }}</b></span>
+            <span class="rounded-xl border px-3 py-1.5 {{ $overview['overdueNow'] > 0 ? 'border-red-200 bg-red-50 text-red-700' : 'border-zinc-200 bg-surface text-zinc-600' }}">Overdue now <b class="ml-1 tabular-nums">{{ $overview['overdueNow'] }}</b></span>
         </div>
 
         @if ($range->type === 'daily')
-            <p class="mt-4 rounded-xl border border-dashed border-zinc-300 bg-white px-4 py-6 text-center text-sm text-zinc-500">Trends need more than one day. Pick <button type="button" wire:click="setPeriod('weekly')" class="font-semibold text-brand hover:underline">a week</button>, <button type="button" wire:click="setPeriod('monthly')" class="font-semibold text-brand hover:underline">a month</button> or a year.</p>
+            <p class="mt-4 rounded-xl border border-dashed border-zinc-300 bg-surface px-4 py-6 text-center text-sm text-zinc-500">Trends need more than one day. Pick <button type="button" wire:click="setPeriod('weekly')" class="font-semibold text-brand hover:underline">a week</button>, <button type="button" wire:click="setPeriod('monthly')" class="font-semibold text-brand hover:underline">a month</button> or a year.</p>
         @else
             @php
                 $maxHours = max($series->max('hours'), 0.01);
@@ -303,7 +303,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
             <div class="mt-4 grid gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-2">
                 {{-- Hours logged: one series. Tooltips are out of the layout until hover (so they never widen the page)
                      and anchor inward near the chart's edges. --}}
-                <div class="rounded-xl border border-zinc-200 bg-white p-4 sm:p-5">
+                <div class="rounded-xl border border-zinc-200 bg-surface p-4 sm:p-5">
                     <div class="flex items-baseline justify-between gap-2">
                         <h2 class="text-sm font-semibold text-zinc-900">Hours logged</h2>
                         <span class="text-xs text-zinc-500">by {{ $range->granularity() }} · total <b class="text-zinc-900">{{ $h($k['hours']) }}</b></span>
@@ -315,7 +315,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
                         <div class="relative flex h-full items-end gap-0.5">
                             @foreach ($series as $bucket)
                                 <div class="group relative flex h-full flex-1 items-end">
-                                    <div class="pointer-events-none absolute bottom-full z-10 mb-1 hidden whitespace-nowrap rounded-md bg-zinc-900 px-2 py-1 text-[11px] text-white shadow-lg group-hover:block {{ $loop->index < $loop->count / 3 ? 'left-0' : ($loop->index >= $loop->count * 2 / 3 ? 'right-0' : 'left-1/2 -translate-x-1/2') }}">
+                                    <div class="pointer-events-none absolute bottom-full z-10 mb-1 hidden whitespace-nowrap rounded-md bg-ink-900 px-2 py-1 text-[11px] text-white shadow-lg group-hover:block {{ $loop->index < $loop->count / 3 ? 'left-0' : ($loop->index >= $loop->count * 2 / 3 ? 'right-0' : 'left-1/2 -translate-x-1/2') }}">
                                         <b>{{ $h($bucket['hours']) }}</b> · {{ $bucket['long'] }}
                                     </div>
                                     <div class="w-full rounded-t-[4px] bg-[#16a34a] transition-opacity group-hover:opacity-80" style="height: {{ $bucket['hours'] > 0 ? max(2, $bucket['hours'] / $maxHours * 100) : 0 }}%"></div>
@@ -331,7 +331,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
                 </div>
 
                 {{-- Created vs completed: two series, legend + direct tooltips --}}
-                <div class="rounded-xl border border-zinc-200 bg-white p-4 sm:p-5">
+                <div class="rounded-xl border border-zinc-200 bg-surface p-4 sm:p-5">
                     <div class="flex flex-wrap items-baseline justify-between gap-2">
                         <h2 class="text-sm font-semibold text-zinc-900">Created vs completed</h2>
                         <div class="flex items-center gap-3 text-xs text-zinc-600">
@@ -346,7 +346,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
                         <div class="relative flex h-full items-end gap-1">
                             @foreach ($series as $bucket)
                                 <div class="group relative flex h-full flex-1 items-end gap-0.5">
-                                    <div class="pointer-events-none absolute bottom-full z-10 mb-1 hidden whitespace-nowrap rounded-md bg-zinc-900 px-2 py-1 text-[11px] text-white shadow-lg group-hover:block {{ $loop->index < $loop->count / 3 ? 'left-0' : ($loop->index >= $loop->count * 2 / 3 ? 'right-0' : 'left-1/2 -translate-x-1/2') }}">
+                                    <div class="pointer-events-none absolute bottom-full z-10 mb-1 hidden whitespace-nowrap rounded-md bg-ink-900 px-2 py-1 text-[11px] text-white shadow-lg group-hover:block {{ $loop->index < $loop->count / 3 ? 'left-0' : ($loop->index >= $loop->count * 2 / 3 ? 'right-0' : 'left-1/2 -translate-x-1/2') }}">
                                         {{ $bucket['long'] }} · <b>{{ $bucket['created'] }}</b> created · <b>{{ $bucket['completed'] }}</b> completed
                                     </div>
                                     <div class="w-1/2 rounded-t-[4px] bg-[#0284c7]" style="height: {{ $bucket['created'] > 0 ? max(2, $bucket['created'] / $maxCount * 100) : 0 }}%"></div>
@@ -366,7 +366,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
 
         <div class="mt-4 grid gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-3">
             @php $statusMax = max($overview['statusBreakdown']->max('count'), 1); @endphp
-            <div class="rounded-xl border border-zinc-200 bg-white p-4 sm:p-5">
+            <div class="rounded-xl border border-zinc-200 bg-surface p-4 sm:p-5">
                 <h2 class="text-sm font-semibold text-zinc-900">Where new tasks are now</h2>
                 <p class="text-xs text-zinc-500">Current status of the {{ $k['created'] }} created this period</p>
                 <ul class="mt-4 space-y-2.5">
@@ -381,7 +381,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
 
             @foreach ([['Top projects by hours', $overview['topProjects'], 'No time logged against projects.'], ['Top people by hours', $overview['topPeople'], 'No time logged this period.']] as [$title, $rows, $empty])
                 @php $rowMax = max($rows->max('hours'), 0.01); @endphp
-                <div class="rounded-xl border border-zinc-200 bg-white p-4 sm:p-5">
+                <div class="rounded-xl border border-zinc-200 bg-surface p-4 sm:p-5">
                     <h2 class="text-sm font-semibold text-zinc-900">{{ $title }}</h2>
                     <ul class="mt-4 space-y-2.5">
                         @forelse ($rows as $row)
@@ -397,22 +397,22 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
             @endforeach
         </div>
     @elseif ($tab === 'tasks')
-        <div class="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-3 lg:flex-row lg:items-center">
+        <div class="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-surface p-3 lg:flex-row lg:items-center">
             <div class="relative flex-1">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                <input wire:model.live.debounce.300ms="q" type="search" placeholder="Search title or key…" class="block w-full rounded-lg border border-zinc-300 bg-zinc-50/60 py-2 pl-9 pr-3 text-sm placeholder:text-zinc-400 focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                <input wire:model.live.debounce.300ms="q" type="search" placeholder="Search title or key…" class="block w-full rounded-lg border border-zinc-300 bg-zinc-50/60 py-2 pl-9 pr-3 text-sm placeholder:text-zinc-400 focus:border-brand focus:bg-surface focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
             </div>
             <div class="grid grid-cols-3 gap-2 lg:flex">
-                <select wire:model.live="project" class="rounded-lg border border-zinc-300 bg-white py-2 pl-3 pr-8 text-sm text-zinc-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40" aria-label="Project">
+                <select wire:model.live="project" class="rounded-lg border border-zinc-300 bg-surface py-2 pl-3 pr-8 text-sm text-zinc-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40" aria-label="Project">
                     <option value="">All projects</option>
                     <option value="none">No project</option>
                     @foreach ($projectOptions as $option)<option value="{{ $option->id }}">{{ $option->name }}</option>@endforeach
                 </select>
-                <select wire:model.live="status" class="rounded-lg border border-zinc-300 bg-white py-2 pl-3 pr-8 text-sm text-zinc-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40" aria-label="Status">
+                <select wire:model.live="status" class="rounded-lg border border-zinc-300 bg-surface py-2 pl-3 pr-8 text-sm text-zinc-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40" aria-label="Status">
                     <option value="">Any status</option>
                     @foreach (\App\Enums\TaskStatus::cases() as $case)<option value="{{ $case->value }}">{{ $case->label() }}</option>@endforeach
                 </select>
-                <select wire:model.live="assignee" class="rounded-lg border border-zinc-300 bg-white py-2 pl-3 pr-8 text-sm text-zinc-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40" aria-label="Assignee">
+                <select wire:model.live="assignee" class="rounded-lg border border-zinc-300 bg-surface py-2 pl-3 pr-8 text-sm text-zinc-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40" aria-label="Assignee">
                     <option value="">Anyone</option>
                     @foreach ($userOptions as $option)<option value="{{ $option->id }}">{{ $option->name }}</option>@endforeach
                 </select>
@@ -425,9 +425,9 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
         </div>
 
         @if ($tasks->isEmpty())
-            <p class="mt-3 rounded-xl border border-dashed border-zinc-300 bg-white px-4 py-12 text-center text-sm text-zinc-500">No tasks were created, completed, due or worked on in this period{{ $taskFiltering ? ' with these filters' : '' }}.</p>
+            <p class="mt-3 rounded-xl border border-dashed border-zinc-300 bg-surface px-4 py-12 text-center text-sm text-zinc-500">No tasks were created, completed, due or worked on in this period{{ $taskFiltering ? ' with these filters' : '' }}.</p>
         @else
-            <div class="mt-3 hidden overflow-x-auto rounded-xl border border-zinc-200 bg-white md:block">
+            <div class="mt-3 hidden overflow-x-auto rounded-xl border border-zinc-200 bg-surface md:block">
                 <table class="min-w-full divide-y divide-zinc-100 text-sm">
                     <thead class="bg-zinc-50/80 text-left text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
                         <tr>
@@ -461,7 +461,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
             <div class="mt-3 space-y-2 md:hidden">
                 @foreach ($tasks as $task)
                     @php $overdue = $task->status !== \App\Enums\TaskStatus::Done && $task->deadline && $task->deadline->lt(today()); @endphp
-                    <a wire:key="tm-{{ $task->id }}" href="{{ route('tasks.show', $task) }}" wire:navigate class="block rounded-xl border border-zinc-200 bg-white p-3.5">
+                    <a wire:key="tm-{{ $task->id }}" href="{{ route('tasks.show', $task) }}" wire:navigate class="block rounded-xl border border-zinc-200 bg-surface p-3.5">
                         <div class="flex items-start justify-between gap-2">
                             <span class="min-w-0"><span class="font-mono text-[11px] font-semibold text-violet-700">{{ $task->task_key }}</span><span class="block truncate text-sm font-medium text-zinc-900">{{ $task->title }}</span></span>
                             <span class="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium {{ $task->status->pillClasses() }}">{{ $task->status->label() }}</span>
@@ -480,9 +480,9 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
         @endif
     @elseif ($tab === 'projects')
         @if ($projectRows->isEmpty())
-            <p class="rounded-xl border border-dashed border-zinc-300 bg-white px-4 py-12 text-center text-sm text-zinc-500">No projects yet.</p>
+            <p class="rounded-xl border border-dashed border-zinc-300 bg-surface px-4 py-12 text-center text-sm text-zinc-500">No projects yet.</p>
         @else
-            <div class="hidden overflow-x-auto rounded-xl border border-zinc-200 bg-white md:block">
+            <div class="hidden overflow-x-auto rounded-xl border border-zinc-200 bg-surface md:block">
                 <table class="min-w-full divide-y divide-zinc-100 text-sm">
                     <thead class="bg-zinc-50/80 text-left text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
                         <tr>
@@ -519,7 +519,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
             <div class="space-y-2 md:hidden">
                 @foreach ($projectRows as $row)
                     @php $project = $row['project']; @endphp
-                    <a wire:key="pm-{{ $project->id }}" href="{{ route('projects.show', $project) }}" wire:navigate class="block rounded-xl border border-zinc-200 bg-white p-3.5">
+                    <a wire:key="pm-{{ $project->id }}" href="{{ route('projects.show', $project) }}" wire:navigate class="block rounded-xl border border-zinc-200 bg-surface p-3.5">
                         <div class="flex items-start justify-between gap-2">
                             <span class="truncate text-sm font-semibold text-zinc-900">{{ $project->name }}</span>
                             <span class="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium {{ $project->status->pillClasses() }}">{{ $project->status->label() }}</span>
@@ -547,7 +547,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
                 </button>
             </div>
 
-            <div class="mt-3 flex flex-wrap items-center gap-4 rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5">
+            <div class="mt-3 flex flex-wrap items-center gap-4 rounded-2xl border border-zinc-200 bg-surface p-4 sm:p-5">
                 <x-user-avatar :user="$pr['user']" class="size-14 rounded-2xl text-base" />
                 <div class="min-w-0 flex-1">
                     <h2 class="truncate text-lg font-semibold text-zinc-900">{{ $pr['user']->name }}</h2>
@@ -566,7 +566,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
                     ['Tasks worked on', $pr['tasksWorked'], 'with time logged'],
                     ['Tasks completed', $pr['completedCount'], $pr['onTimeRate'] !== null ? $pr['onTimeRate'].'% on time' : null],
                 ] as [$label, $value, $hint])
-                    <div class="rounded-xl border border-zinc-200 bg-white p-4 {{ $loop->last ? 'col-span-2 lg:col-span-1' : '' }}">
+                    <div class="rounded-xl border border-zinc-200 bg-surface p-4 {{ $loop->last ? 'col-span-2 lg:col-span-1' : '' }}">
                         <p class="text-xs font-medium text-zinc-500">{{ $label }}</p>
                         <p class="mt-1 text-xl font-semibold tabular-nums text-zinc-900">{{ $value }}</p>
                         @if ($hint)<p class="text-xs text-zinc-400">{{ $hint }}</p>@endif
@@ -575,7 +575,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
             </div>
 
             @if ($range->type !== 'daily')
-                <div class="mt-4 rounded-xl border border-zinc-200 bg-white p-4 sm:mt-6 sm:p-5">
+                <div class="mt-4 rounded-xl border border-zinc-200 bg-surface p-4 sm:mt-6 sm:p-5">
                     <div class="flex items-baseline justify-between gap-2">
                         <h3 class="text-sm font-semibold text-zinc-900">Hours by {{ $range->granularity() }}</h3>
                         <span class="text-xs text-zinc-500">total <b class="text-zinc-900">{{ $h($pr['hours']) }}</b></span>
@@ -587,7 +587,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
                         <div class="relative flex h-full items-end gap-0.5">
                             @foreach ($series as $bucket)
                                 <div class="group relative flex h-full flex-1 items-end">
-                                    <div class="pointer-events-none absolute bottom-full z-10 mb-1 hidden whitespace-nowrap rounded-md bg-zinc-900 px-2 py-1 text-[11px] text-white shadow-lg group-hover:block {{ $loop->index < $loop->count / 3 ? 'left-0' : ($loop->index >= $loop->count * 2 / 3 ? 'right-0' : 'left-1/2 -translate-x-1/2') }}">
+                                    <div class="pointer-events-none absolute bottom-full z-10 mb-1 hidden whitespace-nowrap rounded-md bg-ink-900 px-2 py-1 text-[11px] text-white shadow-lg group-hover:block {{ $loop->index < $loop->count / 3 ? 'left-0' : ($loop->index >= $loop->count * 2 / 3 ? 'right-0' : 'left-1/2 -translate-x-1/2') }}">
                                         <b>{{ $h($bucket['hours']) }}</b> · {{ $bucket['long'] }}
                                     </div>
                                     <div class="w-full rounded-t-[4px] bg-[#16a34a] transition-opacity group-hover:opacity-80" style="height: {{ $bucket['hours'] > 0 ? max(2, $bucket['hours'] / $prMax * 100) : 0 }}%"></div>
@@ -605,7 +605,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
 
             <div class="mt-4 grid gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-3 lg:items-start">
                 {{-- Daily time logs, grouped by day --}}
-                <div class="overflow-hidden rounded-xl border border-zinc-200 bg-white lg:col-span-2">
+                <div class="overflow-hidden rounded-xl border border-zinc-200 bg-surface lg:col-span-2">
                     <div class="flex items-baseline justify-between gap-2 border-b border-zinc-100 px-4 py-3.5 sm:px-5">
                         <h3 class="text-sm font-semibold text-zinc-900">Daily time logs</h3>
                         <span class="text-xs text-zinc-500">{{ $pr['timeLogs']->count() }} {{ \Illuminate\Support\Str::plural('entry', $pr['timeLogs']->count()) }}</span>
@@ -644,7 +644,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
                 </div>
 
                 {{-- Completed tasks --}}
-                <div class="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+                <div class="overflow-hidden rounded-xl border border-zinc-200 bg-surface">
                     <div class="flex items-baseline justify-between gap-2 border-b border-zinc-100 px-4 py-3.5 sm:px-5">
                         <h3 class="text-sm font-semibold text-zinc-900">Completed tasks</h3>
                         <span class="text-xs text-zinc-500">{{ $pr['completedCount'] }}</span>
@@ -673,7 +673,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
             </div>
         @else
             <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <div class="inline-flex rounded-lg border border-zinc-300 bg-white p-0.5" role="group" aria-label="People view">
+                <div class="inline-flex rounded-lg border border-zinc-300 bg-surface p-0.5" role="group" aria-label="People view">
                     @foreach (['summary' => 'Summary', 'daily' => 'Daily hours'] as $key => $label)
                         <button type="button" wire:click="$set('peopleView', '{{ $key }}')" class="rounded-md px-3 py-1.5 text-sm font-medium {{ $peopleView === $key ? 'bg-brand text-white' : 'text-zinc-600 hover:bg-zinc-50' }}">{{ $label }}</button>
                     @endforeach
@@ -695,7 +695,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
                     $byDay = $range->granularity() === 'day';
                 @endphp
                 {{-- Hours per person per day (per month for long periods), shaded light → dark by hours. --}}
-                <div class="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
+                <div class="overflow-x-auto rounded-xl border border-zinc-200 bg-surface">
                     <table class="min-w-full border-separate border-spacing-0 text-xs">
                         <thead>
                             <tr>
@@ -716,7 +716,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
                         <tbody>
                             @foreach ($grid['rows'] as $row)
                                 <tr wire:key="g-{{ $row['user']->id }}" class="group cursor-pointer" wire:click="$set('person', '{{ $row['user']->id }}')">
-                                    <td class="sticky left-0 z-10 border-b border-zinc-100 bg-white px-4 py-2 group-hover:bg-zinc-50">
+                                    <td class="sticky left-0 z-10 border-b border-zinc-100 bg-surface px-4 py-2 group-hover:bg-zinc-50">
                                         <span class="flex items-center gap-2 whitespace-nowrap">
                                             <x-user-avatar :user="$row['user']" class="size-6 rounded-full text-[9px]" />
                                             <span class="font-medium text-zinc-900 group-hover:text-brand">{{ $row['user']->name }}</span>
@@ -726,7 +726,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
                                         @php $v = $row['cells'][$bucket['key']]; @endphp
                                         <td class="border-b border-zinc-100 px-1 py-2 text-center tabular-nums {{ $tone($v) }} {{ $v > 0 ? 'font-medium text-zinc-900' : 'text-zinc-300' }}" title="{{ $row['user']->name }} · {{ $bucket['long'] }} · {{ $h($v) }}">{{ $v > 0 ? rtrim(rtrim(number_format($v, 1), '0'), '.') : '·' }}</td>
                                     @endforeach
-                                    <td class="sticky right-0 whitespace-nowrap border-b border-l border-zinc-100 bg-white px-3 py-2 text-right font-semibold tabular-nums text-zinc-900 group-hover:bg-zinc-50">{{ $h($row['total']) }}</td>
+                                    <td class="sticky right-0 whitespace-nowrap border-b border-l border-zinc-100 bg-surface px-3 py-2 text-right font-semibold tabular-nums text-zinc-900 group-hover:bg-zinc-50">{{ $h($row['total']) }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -745,9 +745,9 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
             @else
             @php $peopleMax = max($peopleRows->max('hours'), 0.01); @endphp
             @if ($peopleRows->isEmpty())
-                <p class="rounded-xl border border-dashed border-zinc-300 bg-white px-4 py-12 text-center text-sm text-zinc-500">No team members yet.</p>
+                <p class="rounded-xl border border-dashed border-zinc-300 bg-surface px-4 py-12 text-center text-sm text-zinc-500">No team members yet.</p>
             @else
-            <div class="hidden overflow-x-auto rounded-xl border border-zinc-200 bg-white md:block">
+            <div class="hidden overflow-x-auto rounded-xl border border-zinc-200 bg-surface md:block">
                 <table class="min-w-full divide-y divide-zinc-100 text-sm">
                     <thead class="bg-zinc-50/80 text-left text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
                         <tr>
@@ -784,7 +784,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
 
             <div class="space-y-2 md:hidden">
                 @foreach ($peopleRows as $row)
-                    <button type="button" wire:key="um-{{ $row['user']->id }}" wire:click="$set('person', '{{ $row['user']->id }}')" class="block w-full rounded-xl border border-zinc-200 bg-white p-3.5 text-left">
+                    <button type="button" wire:key="um-{{ $row['user']->id }}" wire:click="$set('person', '{{ $row['user']->id }}')" class="block w-full rounded-xl border border-zinc-200 bg-surface p-3.5 text-left">
                         <div class="flex items-center gap-2.5">
                             <x-user-avatar :user="$row['user']" class="size-9 rounded-full text-xs" />
                             <span class="min-w-0 flex-1"><span class="block truncate text-sm font-semibold text-zinc-900">{{ $row['user']->name }}</span><span class="block text-xs text-zinc-500">{{ $row['role'] }}</span></span>

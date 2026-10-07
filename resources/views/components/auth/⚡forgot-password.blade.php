@@ -50,7 +50,7 @@ new #[Layout('layouts.guest')] #[Title('Forgot password')] class extends Compone
                     id="email"
                     type="email"
                     autofocus
-                    class="block w-full rounded-xl border border-zinc-300 bg-white/70 py-3 pl-10.5 pr-3.5 text-sm text-zinc-900 placeholder:text-zinc-500 transition focus:border-brand focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-lime/20 lg:py-2.5"
+                    class="block w-full rounded-xl border border-zinc-300 bg-surface/70 py-3 pl-10.5 pr-3.5 text-sm text-zinc-900 placeholder:text-zinc-500 transition focus:border-brand focus:bg-surface focus:outline-none focus:ring-4 focus:ring-brand-lime/20 lg:py-2.5"
                 >
             </div>
             @error('email')

@@ -194,7 +194,7 @@ new #[Layout('layouts.app')] #[Title('Dashboard')] class extends Component
         </div>
         <div class="flex items-center gap-2">
             @if ($canCreateProject)
-                <a href="{{ route('projects.create') }}" wire:navigate class="hidden items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 sm:inline-flex">
+                <a href="{{ route('projects.create') }}" wire:navigate class="hidden items-center gap-1.5 rounded-lg border border-zinc-300 bg-surface px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 sm:inline-flex">
                     <x-nav-icon name="projects" class="size-4" />
                     New project
                 </a>
@@ -216,7 +216,7 @@ new #[Layout('layouts.app')] #[Title('Dashboard')] class extends Component
             ['Overdue', $my['overdue'], $my['overdue'] > 0 ? 'needs attention' : 'all on track', route('tasks.index', ['tab' => 'assigned-to-me', 'view' => 'list']), $my['overdue'] > 0 ? 'bg-red-100 text-red-600' : 'bg-zinc-100 text-zinc-400', 'notifications', $my['overdue'] > 0],
             ['My hours this week', \App\Support\Duration::forHumans($my['hoursWeek']), ($my['weekTarget'] ? 'of '.\App\Support\Duration::forHumans($my['weekTarget']).' target · ' : '').\App\Support\Duration::forHumans($my['hoursToday']).' today', route('work-history.index'), 'bg-brand-lime/25 text-brand', 'work-history', false],
         ] as [$label, $value, $hint, $href, $tone, $icon, $alert])
-            <a href="{{ $href }}" wire:navigate class="group rounded-xl border border-zinc-200 bg-white p-4 transition hover:border-brand/30 hover:shadow-sm sm:p-5">
+            <a href="{{ $href }}" wire:navigate class="group rounded-xl border border-zinc-200 bg-surface p-4 transition hover:border-brand/30 hover:shadow-sm sm:p-5">
                 <div class="flex items-center justify-between gap-2">
                     <span class="text-xs font-medium text-zinc-500">{{ $label }}</span>
                     <span class="flex size-8 shrink-0 items-center justify-center rounded-lg {{ $tone }}">
@@ -231,7 +231,7 @@ new #[Layout('layouts.app')] #[Title('Dashboard')] class extends Component
 
     <div class="grid gap-4 sm:gap-6 lg:grid-cols-3">
         {{-- Needs your attention --}}
-        <div class="overflow-hidden rounded-xl border border-zinc-200 bg-white lg:col-span-2">
+        <div class="overflow-hidden rounded-xl border border-zinc-200 bg-surface lg:col-span-2">
             <div class="flex items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3.5 sm:px-5">
                 <div>
                     <h2 class="text-sm font-semibold text-zinc-900">Needs your attention</h2>
@@ -258,7 +258,7 @@ new #[Layout('layouts.app')] #[Title('Dashboard')] class extends Component
                                 </span>
                             </span>
                             @if ($reason)
-                                <span class="shrink-0 rounded-full bg-zinc-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">{{ $reason }}</span>
+                                <span class="shrink-0 rounded-full bg-ink-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">{{ $reason }}</span>
                             @endif
                             <span class="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium {{ $task->status->pillClasses() }}">{{ $task->status->label() }}</span>
                         </a>
@@ -276,7 +276,7 @@ new #[Layout('layouts.app')] #[Title('Dashboard')] class extends Component
         </div>
 
         {{-- My hours, last 14 days --}}
-        <div class="flex flex-col rounded-xl border border-zinc-200 bg-white p-4 sm:p-5">
+        <div class="flex flex-col rounded-xl border border-zinc-200 bg-surface p-4 sm:p-5">
             <div class="flex items-baseline justify-between gap-2">
                 <h2 class="text-sm font-semibold text-zinc-900">My hours</h2>
                 <span class="text-xs text-zinc-500">last 14 days · <span class="font-semibold text-zinc-900">{{ \App\Support\Duration::forHumans($chart['total']) }}</span></span>
@@ -284,7 +284,7 @@ new #[Layout('layouts.app')] #[Title('Dashboard')] class extends Component
             <div class="mt-6 flex min-h-36 flex-1 items-stretch gap-1">
                 @foreach ($chart['days'] as $day)
                     <div class="group relative flex flex-1 flex-col items-center justify-end">
-                        <div class="pointer-events-none absolute -top-7 z-10 whitespace-nowrap rounded bg-zinc-900 px-2 py-1 text-[10px] font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
+                        <div class="pointer-events-none absolute -top-7 z-10 whitespace-nowrap rounded bg-ink-900 px-2 py-1 text-[10px] font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
                             {{ \App\Support\Duration::forHumans($day['hours']) }} · {{ $day['date']->format('j M') }}
                         </div>
                         <div
@@ -310,7 +310,7 @@ new #[Layout('layouts.app')] #[Title('Dashboard')] class extends Component
                     ['Completed this week', $team['completedWeek'], 'text-zinc-900'],
                     ['Team hours this week', \App\Support\Duration::forHumans($team['hoursWeek']), 'text-zinc-900'],
                 ] as [$label, $value, $tone])
-                    <div class="rounded-xl border border-zinc-200 bg-white p-4">
+                    <div class="rounded-xl border border-zinc-200 bg-surface p-4">
                         <p class="text-xs font-medium text-zinc-500">{{ $label }}</p>
                         <p class="mt-1 text-xl font-semibold tabular-nums {{ $tone }}">{{ $value }}</p>
                     </div>
@@ -318,7 +318,7 @@ new #[Layout('layouts.app')] #[Title('Dashboard')] class extends Component
             </div>
 
             <div class="grid gap-4 sm:gap-6 {{ $contributors !== null ? 'lg:grid-cols-3' : '' }}">
-                <div class="rounded-xl border border-zinc-200 bg-white p-4 sm:p-5 {{ $contributors !== null ? 'lg:col-span-2' : '' }}">
+                <div class="rounded-xl border border-zinc-200 bg-surface p-4 sm:p-5 {{ $contributors !== null ? 'lg:col-span-2' : '' }}">
                     <h3 class="text-sm font-semibold text-zinc-900">Task pipeline</h3>
                     <div class="mt-4 flex h-3 overflow-hidden rounded-full bg-zinc-100">
                         @foreach ($team['pipeline'] as $row)
@@ -339,7 +339,7 @@ new #[Layout('layouts.app')] #[Title('Dashboard')] class extends Component
                 </div>
 
                 @if ($contributors !== null)
-                    <div class="rounded-xl border border-zinc-200 bg-white p-4 sm:p-5">
+                    <div class="rounded-xl border border-zinc-200 bg-surface p-4 sm:p-5">
                         <h3 class="text-sm font-semibold text-zinc-900">Top contributors <span class="font-normal text-zinc-400">· this week</span></h3>
                         <ul class="mt-4 space-y-3">
                             @forelse ($contributors as $row)
