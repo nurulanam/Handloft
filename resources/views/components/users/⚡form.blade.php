@@ -102,15 +102,27 @@ new #[Layout('layouts.app')] #[Title('User')] class extends Component
         return $candidate;
     }
 
+    /**
+     * Roles this admin may hand out: everything for a Super Admin, never Super Admin for anyone else.
+     *
+     * @return list<Role>
+     */
+    public function assignableRoles(): array
+    {
+        return array_values(array_filter(Role::cases(), fn (Role $role) => $role !== Role::SuperAdmin || Gate::allows('grantSuperAdmin', User::class)));
+    }
+
     public function save(): void
     {
+        Gate::authorize($this->user ? 'update' : 'create', $this->user ?? User::class);
+
         $data = $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'user_id' => ['required', 'string', 'max:50', Rule::unique('users', 'user_id')->ignore($this->user?->id)],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($this->user?->id)],
             'phone' => ['nullable', 'string', 'max:30'],
             'password' => [$this->user ? 'nullable' : 'required', 'string', 'min:8', 'confirmed'],
-            'role' => ['required', Rule::in(array_column(Role::cases(), 'value'))],
+            'role' => ['required', Rule::in(array_column($this->assignableRoles(), 'value'))],
             'department' => ['nullable', 'string', 'max:255'],
             'joining_date' => ['nullable', 'date'],
             'status' => ['required', Rule::in(['active', 'inactive'])],
@@ -290,8 +302,8 @@ new #[Layout('layouts.app')] #[Title('User')] class extends Component
 
                 <x-form.card title="Role & access" description="What they can see and do in {{ config('app.name') }}." icon='<path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/>'>
                     <x-form.field label="Role" error="role" required>
-                        <div class="grid grid-cols-1 gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Role">
-                            @foreach (Role::cases() as $roleOption)
+                        <div @class(['grid grid-cols-1 gap-2', 'sm:grid-cols-3' => count($this->assignableRoles()) === 3, 'sm:grid-cols-2' => count($this->assignableRoles()) === 2]) role="radiogroup" aria-label="Role">
+                            @foreach ($this->assignableRoles() as $roleOption)
                                 <label class="group cursor-pointer">
                                     <input type="radio" wire:model.live="role" value="{{ $roleOption->value }}" class="peer sr-only">
                                     <span @class([

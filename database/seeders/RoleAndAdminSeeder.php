@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Enums\Role as RoleEnum;
 use App\Models\TaskCategory;
 use App\Models\User;
+use App\Support\PermissionCatalog;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -12,58 +13,27 @@ use Spatie\Permission\PermissionRegistrar;
 
 class RoleAndAdminSeeder extends Seeder
 {
-    /**
-     * Permissions from the SRS §41 permission matrix. Items marked "Permission"
-     * for a role in the matrix are configurable by Admin later (Settings >
-     * Roles & Permissions) rather than granted here by default.
-     */
-    private const PERMISSIONS = [
-        'manage-users',
-        'manage-roles-permissions',
-        'view-all-tasks',
-        'create-task',
-        'assign-task',
-        'reassign-task',
-        'manage-projects',
-        'view-own-work-history',
-        'view-all-work-history',
-        'edit-completed-hours',
-        'manage-templates',
-        'view-reports',
-        'export-data',
-        'view-audit-log',
-        'manage-settings',
-    ];
-
     public function run(): void
     {
-        foreach (self::PERMISSIONS as $permission) {
+        foreach (PermissionCatalog::ALL as $permission) {
             Permission::findOrCreate($permission);
         }
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         $superAdmin = Role::findOrCreate(RoleEnum::SuperAdmin->value);
-        $superAdmin->syncPermissions(self::PERMISSIONS);
+        $superAdmin->syncPermissions(PermissionCatalog::ALL);
 
-        $manager = Role::findOrCreate(RoleEnum::Manager->value);
-        $manager->syncPermissions([
-            'view-all-tasks',
-            'create-task',
-            'assign-task',
-            'manage-projects',
-            'view-own-work-history',
-            'view-all-work-history',
-            'view-reports',
-            'export-data',
-        ]);
+        // Manager and Team Member are adjustable in Settings → Roles & permissions, so their defaults
+        // (PermissionCatalog::DEFAULTS) are only applied when the role is first created; re-running
+        // the seeder never undoes an admin's choices.
+        foreach ([RoleEnum::Manager, RoleEnum::TeamMember] as $roleEnum) {
+            $role = Role::findOrCreate($roleEnum->value);
 
-        $teamMember = Role::findOrCreate(RoleEnum::TeamMember->value);
-        $teamMember->syncPermissions([
-            'create-task',
-            'assign-task',
-            'view-own-work-history',
-        ]);
+            if ($role->wasRecentlyCreated) {
+                $role->syncPermissions(PermissionCatalog::DEFAULTS[$roleEnum->value]);
+            }
+        }
 
         $admin = User::firstOrCreate(
             ['email' => 'admin@am2amdesk.test'],

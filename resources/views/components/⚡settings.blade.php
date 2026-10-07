@@ -4,7 +4,9 @@ use App\Mail\SmtpTestMail;
 use App\Models\AppSetting;
 use App\Notifications\MailTemplatePreview;
 use App\Support\MailSettings;
+use App\Support\PermissionCatalog;
 use App\Support\WorkSchedule;
+use Spatie\Permission\Models\Role as RoleModel;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rule;
@@ -59,6 +61,9 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
 
     public string $template_preview_email = '';
 
+    /** @var array<string, list<string>> Roles & permissions: role name => granted (editable) permissions. */
+    public array $grants = [];
+
     /**
      * Everyone can open Settings for the Look tab (their own, per-browser appearance); the other tabs
      * are app-wide and for Super Admins (manage-settings) only. Their values are only loaded for them,
@@ -78,6 +83,8 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
         }
 
         $settings = AppSetting::current();
+
+        $this->grants = $this->savedGrants();
 
         $this->show_loading_screen = $settings->show_loading_screen;
         $this->loading_screen_seconds = $settings->loading_screen_seconds;
@@ -288,10 +295,75 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
         }
     }
 
+    /**
+     * What Manager and Team Member are granted right now, limited to the editable permissions.
+     *
+     * @return array<string, list<string>>
+     */
+    private function savedGrants(): array
+    {
+        return collect(PermissionCatalog::editableRoles())->mapWithKeys(fn ($role) => [
+            $role->value => array_values(array_intersect(
+                PermissionCatalog::editable(),
+                RoleModel::findOrCreate($role->value)->permissions->pluck('name')->all(),
+            )),
+        ])->all();
+    }
+
+    /**
+     * Turning a permission off also turns off the ones that depend on it (e.g. exporting needs reports).
+     */
+    public function updatedGrants(): void
+    {
+        foreach (PermissionCatalog::editableRoles() as $role) {
+            $this->grants[$role->value] = PermissionCatalog::normalize((array) ($this->grants[$role->value] ?? []));
+        }
+    }
+
+    public function resetPermissionDefaults(): void
+    {
+        abort_unless($this->canManage(), 403);
+
+        foreach (PermissionCatalog::editableRoles() as $role) {
+            $this->grants[$role->value] = PermissionCatalog::normalize(PermissionCatalog::DEFAULTS[$role->value]);
+        }
+    }
+
+    public function savePermissions(): void
+    {
+        abort_unless($this->canManage(), 403);
+
+        $this->validate([
+            'grants' => ['array'],
+            'grants.*' => ['array'],
+            'grants.*.*' => ['string', Rule::in(PermissionCatalog::editable())],
+        ]);
+
+        foreach (PermissionCatalog::editableRoles() as $role) {
+            $model = RoleModel::findOrCreate($role->value);
+            $granted = PermissionCatalog::normalize((array) ($this->grants[$role->value] ?? []));
+
+            // Only the editable permissions change; anything else the role holds (legacy ones) is kept.
+            $kept = $model->permissions->pluck('name')->diff(PermissionCatalog::editable())->all();
+            $model->syncPermissions([...$kept, ...$granted]);
+        }
+
+        $this->grants = $this->savedGrants();
+        $this->dispatch('notify', message: 'Permissions saved. They apply right away.', type: 'success');
+    }
+
     public function with(): array
     {
+        $saved = $this->canManage() ? $this->savedGrants() : [];
+        $changes = 0;
+        foreach ($saved as $role => $permissions) {
+            $current = (array) ($this->grants[$role] ?? []);
+            $changes += count(array_diff($current, $permissions)) + count(array_diff($permissions, $current));
+        }
+
         return [
             'smtpConfigured' => filled(AppSetting::current()->mail_host),
+            'permissionChanges' => $changes,
         ];
     }
 };
@@ -304,6 +376,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
     $tabs = [
         'appearance' => ['Appearance', 'Look', 'Glass or static, theme colours', '<path d="m14.622 17.897-10.68-2.913"/><path d="M18.376 2.622a1 1 0 1 1 3.002 3.002L17.36 9.643a.5.5 0 0 0 0 .707l.944.944a2.41 2.41 0 0 1 0 3.408l-.944.944a.5.5 0 0 1-.707 0L8.354 7.348a.5.5 0 0 1 0-.707l.944-.944a2.41 2.41 0 0 1 3.408 0l.944.944a.5.5 0 0 0 .707 0z"/><path d="M9 8c-1.804 2.71-3.97 3.46-6.583 3.948a.507.507 0 0 0-.302.819l7.32 8.883a1 1 0 0 0 1.185.204C12.735 20.405 16 16.792 16 15"/>'],
         'schedule' => ['Work Schedule', 'Schedule', 'Days off, week start, hours', '<path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.3V14"/><circle cx="16" cy="16" r="6"/>'],
+        'permissions' => ['Roles & Permissions', 'Access', 'What managers and members can do', '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>'],
         'loading-screen' => ['Loading Screen', 'Loading', 'Shown right after sign-in', '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>'],
         'smtp' => ['Email / SMTP', 'SMTP', 'Server used to send email', '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>'],
         'mail-template' => ['Email Template', 'Template', 'Colors and footer of emails', '<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 11.994 2z"/>'],
@@ -325,7 +398,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
     <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-8">
         {{-- Section nav (Super Admins, who see every tab): an icon tab bar on phones, a described side menu from lg up. --}}
         @if (count($tabs) > 1)
-        <nav class="grid shrink-0 grid-cols-5 gap-1 rounded-xl border border-zinc-200 bg-surface p-1 lg:sticky lg:top-20 lg:flex lg:w-64 lg:flex-col lg:gap-1 lg:p-2" aria-label="Settings sections">
+        <nav class="grid shrink-0 grid-cols-3 gap-1 sm:grid-cols-6 rounded-xl border border-zinc-200 bg-surface p-1 lg:sticky lg:top-20 lg:flex lg:w-64 lg:flex-col lg:gap-1 lg:p-2" aria-label="Settings sections">
             @foreach ($tabs as $key => [$name, $short, $hint, $icon])
                 <button
                     type="button"
@@ -533,6 +606,96 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
 
                     <div class="flex justify-end border-t border-zinc-100 bg-zinc-50/70 px-4 py-3 sm:px-6">
                         <button type="submit" class="{{ $primary }}" wire:loading.attr="disabled" wire:target="saveSchedule">Save work schedule</button>
+                    </div>
+                </form>
+            @elseif ($activeTab === 'permissions')
+                @php
+                    $roleColumns = \App\Support\PermissionCatalog::editableRoles();
+                    $requires = \App\Support\PermissionCatalog::REQUIRES;
+                @endphp
+                <form wire:submit="savePermissions" class="rounded-2xl border border-zinc-200 bg-surface">
+                    <div class="px-4 pt-5 sm:px-6">
+                        <h2 class="text-base font-semibold text-zinc-900">Roles &amp; permissions</h2>
+                        <p class="text-sm text-zinc-500">Choose what Managers and Team Members can do. Super Admins can always do everything. Changes apply as soon as you save.</p>
+                    </div>
+
+                    <div class="mt-4 overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-y border-zinc-100 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+                                    <th class="px-4 py-2.5 text-left font-semibold sm:px-6">Capability</th>
+                                    <th class="hidden w-28 px-2 py-2.5 text-center font-semibold md:table-cell">Super Admin</th>
+                                    @foreach ($roleColumns as $role)
+                                        <th class="w-24 px-2 py-2.5 text-center font-semibold sm:w-28 {{ $loop->last ? 'pr-4 sm:pr-6' : '' }}">{{ $role->label() }}</th>
+                                    @endforeach
+                                </tr>
+                            </thead>
+                            @foreach (\App\Support\PermissionCatalog::GROUPS as $group => $permissions)
+                                <tbody class="divide-y divide-zinc-100 border-b border-zinc-100">
+                                    <tr>
+                                        <th colspan="{{ count($roleColumns) + 2 }}" class="bg-zinc-50/70 px-4 py-2 text-left text-xs font-semibold text-zinc-600 sm:px-6">{{ $group }}</th>
+                                    </tr>
+                                    @foreach ($permissions as $permission => [$permissionLabel, $permissionHint])
+                                        <tr wire:key="perm-{{ $permission }}">
+                                            <td class="px-4 py-3 sm:px-6">
+                                                <p class="font-medium text-zinc-900">{{ $permissionLabel }}</p>
+                                                <p class="text-xs text-zinc-500">{{ $permissionHint }}</p>
+                                                @isset($requires[$permission])
+                                                    <p class="mt-0.5 text-[11px] text-zinc-400">Needs “{{ \App\Support\PermissionCatalog::label($requires[$permission]) }}”.</p>
+                                                @endisset
+                                            </td>
+                                            <td class="hidden px-2 py-3 text-center md:table-cell">
+                                                <span class="inline-flex size-6 items-center justify-center rounded-full bg-brand/10 text-brand" title="Super Admins always have this">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" /></svg>
+                                                </span>
+                                            </td>
+                                            @foreach ($roleColumns as $role)
+                                                @php $blocked = isset($requires[$permission]) && ! in_array($requires[$permission], $grants[$role->value] ?? [], true); @endphp
+                                                <td class="px-2 py-3 text-center {{ $loop->last ? 'pr-4 sm:pr-6' : '' }}">
+                                                    <label class="relative inline-flex {{ $blocked ? 'cursor-not-allowed opacity-40' : 'cursor-pointer' }}" title="{{ $blocked ? 'Turn on “'.\App\Support\PermissionCatalog::label($requires[$permission]).'” first' : $role->label().': '.$permissionLabel }}">
+                                                        <input type="checkbox" wire:model.live="grants.{{ $role->value }}" value="{{ $permission }}" @disabled($blocked) class="peer sr-only">
+                                                        <span class="h-6 w-11 rounded-full bg-zinc-300 transition-colors peer-checked:bg-brand peer-focus-visible:ring-4 peer-focus-visible:ring-brand/20"></span>
+                                                        <span class="absolute left-0.5 top-0.5 size-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5"></span>
+                                                        <span class="sr-only">{{ $role->label() }}: {{ $permissionLabel }}</span>
+                                                    </label>
+                                                </td>
+                                            @endforeach
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            @endforeach
+                            <tbody>
+                                @foreach (\App\Support\PermissionCatalog::LOCKED as $permission => [$permissionLabel, $permissionHint])
+                                    <tr>
+                                        <td class="px-4 py-3 sm:px-6">
+                                            <p class="flex items-center gap-1.5 font-medium text-zinc-900">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5 text-zinc-400"><path fill-rule="evenodd" d="M10 1a4.5 4.5 0 0 0-4.5 4.5V9H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-.5V5.5A4.5 4.5 0 0 0 10 1Zm3 8V5.5a3 3 0 1 0-6 0V9h6Z" clip-rule="evenodd" /></svg>
+                                                {{ $permissionLabel }}
+                                            </p>
+                                            <p class="text-xs text-zinc-500">{{ $permissionHint }} Always Super Admin only.</p>
+                                        </td>
+                                        <td class="hidden px-2 py-3 text-center md:table-cell">
+                                            <span class="inline-flex size-6 items-center justify-center rounded-full bg-brand/10 text-brand"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" /></svg></span>
+                                        </td>
+                                        @foreach ($roleColumns as $role)
+                                            <td class="px-2 py-3 text-center text-zinc-300 {{ $loop->last ? 'pr-4 sm:pr-6' : '' }}">—</td>
+                                        @endforeach
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {{-- Reset only fills in the defaults; nothing changes until Save. --}}
+                    <div class="flex flex-wrap items-center justify-end gap-x-3 gap-y-2 border-t border-zinc-100 px-4 py-3.5 sm:px-6">
+                        @if ($permissionChanges > 0)
+                            <span class="mr-auto text-xs font-medium text-amber-700 sm:mr-0">{{ $permissionChanges }} unsaved {{ \Illuminate\Support\Str::plural('change', $permissionChanges) }}</span>
+                        @endif
+                        <button type="button" wire:click="resetPermissionDefaults" class="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-surface px-4 py-2.5 text-sm font-semibold text-red-600 shadow-xs transition hover:border-red-300 hover:bg-red-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-red-500/15 active:scale-[0.98]">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4"><path fill-rule="evenodd" d="M7.793 2.232a.75.75 0 0 1-.025 1.06L3.622 7.25h10.003a5.375 5.375 0 0 1 0 10.75H10.75a.75.75 0 0 1 0-1.5h2.875a3.875 3.875 0 0 0 0-7.75H3.622l4.146 3.957a.75.75 0 0 1-1.036 1.085l-5.5-5.25a.75.75 0 0 1 0-1.085l5.5-5.25a.75.75 0 0 1 1.06.025Z" clip-rule="evenodd" /></svg>
+                            Reset to defaults
+                        </button>
+                        <button type="submit" class="btn-primary" @disabled($permissionChanges === 0) wire:loading.attr="disabled" wire:target="savePermissions">Save permissions</button>
                     </div>
                 </form>
             @elseif ($activeTab === 'loading-screen')
