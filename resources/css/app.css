@@ -618,3 +618,97 @@ body {
     .sidebar-collapsed .sidebar-notch { width: 5rem; }
     .sidebar-collapsed .sidebar-toggle { left: 5rem; }
 }
+
+/* ---------------------------------------------------------------------------------------------
+   Form kit (resources/views/components/form/*): the create/edit pages for tasks, projects and
+   team members share these. They're named classes rather than utility strings so the Liquid
+   glass card rule (which matches rounded-* border-zinc-200 bg-surface) never frosts a control:
+   inputs and menus stay crisp and solid on top of the frosted cards.
+   --------------------------------------------------------------------------------------------- */
+@layer components {
+    .field-input {
+        @apply block w-full rounded-xl border border-zinc-200 bg-surface px-3.5 py-2.5 text-sm text-zinc-900 shadow-xs transition placeholder:text-zinc-400 hover:border-zinc-300 focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/10 disabled:cursor-not-allowed disabled:opacity-60;
+    }
+
+    .field-input:focus-within {
+        @apply border-brand ring-4 ring-brand/10;
+    }
+
+    .field-input-error {
+        @apply border-red-300 hover:border-red-400 focus:border-red-500 focus:ring-red-500/10;
+    }
+
+    .menu-panel {
+        @apply absolute z-30 mt-1.5 rounded-xl border border-zinc-200 bg-surface p-1 shadow-xl shadow-zinc-900/10;
+    }
+
+    .menu-item {
+        @apply flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-900;
+    }
+
+    .btn-primary {
+        @apply inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-brand/20 transition hover:bg-brand/90 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand/20 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60;
+    }
+
+    .btn-secondary {
+        @apply inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-surface px-4 py-2.5 text-sm font-semibold text-zinc-700 shadow-xs transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand/10 active:scale-[0.98];
+    }
+}
+
+/* Rich-text editor (Quill) inside .rich-editor: a rounded, field-like box with a soft toolbar,
+   one focus ring around both, and theme-aware icons in dark mode. */
+.rich-editor .ql-toolbar.ql-snow {
+    border-color: var(--color-zinc-200);
+    border-radius: 0.75rem 0.75rem 0 0;
+    background: var(--color-zinc-50);
+    padding: 0.5rem 0.625rem;
+    font-family: inherit;
+}
+
+.rich-editor .ql-container.ql-snow {
+    border-color: var(--color-zinc-200);
+    border-radius: 0 0 0.75rem 0.75rem;
+    background: var(--color-surface);
+    font-family: inherit;
+    font-size: 0.875rem;
+}
+
+.rich-editor .ql-editor {
+    min-height: var(--editor-height, 11rem);
+    padding: 0.875rem 1rem;
+    color: var(--color-zinc-900);
+}
+
+.rich-editor .ql-editor.ql-blank::before {
+    left: 1rem;
+    color: var(--color-zinc-400);
+    font-style: normal;
+}
+
+.rich-editor {
+    border-radius: 0.75rem;
+    transition: box-shadow 150ms;
+}
+
+.rich-editor:focus-within {
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-brand) 10%, transparent);
+}
+
+.rich-editor:focus-within .ql-toolbar.ql-snow,
+.rich-editor:focus-within .ql-container.ql-snow {
+    border-color: var(--color-brand);
+}
+
+.rich-editor .ql-snow .ql-stroke { stroke: var(--color-zinc-600); }
+.rich-editor .ql-snow .ql-fill { fill: var(--color-zinc-600); }
+.rich-editor .ql-snow .ql-picker { color: var(--color-zinc-600); }
+.rich-editor .ql-snow button:hover .ql-stroke,
+.rich-editor .ql-snow button.ql-active .ql-stroke { stroke: var(--color-brand); }
+.rich-editor .ql-snow button:hover .ql-fill,
+.rich-editor .ql-snow button.ql-active .ql-fill { fill: var(--color-brand); }
+.rich-editor .ql-snow .ql-picker-options {
+    border-radius: 0.75rem;
+    border-color: var(--color-zinc-200) !important;
+    background: var(--color-surface);
+    padding: 0.25rem 0.5rem;
+}

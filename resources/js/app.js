@@ -60,6 +60,87 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
+    // A searchable dropdown (people, projects, categories…) for the <x-form.picker> component.
+    // `labels` lists every option's label, so the menu can say when a search matches nothing.
+    Alpine.data('picker', (initialValue = '', initialLabel = '', labels = []) => ({
+        open: false,
+        query: '',
+        value: initialValue,
+        label: initialLabel,
+        labels,
+        initialsOf,
+        toggle() {
+            this.open = ! this.open;
+            if (this.open) {
+                this.query = '';
+                this.$nextTick(() => this.$refs.search?.focus());
+            }
+        },
+        choose(value, label) {
+            this.value = value;
+            this.label = label;
+            this.open = false;
+        },
+        matches(label) {
+            return label.toLowerCase().includes(this.query.trim().toLowerCase());
+        },
+        get nothingMatches() {
+            return this.query.trim() !== '' && ! this.labels.some((label) => this.matches(label));
+        },
+    }));
+
+    // The server-searched variant (<x-form.picker source="people|projects|tasks">): options come from
+    // the Livewire component's pickerOptions() as the user types, so a list of thousands never has to
+    // be sent to the browser. Choosing sets a Livewire property (model) or calls a method (call).
+    Alpine.data('remotePicker', ({ value = '', label = '', source, except = null, model = null, call = null, limit = 20 }) => ({
+        open: false,
+        query: '',
+        value,
+        label,
+        results: [],
+        loading: false,
+        limit,
+        initialsOf,
+        timer: null,
+        request: 0,
+        toggle() {
+            this.open = ! this.open;
+            if (this.open) {
+                this.query = '';
+                this.search(true);
+                this.$nextTick(() => this.$refs.search?.focus());
+            }
+        },
+        search(now = false) {
+            clearTimeout(this.timer);
+            this.timer = setTimeout(() => this.fetch(), now ? 0 : 250);
+        },
+        async fetch() {
+            const request = ++this.request;
+            this.loading = true;
+            try {
+                const results = await this.$wire.pickerOptions(source, this.query, except);
+                if (request === this.request) {
+                    this.results = results;
+                }
+            } finally {
+                if (request === this.request) {
+                    this.loading = false;
+                }
+            }
+        },
+        choose(value, label) {
+            this.value = value;
+            this.label = label;
+            this.open = false;
+            if (model) {
+                this.$wire.set(model, value);
+            } else if (call) {
+                this.$wire.call(call, value === '' ? null : Number(value));
+            }
+        },
+    }));
+
     Alpine.data('quillEditor', (initialValue = '') => ({
         quill: null,
 
@@ -91,8 +172,17 @@ document.addEventListener('alpine:init', () => {
 });
 
 function mountQuill(editorEl, inputEl, initialValue) {
+    // A page restored with the back/forward buttons (wire:navigate's snapshot cache) comes back with
+    // the previous editor's markup still in place: its toolbar beside the element and its content
+    // inside it. Mounting on top of that would stack another toolbar on every visit and fold the old
+    // content in as blank lines, so start from a clean element.
+    editorEl.parentElement?.querySelectorAll(':scope > .ql-toolbar').forEach((toolbar) => toolbar.remove());
+    editorEl.classList.remove('ql-container', 'ql-snow', 'ql-disabled');
+    editorEl.replaceChildren();
+
     const quill = new Quill(editorEl, {
         theme: 'snow',
+        placeholder: editorEl.dataset.placeholder ?? '',
         modules: {
             toolbar: [
                 [{ header: [1, 2, 3, false] }],

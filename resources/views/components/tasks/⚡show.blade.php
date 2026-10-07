@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Concerns\SearchesPickerOptions;
 use App\Livewire\Concerns\TogglesStars;
 use App\Enums\TaskActivityType;
 use App\Enums\TaskPriority;
@@ -21,7 +22,7 @@ use Livewire\WithFileUploads;
 
 new #[Layout('layouts.app')] #[Title('Task')] class extends Component
 {
-    use WithFileUploads, TogglesStars;
+    use SearchesPickerOptions, TogglesStars, WithFileUploads;
 
     public Task $task;
 
@@ -537,9 +538,8 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         return [
             'timeline' => $this->task->activities()->with('causer')->get(),
             'currentAssignee' => $this->task->currentAssignee(),
-            'users' => User::query()->orderBy('name')->get(),
-            'projects' => Project::query()->orderBy('name')->get(),
-            'availableParents' => Task::query()->where('id', '!=', $this->task->id)->orderBy('title')->get(),
+            // People, projects and parent tasks are searched on demand (SearchesPickerOptions), not listed here.
+            'subtaskAssigneeName' => $this->subtask_assigned_to ? User::query()->whereKey($this->subtask_assigned_to)->value('name') : null,
             'availableStatuses' => $nextStatuses,
             'allAttachments' => $taskAttachments->concat($commentAttachments)->sortByDesc('created_at')->values(),
             'canReassign' => Gate::allows('reassign', $this->task),
@@ -556,29 +556,68 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
 ?>
 
 <div class="space-y-6">
-    <div>
-        <div class="flex items-center gap-2">
-            <span class="rounded-full bg-violet-100 px-2.5 py-1 font-mono text-xs font-semibold text-violet-700">{{ $task->task_key }}</span>
+    <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        <div class="min-w-0">
+            <nav class="mb-2 flex min-w-0 flex-wrap items-center gap-1.5 text-sm text-zinc-500" aria-label="Breadcrumb">
+                <a href="{{ route('tasks.index') }}" wire:navigate class="group inline-flex items-center gap-1.5 font-medium transition-colors hover:text-brand">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4 transition-transform group-hover:-translate-x-0.5"><path fill-rule="evenodd" d="M17 10a.75.75 0 0 1-.75.75H5.612l4.158 3.96a.75.75 0 1 1-1.04 1.08l-5.5-5.25a.75.75 0 0 1 0-1.08l5.5-5.25a.75.75 0 1 1 1.04 1.08L5.612 9.25H16.25A.75.75 0 0 1 17 10Z" clip-rule="evenodd" /></svg>
+                    Tasks
+                </a>
+                @if ($task->project)
+                    <span class="text-zinc-300">/</span>
+                    <a href="{{ route('projects.show', $task->project) }}" wire:navigate class="max-w-48 truncate font-medium transition-colors hover:text-brand">{{ $task->project->name }}</a>
+                @endif
+                @if ($task->parent)
+                    <span class="text-zinc-300">/</span>
+                    <a href="{{ route('tasks.show', $task->parent) }}" wire:navigate class="max-w-56 truncate font-medium transition-colors hover:text-brand">{{ $task->parent->task_key }} {{ $task->parent->title }}</a>
+                @endif
+            </nav>
 
-            <button type="button" wire:click="toggleStar" class="{{ $isStarred ? 'text-amber-400' : 'text-zinc-300 hover:text-amber-400' }}" title="{{ $isStarred ? 'Unstar' : 'Star' }}">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5">
-                    <path d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z" />
-                </svg>
+            <div class="flex items-center gap-2">
+                <span class="rounded-full bg-violet-100 px-2.5 py-1 font-mono text-xs font-semibold text-violet-700">{{ $task->task_key }}</span>
+                <button type="button" wire:click="toggleStar" class="flex size-7 items-center justify-center rounded-lg transition-colors hover:bg-amber-50 {{ $isStarred ? 'text-amber-400' : 'text-zinc-300 hover:text-amber-400' }}" title="{{ $isStarred ? 'Unstar' : 'Star' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5">
+                        <path d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z" />
+                    </svg>
+                </button>
+            </div>
+            <h1 class="mt-2 text-2xl font-semibold tracking-tight text-zinc-900 sm:text-[1.75rem] sm:leading-9">{{ $task->title }}</h1>
+            <p class="mt-1.5 flex items-center gap-2 text-sm text-zinc-500">
+                <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-ink-700 text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($task->creator->name) }}</span>
+                <span>Created by <span class="font-medium text-zinc-700">{{ $task->creator->name }}</span> on {{ $task->created_at->format('d M Y') }}</span>
+            </p>
+        </div>
+
+        {{-- Status: moves the task along the board (only to the statuses its workflow allows). --}}
+        <div class="relative shrink-0" x-data="dropdownMenu()" @click.outside="open = false">
+            <button
+                type="button"
+                @click="open = ! open"
+                :aria-expanded="open"
+                @disabled(! $canEditStatus)
+                class="inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold shadow-xs ring-1 ring-inset ring-zinc-900/5 transition {{ $task->status->pillClasses() }} {{ $canEditStatus ? 'hover:brightness-95' : 'cursor-default' }}"
+            >
+                <span class="size-2 rounded-full bg-current opacity-70"></span>
+                {{ $task->status->label() }}
+                @if ($canEditStatus)
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4 opacity-60 transition-transform" :class="open && 'rotate-180'"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
+                @endif
             </button>
 
-            @if ($task->project)
-                <a href="{{ route('projects.show', $task->project) }}" wire:navigate class="text-xs font-medium text-zinc-500 hover:text-brand">
-                    {{ $task->project->name }} /
-                </a>
-            @endif
-            @if ($task->parent)
-                <a href="{{ route('tasks.show', $task->parent) }}" wire:navigate class="text-xs font-medium text-zinc-500 hover:text-brand">
-                    {{ $task->parent->task_key }} {{ $task->parent->title }} /
-                </a>
+            @if ($canEditStatus)
+                <div x-show="open" x-cloak x-transition class="menu-panel right-0 w-52 sm:right-0">
+                    <p class="px-2.5 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Move to</p>
+                    @forelse ($availableStatuses as $option)
+                        <button type="button" wire:click="saveStatus('{{ $option->value }}')" @click="open = false" class="menu-item">
+                            <span class="size-2 rounded-full {{ $option->pillClasses() }}"></span>
+                            {{ $option->label() }}
+                        </button>
+                    @empty
+                        <p class="px-2.5 py-2 text-sm text-zinc-400">No other status available.</p>
+                    @endforelse
+                </div>
             @endif
         </div>
-        <h1 class="mt-1 text-2xl font-semibold text-zinc-900">{{ $task->title }}</h1>
-        <p class="mt-1 text-sm text-zinc-500">Created by {{ $task->creator->name }} on {{ $task->created_at->format('d M Y') }}</p>
     </div>
 
     {{-- On phones both column wrappers are display:contents, so every card becomes its own grid row and
@@ -588,11 +627,15 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         {{-- Main column --}}
         <div class="contents lg:col-span-2 lg:block lg:space-y-6">
             {{-- Description --}}
-            <div class="order-3 rounded-lg border border-zinc-200 bg-surface p-4 sm:p-5" x-data="lazyQuillEditor(@js($task->description))">
-                <div class="flex items-center justify-between">
-                    <h2 class="text-sm font-semibold text-zinc-900">Description</h2>
+            <div class="order-3 relative rounded-2xl border border-zinc-200 bg-surface p-4 sm:p-5 has-[[aria-expanded=true]]:z-20" x-data="lazyQuillEditor(@js($task->description))">
+                <div class="-mx-4 -mt-4 mb-4 flex items-center gap-3 border-b border-zinc-100 px-4 py-3.5 sm:-mx-5 sm:-mt-5 sm:px-5">
+                    <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></span>
+                    <h2 class="min-w-0 flex-1 text-sm font-semibold text-zinc-900">Description</h2>
                     @if ($canEditMeta)
-                        <button type="button" x-show="!editing" @click="startEditing()" class="text-xs font-medium text-brand hover:underline">Edit</button>
+                        <button type="button" x-show="!editing" @click="startEditing()" class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-brand transition-colors hover:bg-brand/5">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5"><path d="m5.433 13.917 1.262-3.155A4 4 0 0 1 7.58 9.42l6.92-6.918a2.121 2.121 0 0 1 3 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 0 1-.65-.65Z" /></svg>
+                            Edit
+                        </button>
                     @endif
                 </div>
 
@@ -606,7 +649,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                                  hug the interpolation with no whitespace in between. --}}
                             <div
                                 x-ref="descriptionContent"
-                                class="ql-editor mt-2 p-0! text-sm! text-zinc-600 [&_a]:text-brand [&_a]:underline [&_blockquote]:text-zinc-500 [&_code]:rounded [&_code]:bg-zinc-100 [&_code]:px-1"
+                                class="ql-editor p-0! text-sm! leading-relaxed text-zinc-700 [&_a]:text-brand [&_a]:underline [&_blockquote]:text-zinc-500 [&_code]:rounded [&_code]:bg-zinc-100 [&_code]:px-1"
                                 :class="expanded ? '' : 'line-clamp-10'"
                             >{!! $task->description !!}</div>
 
@@ -620,7 +663,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                             </div>
                         </div>
                     @else
-                        <p class="mt-2 text-sm italic text-zinc-400">No description provided.</p>
+                        <p class="text-sm text-zinc-400">No description yet.</p>
                     @endif
                 </div>
 
@@ -630,14 +673,14 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                          text layout on init, so creating it while hidden (display:none) breaks it,
                          and recreating it on every edit leaks a document-level listener. --}}
                     <div x-show="editing" x-cloak wire:ignore>
-                        <div class="mt-3">
-                            <div x-ref="editor" class="min-h-32 rounded-b-lg border border-zinc-300 bg-surface text-sm [&_.ql-toolbar]:rounded-t-lg [&_.ql-toolbar]:border-zinc-300"></div>
+                        <div class="rich-editor">
+                            <div x-ref="editor" data-placeholder="Steps, links, what done looks like…"></div>
                             <input type="hidden" x-ref="input" wire:model="description">
                         </div>
 
-                        <div class="mt-3 flex justify-end gap-3">
-                            <button type="button" @click="editing = false" class="text-sm font-medium text-zinc-600 hover:text-zinc-900">Cancel</button>
-                            <button type="button" @click="$wire.saveDescription().then(() => editing = false)" class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90">Save</button>
+                        <div class="mt-3 flex justify-end gap-2">
+                            <button type="button" @click="editing = false" class="btn-secondary px-3.5 py-2">Cancel</button>
+                            <button type="button" @click="$wire.saveDescription().then(() => editing = false)" class="btn-primary px-3.5 py-2">Save</button>
                         </div>
                     </div>
                     @error('description') <p x-show="editing" class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
@@ -645,8 +688,11 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
             </div>
 
             {{-- Attachments (task-level + comment attachments, combined) --}}
-            <div class="order-5 rounded-lg border border-zinc-200 bg-surface p-4 sm:p-5">
-                <h2 class="mb-4 text-sm font-semibold text-zinc-900">Attachments ({{ $allAttachments->count() }})</h2>
+            <div class="order-5 relative rounded-2xl border border-zinc-200 bg-surface p-4 sm:p-5 has-[[aria-expanded=true]]:z-20">
+                <div class="-mx-4 -mt-4 mb-4 flex items-center gap-3 border-b border-zinc-100 px-4 py-3.5 sm:-mx-5 sm:-mt-5 sm:px-5">
+                    <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/></svg></span>
+                    <h2 class="min-w-0 flex-1 text-sm font-semibold text-zinc-900">Attachments</h2><span class="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">{{ $allAttachments->count() }}</span>
+                </div>
 
                 @if ($allAttachments->isNotEmpty())
                     <div class="flex flex-wrap gap-2">
@@ -673,52 +719,41 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                 @endif
 
                 @if ($canEditMeta)
-                    <div class="mt-3 border-t border-zinc-100 pt-3">
-                        <label class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-zinc-300 px-3 py-1.5 text-sm text-zinc-600 hover:border-brand hover:text-brand">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/></svg>
-                            Add files
-                            <input wire:model="newAttachments" type="file" multiple class="sr-only">
-                        </label>
-                        @error('newAttachments.*') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-
-                        @if (! empty($newAttachments))
-                            <div class="mt-2 flex flex-wrap gap-2">
-                                @foreach ($newAttachments as $index => $file)
-                                    <span class="inline-flex items-center gap-2 rounded-md border border-zinc-200 bg-zinc-50 py-1 pl-2 pr-1 text-xs text-zinc-700">
-                                        @if (str($file->getMimeType())->startsWith('image/'))
-                                            <img src="{{ $file->temporaryUrl() }}" class="size-5 rounded object-cover">
-                                        @endif
-                                        {{ $file->getClientOriginalName() }}
-                                        <button type="button" wire:click="removeNewAttachment({{ $index }})" class="rounded-full p-0.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700" title="Remove">
-                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3">
-                                                <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-                                            </svg>
-                                        </button>
-                                    </span>
-                                @endforeach
-                                <button type="button" wire:click="addAttachments" class="rounded-lg bg-brand px-3 py-1 text-xs font-semibold text-white hover:bg-brand/90">Upload</button>
-                            </div>
-                        @endif
+                    <div class="mt-4">
+                        <x-form.dropzone model="newAttachments" compact>
+                            @error('newAttachments.*') <p class="text-xs font-medium text-red-600">{{ $message }}</p> @enderror
+                            @if (! empty($newAttachments))
+                                <div class="grid gap-2 sm:grid-cols-2">
+                                    @foreach ($newAttachments as $index => $file)
+                                        <x-form.file-chip :file="$file" :remove="'removeNewAttachment('.$index.')'" />
+                                    @endforeach
+                                </div>
+                                <div class="flex justify-end">
+                                    <button type="button" wire:click="addAttachments" wire:loading.attr="disabled" wire:target="addAttachments" class="btn-primary px-3.5 py-2">Upload {{ count($newAttachments) }} {{ \Illuminate\Support\Str::plural('file', count($newAttachments)) }}</button>
+                                </div>
+                            @endif
+                        </x-form.dropzone>
                     </div>
                 @endif
             </div>
 
             {{-- Comments --}}
-            <div class="order-6 rounded-lg border border-zinc-200 bg-surface p-4 sm:p-5">
-                <h2 class="mb-4 text-sm font-semibold text-zinc-900">Comments</h2>
+            <div class="order-6 relative rounded-2xl border border-zinc-200 bg-surface p-4 sm:p-5 has-[[aria-expanded=true]]:z-20">
+                <div class="-mx-4 -mt-4 mb-4 flex items-center gap-3 border-b border-zinc-100 px-4 py-3.5 sm:-mx-5 sm:-mt-5 sm:px-5">
+                    <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg></span>
+                    <h2 class="min-w-0 flex-1 text-sm font-semibold text-zinc-900">Comments</h2><span class="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">{{ $task->comments->count() }}</span>
+                </div>
 
                 <div class="space-y-4">
                     @forelse ($task->comments as $comment)
                         <div class="flex gap-3">
-                            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-xs font-semibold text-zinc-600">
-                                {{ strtoupper(substr($comment->user->name, 0, 1)) }}
-                            </div>
+                            <x-user-avatar :user="$comment->user" class="size-8 shrink-0 rounded-full text-[11px]" />
                             <div class="flex-1">
                                 <div class="flex items-center gap-2">
                                     <span class="text-sm font-medium text-zinc-900">{{ $comment->user->name }}</span>
                                     <span class="text-xs text-zinc-400">{{ $comment->created_at->format('d M Y — h:i A') }}</span>
                                 </div>
-                                <p class="mt-1 whitespace-pre-line text-sm text-zinc-600">{{ $comment->body }}</p>
+                                <p class="mt-1 whitespace-pre-line rounded-xl rounded-tl-sm bg-zinc-50 px-3.5 py-2.5 text-sm text-zinc-700">{{ $comment->body }}</p>
                                 @if ($comment->attachments->isNotEmpty())
                                     <div class="mt-2 flex flex-wrap gap-2">
                                         @foreach ($comment->attachments as $attachment)
@@ -740,13 +775,13 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                             </div>
                         </div>
                     @empty
-                        <p class="text-sm text-zinc-400">No comments yet.</p>
+                        <p class="text-sm text-zinc-400">No comments yet. Start the conversation below.</p>
                     @endforelse
                 </div>
 
                 @if ($canComment)
                     <div class="mt-5 border-t border-zinc-100 pt-4">
-                        <textarea wire:model="newComment" rows="3" placeholder="Add a comment…" class="block w-full rounded-lg border border-zinc-300 bg-surface px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40"></textarea>
+                        <textarea wire:model="newComment" rows="3" placeholder="Write a comment…" class="field-input resize-y"></textarea>
                         @error('newComment') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
 
                         @if (! empty($commentAttachments))
@@ -769,12 +804,12 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                         @endif
 
                         <div class="mt-2 flex items-center justify-between gap-3">
-                            <label class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700">
+                            <label class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/></svg>
                                 Attach
                                 <input type="file" wire:model="commentAttachments" multiple class="sr-only">
                             </label>
-                            <button type="button" wire:click="addComment" class="shrink-0 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90">Comment</button>
+                            <button type="button" wire:click="addComment" wire:loading.attr="disabled" wire:target="addComment" class="btn-primary shrink-0 px-4 py-2">Comment</button>
                         </div>
                         @error('commentAttachments.*') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                     </div>
@@ -783,16 +818,18 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
 
             {{-- Activity Timeline --}}
             @php $hiddenEntries = max(0, $timeline->count() - 5); @endphp
-            <div class="order-8 rounded-lg border border-zinc-200 bg-surface p-4 sm:p-5" x-data="{ all: false }">
-                <div class="mb-4 flex items-center justify-between">
-                    <h2 class="text-sm font-semibold text-zinc-900">Activity</h2>
+            <div class="order-8 relative rounded-2xl border border-zinc-200 bg-surface p-4 sm:p-5 has-[[aria-expanded=true]]:z-20" x-data="{ all: false }">
+                <div class="-mx-4 -mt-4 mb-4 flex items-center gap-3 border-b border-zinc-100 px-4 py-3.5 sm:-mx-5 sm:-mt-5 sm:px-5">
+                    <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></svg></span>
+                    <h2 class="min-w-0 flex-1 text-sm font-semibold text-zinc-900">Activity</h2>
                     @if ($hiddenEntries > 0)
-                        <button type="button" @click="all = ! all" class="text-xs font-medium text-brand hover:underline" x-text="all ? 'Show recent only' : 'Show all {{ $timeline->count() }}'"></button>
+                        <button type="button" @click="all = ! all" class="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-brand transition-colors hover:bg-brand/5" x-text="all ? 'Show recent only' : 'Show all {{ $timeline->count() }}'"></button>
                     @endif
                 </div>
-                <ol class="space-y-4 border-l border-zinc-200 pl-4">
+                <ol class="relative space-y-4 pl-5 before:absolute before:inset-y-1 before:left-[5px] before:w-px before:bg-zinc-200">
                     @foreach ($timeline as $entry)
-                        <li @if ($loop->index < $hiddenEntries) x-show="all" x-cloak @endif>
+                        <li class="relative" @if ($loop->index < $hiddenEntries) x-show="all" x-cloak @endif>
+                            <span class="absolute -left-5 top-1.5 size-[11px] rounded-full border-2 border-surface bg-zinc-300 ring-1 ring-zinc-200 {{ $loop->last ? 'bg-brand!' : '' }}"></span>
                             <p class="text-sm text-zinc-900">{{ $entry->description }}</p>
                             <p class="text-xs text-zinc-500">{{ $entry->occurred_at->format('d M Y — h:i A') }}</p>
                         </li>
@@ -803,282 +840,144 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
 
         {{-- Sidebar --}}
         <div class="contents lg:sticky lg:top-20 lg:block lg:space-y-4 lg:self-start">
-            {{-- Status dropdown menu --}}
-            <div class="relative order-1 inline-block justify-self-start" x-data="dropdownMenu()">
-                <button
-                    type="button"
-                    @click="open = ! open"
-                    @disabled(! $canEditStatus)
-                    class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium {{ $task->status->pillClasses() }}"
-                >
-                    {{ $task->status->label() }}
-                    @if ($canEditStatus)
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5 opacity-60">
-                            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
-                        </svg>
-                    @endif
-                </button>
-
-                @if ($canEditStatus)
-                    <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute left-0 z-20 mt-1 w-44 rounded-lg border border-zinc-200 bg-surface py-1 shadow-lg">
-                        @foreach ($availableStatuses as $option)
-                            <button type="button" wire:click="saveStatus('{{ $option->value }}')" @click="open = false" class="block w-full px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50">
-                                {{ $option->label() }}
-                            </button>
-                        @endforeach
-                    </div>
-                @endif
-            </div>
-
-            {{-- Details --}}
-            <div class="order-2 rounded-lg border border-zinc-200 bg-surface" x-data="{ open: true }">
-                <button type="button" @click="open = ! open" class="flex w-full items-center gap-1.5 px-4 py-3 text-left">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5 text-zinc-400 transition-transform" :class="open ? 'rotate-90' : ''">
-                        <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
-                    </svg>
-                    <span class="text-sm font-semibold text-zinc-900">Details</span>
-                </button>
-
-                <div x-show="open" x-collapse class="divide-y divide-zinc-100 px-4 pb-2">
-                    {{-- Assignee --}}
-                    <div class="flex items-center justify-between gap-3 py-2.5">
-                        <span class="text-sm text-zinc-500">Assignee</span>
-                        <div class="relative" x-data="dropdownMenu()">
-                            <button type="button" @click="open = ! open" @disabled(! $canReassign) class="flex items-center gap-2 {{ $canReassign ? 'hover:opacity-75' : '' }}">
-                                @if ($currentAssignee)
-                                    <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand text-[10px] font-semibold text-white">{{ \App\Support\Avatar::initials($currentAssignee->name) }}</span>
-                                    <span class="text-sm text-zinc-900">{{ $currentAssignee->name }}</span>
-                                @else
-                                    <span class="text-sm text-zinc-400">{{ $canReassign ? 'Add assignee' : 'Unassigned' }}</span>
-                                @endif
-                            </button>
-
-                            @if ($canReassign)
-                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-surface py-1 shadow-lg">
-                                    @foreach ($users as $option)
-                                        <button type="button" wire:click="saveAssignee({{ $option->id }})" @click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50">
-                                            <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-brand text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($option->name) }}</span>
-                                            {{ $option->name }}
-                                        </button>
-                                    @endforeach
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-
-                    {{-- Reporter --}}
-                    <div class="flex items-center justify-between gap-3 py-2.5">
-                        <span class="text-sm text-zinc-500">Reporter</span>
-                        <div class="relative" x-data="dropdownMenu()">
-                            <button type="button" @click="open = ! open" @disabled(! $canEditMeta) class="flex items-center gap-2 {{ $canEditMeta ? 'hover:opacity-75' : '' }}">
-                                <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-ink-700 text-[10px] font-semibold text-white">{{ \App\Support\Avatar::initials($task->creator->name) }}</span>
-                                <span class="text-sm text-zinc-900">{{ $task->creator->name }}</span>
-                            </button>
-
-                            @if ($canEditMeta)
-                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-surface py-1 shadow-lg">
-                                    @foreach ($users as $option)
-                                        <button type="button" wire:click="saveReporter({{ $option->id }})" @click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50">
-                                            <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-ink-700 text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($option->name) }}</span>
-                                            {{ $option->name }}
-                                        </button>
-                                    @endforeach
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-
-                    {{-- QA / Reviewer --}}
-                    <div class="flex items-center justify-between gap-3 py-2.5">
-                        <span class="text-sm text-zinc-500">QA / Reviewer</span>
-                        <div class="relative" x-data="dropdownMenu()">
-                            @if ($task->qa)
-                                <button type="button" @click="open = ! open" @disabled(! $canEditMeta) class="flex items-center gap-2 {{ $canEditMeta ? 'hover:opacity-75' : '' }}">
-                                    <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-ink-700 text-[10px] font-semibold text-white">{{ \App\Support\Avatar::initials($task->qa->name) }}</span>
-                                    <span class="text-sm text-zinc-900">{{ $task->qa->name }}</span>
-                                </button>
-                            @else
-                                <button type="button" @click="open = ! open" @disabled(! $canEditMeta) class="text-sm text-zinc-400 {{ $canEditMeta ? 'hover:text-brand' : '' }}">
-                                    {{ $canEditMeta ? 'Add reviewer' : 'None' }}
-                                </button>
-                            @endif
-
-                            @if ($canEditMeta)
-                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-surface py-1 shadow-lg">
-                                    <button type="button" wire:click="saveQa(null)" @click="open = false" class="block w-full px-3 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-50">Unassigned</button>
-                                    @foreach ($users as $option)
-                                        <button type="button" wire:click="saveQa({{ $option->id }})" @click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50">
-                                            <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-ink-700 text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($option->name) }}</span>
-                                            {{ $option->name }}
-                                        </button>
-                                    @endforeach
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-
-                    {{-- Priority --}}
-                    <div class="flex items-center justify-between gap-3 py-2.5">
-                        <span class="text-sm text-zinc-500">Priority</span>
-                        <div class="relative" x-data="dropdownMenu()">
-                            <button type="button" @click="open = ! open" @disabled(! $canEditMeta) class="flex items-center gap-1.5 text-sm text-zinc-900 {{ $canEditMeta ? 'hover:text-brand' : '' }}">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5 {{ $task->priority->colorClass() }}">
-                                    <path d="M2 10a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 10z" />
-                                </svg>
-                                {{ $task->priority->label() }}
-                            </button>
-
-                            @if ($canEditMeta)
-                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 w-40 rounded-lg border border-zinc-200 bg-surface py-1 shadow-lg">
-                                    @foreach (TaskPriority::cases() as $option)
-                                        <button type="button" wire:click="savePriority('{{ $option->value }}')" @click="open = false" class="flex w-full items-center gap-1.5 px-3 py-2 text-left text-sm hover:bg-zinc-50">
-                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5 {{ $option->colorClass() }}">
-                                                <path d="M2 10a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 10z" />
-                                            </svg>
-                                            {{ $option->label() }}
-                                        </button>
-                                    @endforeach
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-
-                    {{-- Due Date --}}
-                    <div class="flex items-center justify-between gap-3 py-2.5">
-                        <span class="text-sm text-zinc-500">Due date</span>
-                        <div class="relative">
-                            <button type="button" wire:click="startEditField('due_date')" @disabled(! $canEditMeta) class="text-sm {{ $task->deadline ? 'text-zinc-900' : 'text-zinc-400' }} {{ $canEditMeta ? 'hover:text-brand' : '' }}">
-                                {{ $task->deadline?->format('d M Y') ?? ($canEditMeta ? 'Add due date' : 'None') }}
-                            </button>
-
-                            @if ($editingField === 'due_date')
-                                <div class="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-zinc-200 bg-surface p-3 shadow-lg">
-                                    <input wire:model="due_date_value" type="date" class="block w-full rounded-md border border-zinc-300 bg-surface px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                                    @error('due_date_value') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-                                    <div class="mt-2 flex justify-end gap-2">
-                                        <button type="button" wire:click="cancelEditField" class="text-xs text-zinc-500 hover:text-zinc-700">Cancel</button>
-                                        <button type="button" wire:click="saveDueDate" class="text-xs font-medium text-brand hover:underline">Save</button>
-                                    </div>
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-
-                    {{-- Category --}}
-                    <div class="flex items-center justify-between gap-3 py-2.5">
-                        <span class="text-sm text-zinc-500">Category</span>
-                        <span class="text-sm text-zinc-900">{{ $task->category?->name ?? '—' }}</span>
-                    </div>
-
-                    {{-- Project --}}
-                    <div class="flex items-center justify-between gap-3 py-2.5">
-                        <span class="text-sm text-zinc-500">Project</span>
-                        <div class="relative" x-data="dropdownMenu()">
-                            @if ($task->project)
-                                <button type="button" @click="open = ! open" @disabled(! $canEditMeta) class="inline-flex items-center gap-1 rounded border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-xs font-medium text-zinc-700 {{ $canEditMeta ? 'hover:border-brand/40' : '' }}">
-                                    {{ $task->project->name }}
-                                </button>
-                            @else
-                                <button type="button" @click="open = ! open" @disabled(! $canEditMeta) class="text-sm text-zinc-400 {{ $canEditMeta ? 'hover:text-brand' : '' }}">
-                                    {{ $canEditMeta ? 'Add project' : 'None' }}
-                                </button>
-                            @endif
-
-                            @if ($canEditMeta)
-                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-surface py-1 shadow-lg">
-                                    <button type="button" wire:click="saveProject(null)" @click="open = false" class="block w-full px-3 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-50">None</button>
-                                    @foreach ($projects as $option)
-                                        <button type="button" wire:click="saveProject({{ $option->id }})" @click="open = false" class="block w-full px-3 py-2 text-left text-sm hover:bg-zinc-50">
-                                            {{ $option->name }}
-                                        </button>
-                                    @endforeach
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-
-                    {{-- Parent --}}
-                    <div class="flex items-center justify-between gap-3 py-2.5">
-                        <span class="text-sm text-zinc-500">Parent</span>
-                        <div class="relative" x-data="dropdownMenu()">
-                            @if ($task->parent)
-                                <button type="button" @click="open = ! open" @disabled(! $canEditMeta) class="inline-flex items-center gap-1 rounded border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-xs font-medium text-zinc-700 {{ $canEditMeta ? 'hover:border-brand/40' : '' }}">
-                                    <span class="size-1.5 rounded-full bg-brand"></span>
-                                    {{ $task->parent->task_key }} {{ $task->parent->title }}
-                                </button>
-                            @else
-                                <button type="button" @click="open = ! open" @disabled(! $canEditMeta) class="text-sm text-zinc-400 {{ $canEditMeta ? 'hover:text-brand' : '' }}">
-                                    {{ $canEditMeta ? 'Add parent' : 'None' }}
-                                </button>
-                            @endif
-
-                            @if ($canEditMeta)
-                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 max-h-60 w-56 overflow-y-auto rounded-lg border border-zinc-200 bg-surface py-1 shadow-lg">
-                                    <button type="button" wire:click="saveParent(null)" @click="open = false" class="block w-full px-3 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-50">None</button>
-                                    @foreach ($availableParents as $option)
-                                        <button type="button" wire:click="saveParent({{ $option->id }})" @click="open = false" class="block w-full truncate px-3 py-2 text-left text-sm hover:bg-zinc-50">
-                                            {{ $option->task_key }} {{ $option->title }}
-                                        </button>
-                                    @endforeach
-                                </div>
-                            @endif
-                        </div>
-                        @error('parent_value') <p class="mt-1 max-w-xs text-right text-xs text-red-600">{{ $message }}</p> @enderror
-                    </div>
+            {{-- Details: each value is edited in place (for those allowed to). --}}
+            <div class="order-2 relative rounded-2xl border border-zinc-200 bg-surface p-4 sm:p-5 has-[[aria-expanded=true]]:z-20">
+                <div class="-mx-4 -mt-4 mb-3 flex items-center gap-3 border-b border-zinc-100 px-4 py-3.5 sm:-mx-5 sm:-mt-5 sm:px-5">
+                    <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></svg></span>
+                    <h2 class="min-w-0 flex-1 text-sm font-semibold text-zinc-900">Details</h2>
                 </div>
+                <dl class="divide-y divide-zinc-100">
+                    <div class="flex min-h-11 items-center justify-between gap-3 py-1.5">
+                        <dt class="flex shrink-0 items-center gap-2 text-sm text-zinc-500"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4 text-zinc-400"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>Assignee</dt>
+                        <dd class="flex min-w-0 justify-end">
+                            <x-form.picker variant="inline" call="saveAssignee" :value="$currentAssignee?->id" source="people" :label="$currentAssignee?->name" avatar :placeholder="$canReassign ? 'Add assignee' : 'Unassigned'" :disabled="! $canReassign" />
+                        </dd>
+                    </div>
+                    <div class="flex min-h-11 items-center justify-between gap-3 py-1.5">
+                        <dt class="flex shrink-0 items-center gap-2 text-sm text-zinc-500"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4 text-zinc-400"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>Reporter</dt>
+                        <dd class="flex min-w-0 justify-end">
+                            <x-form.picker variant="inline" call="saveReporter" :value="$task->created_by" source="people" :label="$task->creator->name" avatar :disabled="! $canEditMeta" />
+                        </dd>
+                    </div>
+                    <div class="flex min-h-11 items-center justify-between gap-3 py-1.5">
+                        <dt class="flex shrink-0 items-center gap-2 text-sm text-zinc-500"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4 text-zinc-400"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>QA reviewer</dt>
+                        <dd class="flex min-w-0 justify-end">
+                            <x-form.picker variant="inline" call="saveQa" :value="$task->qa_id" source="people" :label="$task->qa?->name" avatar clearable clear-label="No reviewer" :placeholder="$canEditMeta ? 'Add reviewer' : 'None'" :disabled="! $canEditMeta" />
+                        </dd>
+                    </div>
+                    <div class="flex min-h-11 items-center justify-between gap-3 py-1.5">
+                        <dt class="flex shrink-0 items-center gap-2 text-sm text-zinc-500"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4 text-zinc-400"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/></svg>Priority</dt>
+                        <dd class="flex min-w-0 justify-end">
+                            <div class="relative" x-data="dropdownMenu()" @click.outside="open = false">
+                                <button type="button" @click="open = ! open" :aria-expanded="open" @disabled(! $canEditMeta) class="-mr-2 flex items-center gap-2 rounded-lg px-2 py-1 text-sm text-zinc-900 transition-colors {{ $canEditMeta ? 'hover:bg-zinc-100' : 'cursor-default' }}">
+                                    <span class="size-2 rounded-full bg-current {{ $task->priority->colorClass() }}"></span>
+                                    {{ $task->priority->label() }}
+                                </button>
+                                @if ($canEditMeta)
+                                    <div x-show="open" x-cloak x-transition class="menu-panel right-0 w-44">
+                                        @foreach (TaskPriority::cases() as $option)
+                                            <button type="button" wire:click="savePriority('{{ $option->value }}')" @click="open = false" class="menu-item {{ $task->priority === $option ? 'bg-brand/5 font-medium text-brand!' : '' }}">
+                                                <span class="size-2 rounded-full bg-current {{ $option->colorClass() }}"></span>
+                                                {{ $option->label() }}
+                                            </button>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+                        </dd>
+                    </div>
+                    <div class="flex min-h-11 items-center justify-between gap-3 py-1.5">
+                        <dt class="flex shrink-0 items-center gap-2 text-sm text-zinc-500"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4 text-zinc-400"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>Due date</dt>
+                        <dd class="flex min-w-0 justify-end">
+                            <div class="relative">
+                                <button type="button" wire:click="startEditField('due_date')" @disabled(! $canEditMeta) class="-mr-2 rounded-lg px-2 py-1 text-sm transition-colors {{ $task->deadline ? ($task->deadline->isPast() && $task->status !== TaskStatus::Done ? 'font-medium text-red-600' : 'text-zinc-900') : 'text-zinc-400' }} {{ $canEditMeta ? 'hover:bg-zinc-100' : 'cursor-default' }}">
+                                    {{ $task->deadline?->format('D, d M Y') ?? ($canEditMeta ? 'Add due date' : 'None') }}
+                                </button>
+
+                                @if ($editingField === 'due_date')
+                                    <div class="menu-panel right-0 w-64 p-3">
+                                        <input wire:model="due_date_value" type="date" class="field-input">
+                                        @error('due_date_value') <p class="mt-1.5 text-xs font-medium text-red-600">{{ $message }}</p> @enderror
+                                        <div class="mt-3 flex justify-end gap-2">
+                                            <button type="button" wire:click="cancelEditField" class="btn-secondary px-3 py-1.5">Cancel</button>
+                                            <button type="button" wire:click="saveDueDate" class="btn-primary px-3 py-1.5">Save</button>
+                                        </div>
+                                    </div>
+                                @endif
+                            </div>
+                        </dd>
+                    </div>
+                    <div class="flex min-h-11 items-center justify-between gap-3 py-1.5">
+                        <dt class="flex shrink-0 items-center gap-2 text-sm text-zinc-500"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4 text-zinc-400"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg>Category</dt>
+                        <dd class="flex min-w-0 justify-end">
+                            <span class="truncate text-sm {{ $task->category ? 'text-zinc-900' : 'text-zinc-400' }}">{{ $task->category?->name ?? 'None' }}</span>
+                        </dd>
+                    </div>
+                    <div class="flex min-h-11 items-center justify-between gap-3 py-1.5">
+                        <dt class="flex shrink-0 items-center gap-2 text-sm text-zinc-500"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4 text-zinc-400"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>Project</dt>
+                        <dd class="flex min-w-0 justify-end">
+                            <x-form.picker variant="inline" call="saveProject" :value="$task->project_id" source="projects" :label="$task->project?->name" clearable clear-label="No project" :placeholder="$canEditMeta ? 'Add project' : 'None'" :disabled="! $canEditMeta" />
+                        </dd>
+                    </div>
+                    <div class="flex min-h-11 items-center justify-between gap-3 py-1.5">
+                        <dt class="flex shrink-0 items-center gap-2 text-sm text-zinc-500"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4 text-zinc-400"><path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>Parent</dt>
+                        <dd class="flex min-w-0 justify-end">
+                            <x-form.picker variant="inline" call="saveParent" :value="$task->parent_task_id" source="tasks" :except="$task->id" :label="$task->parent ? $task->parent->task_key.' '.$task->parent->title : null" clearable clear-label="No parent" :placeholder="$canEditMeta ? 'Add parent' : 'None'" :disabled="! $canEditMeta" />
+                        </dd>
+                    </div>
+                </dl>
+                @error('parent_value') <p class="mt-1 text-right text-xs font-medium text-red-600">{{ $message }}</p> @enderror
             </div>
 
-            <div class="order-4 rounded-lg border border-zinc-200 bg-surface p-4">
-                <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Subtasks</h3>
+            <div class="order-4 relative rounded-2xl border border-zinc-200 bg-surface p-4 sm:p-5 has-[[aria-expanded=true]]:z-20">
+                <div class="-mx-4 -mt-4 mb-3 flex items-center gap-3 border-b border-zinc-100 px-4 py-3.5 sm:-mx-5 sm:-mt-5 sm:px-5">
+                    <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M3 5h.01"/><path d="M3 12h.01"/><path d="M3 19h.01"/><path d="M8 5h13"/><path d="M8 12h13"/><path d="M8 19h13"/></svg></span>
+                    <h2 class="min-w-0 flex-1 text-sm font-semibold text-zinc-900">Subtasks</h2><span class="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">{{ $task->children->count() }}</span>
+                </div>
 
-                <div class="mt-2 space-y-2">
+                <div class="space-y-1.5">
                     @forelse ($task->children as $child)
-                        <a href="{{ route('tasks.show', $child) }}" wire:navigate class="flex items-center justify-between gap-2 rounded-md border border-zinc-100 px-2 py-1.5 text-sm hover:border-brand/40">
+                        <a href="{{ route('tasks.show', $child) }}" wire:navigate class="flex items-center justify-between gap-2 rounded-xl border border-zinc-100 px-2.5 py-2 text-sm transition-colors hover:border-brand/30 hover:bg-brand/[0.03]">
                             <span class="flex items-center gap-1.5 truncate text-zinc-700">
                                 <span class="shrink-0 rounded-full bg-violet-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-violet-700">{{ $child->task_key }}</span>
                                 {{ $child->title }}
                             </span>
-                            <span class="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-600">{{ $child->status->label() }}</span>
+                            <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium {{ $child->status->pillClasses() }}">{{ $child->status->label() }}</span>
                         </a>
                     @empty
-                        <p class="text-sm text-zinc-400">No subtasks.</p>
+                        <p class="text-sm text-zinc-400">No subtasks yet.</p>
                     @endforelse
                 </div>
 
                 @if ($canEditMeta)
                     @if ($showAddSubtask)
-                        <div class="mt-3 space-y-2 rounded-md border border-zinc-200 p-2">
-                            <input wire:model="subtask_title" type="text" placeholder="Subtask title" class="block w-full rounded-md border border-zinc-300 px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                        <div class="mt-3 space-y-2.5 rounded-xl bg-zinc-50 p-3">
+                            <input wire:model="subtask_title" type="text" placeholder="What's the subtask?" class="field-input">
                             @error('subtask_title') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
 
-                            <select wire:model="subtask_assigned_to" class="block w-full rounded-md border border-zinc-300 px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
-                                <option value="">Assign to…</option>
-                                @foreach ($users as $option)
-                                    <option value="{{ $option->id }}">{{ $option->name }}</option>
-                                @endforeach
-                            </select>
+                            <x-form.picker model="subtask_assigned_to" :value="$subtask_assigned_to" source="people" :label="$subtaskAssigneeName" avatar placeholder="Assign to…" :error="$errors->has('subtask_assigned_to')" />
                             @error('subtask_assigned_to') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
 
-                            <div class="flex justify-end gap-3">
-                                <button type="button" wire:click="$set('showAddSubtask', false)" class="text-xs text-zinc-500 hover:text-zinc-700">Cancel</button>
-                                <button type="button" wire:click="addSubtask" class="text-xs font-medium text-brand hover:underline">Add</button>
+                            <div class="flex justify-end gap-2">
+                                <button type="button" wire:click="$set('showAddSubtask', false)" class="btn-secondary px-3 py-1.5">Cancel</button>
+                                <button type="button" wire:click="addSubtask" class="btn-primary px-3 py-1.5">Add subtask</button>
                             </div>
                         </div>
                     @else
-                        <button type="button" wire:click="$set('showAddSubtask', true)" class="mt-3 text-xs font-medium text-brand hover:underline">+ Add subtask</button>
+                        <button type="button" wire:click="$set('showAddSubtask', true)" class="-ml-2 mt-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-semibold text-brand transition-colors hover:bg-brand/5"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" /></svg>Add subtask</button>
                     @endif
                 @endif
             </div>
 
-            <div class="order-7 rounded-lg border border-zinc-200 bg-surface p-4">
-                <div class="flex items-center justify-between">
-                    <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Time Logs</h3>
-                    <span class="text-sm font-semibold text-brand">{{ Duration::forHumans((float) $totalLoggedHours) }}</span>
+            <div class="order-7 relative rounded-2xl border border-zinc-200 bg-surface p-4 sm:p-5 has-[[aria-expanded=true]]:z-20">
+                <div class="-mx-4 -mt-4 mb-3 flex items-center gap-3 border-b border-zinc-100 px-4 py-3.5 sm:-mx-5 sm:-mt-5 sm:px-5">
+                    <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span>
+                    <h2 class="min-w-0 flex-1 text-sm font-semibold text-zinc-900">Time logged</h2><span class="text-sm font-semibold tabular-nums text-brand">{{ Duration::forHumans((float) $totalLoggedHours) }}</span>
                 </div>
 
-                <div class="mt-2 space-y-2">
+                <div class="space-y-1.5">
                     @forelse ($timeLogs as $log)
-                        <div class="flex items-center justify-between gap-2 rounded-md border border-zinc-100 px-2 py-1.5 text-sm">
+                        <div class="flex items-center justify-between gap-2 rounded-xl border border-zinc-100 px-2.5 py-2 text-sm">
                             <div class="min-w-0">
                                 <div class="flex min-w-0 items-center gap-1.5">
                                     <span class="shrink-0 whitespace-nowrap font-medium text-zinc-900">{{ $log->logged_date->format('d M') }}</span>
@@ -1109,28 +1008,28 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
 
                 @if ($canLogTime)
                     @if ($showLogTime)
-                        <div class="mt-3 space-y-2 rounded-md border border-zinc-200 p-2">
-                            <input wire:model="log_date" type="date" min="{{ $task->start_date?->toDateString() }}" max="{{ now()->toDateString() }}" class="block w-full rounded-md border border-zinc-300 px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                        <div class="mt-3 space-y-2.5 rounded-xl bg-zinc-50 p-3">
+                            <input wire:model="log_date" type="date" min="{{ $task->start_date?->toDateString() }}" max="{{ now()->toDateString() }}" class="field-input">
                             @error('log_date') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
 
                             <div class="flex items-center gap-2">
-                                <input wire:model="log_hours" type="number" min="0" max="24" placeholder="Hours" class="block w-1/2 rounded-md border border-zinc-300 px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                <input wire:model="log_hours" type="number" min="0" max="24" placeholder="Hours" class="field-input w-1/2 tabular-nums">
                                 <span class="shrink-0 text-xs text-zinc-500">hrs</span>
-                                <input wire:model="log_minutes" type="number" min="0" max="59" placeholder="Minutes" class="block w-1/2 rounded-md border border-zinc-300 px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                                <input wire:model="log_minutes" type="number" min="0" max="59" placeholder="Minutes" class="field-input w-1/2 tabular-nums">
                                 <span class="shrink-0 text-xs text-zinc-500">min</span>
                             </div>
                             @error('log_hours') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
                             @error('log_minutes') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
 
-                            <input wire:model="log_note" type="text" placeholder="Note (optional)" class="block w-full rounded-md border border-zinc-300 px-2 py-1 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40">
+                            <input wire:model="log_note" type="text" placeholder="What did you work on? (optional)" class="field-input">
 
-                            <div class="flex justify-end gap-3">
-                                <button type="button" wire:click="cancelLogTime" class="text-xs text-zinc-500 hover:text-zinc-700">Cancel</button>
-                                <button type="button" wire:click="logTime" class="text-xs font-medium text-brand hover:underline">Save</button>
+                            <div class="flex justify-end gap-2">
+                                <button type="button" wire:click="cancelLogTime" class="btn-secondary px-3 py-1.5">Cancel</button>
+                                <button type="button" wire:click="logTime" class="btn-primary px-3 py-1.5">Log time</button>
                             </div>
                         </div>
                     @else
-                        <button type="button" wire:click="$set('showLogTime', true)" class="mt-3 text-xs font-medium text-brand hover:underline">+ Log time</button>
+                        <button type="button" wire:click="$set('showLogTime', true)" class="-ml-2 mt-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-semibold text-brand transition-colors hover:bg-brand/5"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" /></svg>Log time</button>
                     @endif
                 @endif
             </div>
@@ -1140,7 +1039,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
     {{-- Submit for QA Testing modal --}}
     @if ($showSubmitQaModal)
         <div class="fixed inset-0 z-40 flex items-center justify-center bg-zinc-900/50 px-4">
-            <div class="w-full max-w-md rounded-lg bg-surface p-6 shadow-lg">
+            <div class="w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
                 <h3 class="text-lg font-semibold text-zinc-900">Submit for QA Testing</h3>
                 <p class="mt-1 text-sm text-zinc-500">{{ $task->title }}</p>
 
@@ -1150,12 +1049,12 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
 
                 <div class="mt-4">
                     <label class="block text-sm font-medium text-zinc-700">Note (Optional)</label>
-                    <textarea wire:model="submission_note" rows="2" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-surface px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40"></textarea>
+                    <textarea wire:model="submission_note" rows="2" class="field-input mt-1.5"></textarea>
                 </div>
 
                 <div class="mt-6 flex justify-end gap-3">
-                    <button type="button" wire:click="cancelSubmitForQa" class="text-sm font-medium text-zinc-600 hover:text-zinc-900">Cancel</button>
-                    <button type="button" wire:click="submitForQa" wire:loading.attr="disabled" wire:target="submitForQa" class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90 disabled:opacity-60">
+                    <button type="button" wire:click="cancelSubmitForQa" class="btn-secondary">Cancel</button>
+                    <button type="button" wire:click="submitForQa" wire:loading.attr="disabled" wire:target="submitForQa" class="btn-primary">
                         <span wire:loading.remove wire:target="submitForQa">Submit</span>
                         <span wire:loading wire:target="submitForQa">Submitting…</span>
                     </button>

@@ -216,13 +216,41 @@ class NotificationTest extends TestCase
         $coordinator = $this->teamMember('Karim');
 
         Livewire::actingAs($manager)
-            ->test('projects.create')
+            ->test('projects.form')
             ->set('name', 'Website Relaunch')
             ->set('coordinator_id', $coordinator->id)
             ->call('save');
         $this->flushDeferredNotifications();
 
         Notification::assertSentTo($coordinator, ProjectCoordinatorAssigned::class);
+    }
+
+    public function test_editing_a_project_notifies_a_newly_chosen_coordinator(): void
+    {
+        $manager = $this->manager('Rahim');
+        $coordinator = $this->teamMember('Karim');
+        $project = Project::create(['name' => 'Website Relaunch', 'created_by' => $manager->id, 'status' => ProjectStatus::Active]);
+
+        Notification::fake();
+
+        Livewire::actingAs($manager)->test('projects.form', ['project' => $project])->set('coordinator_id', (string) $coordinator->id)->call('save');
+        $this->flushDeferredNotifications();
+
+        Notification::assertSentTo($coordinator, ProjectCoordinatorAssigned::class);
+    }
+
+    public function test_editing_a_project_without_changing_its_coordinator_sends_nothing(): void
+    {
+        $manager = $this->manager('Rahim');
+        $coordinator = $this->teamMember('Karim');
+        $project = Project::create(['name' => 'Website Relaunch', 'created_by' => $manager->id, 'coordinator_id' => $coordinator->id, 'status' => ProjectStatus::Active]);
+
+        Notification::fake();
+
+        Livewire::actingAs($manager)->test('projects.form', ['project' => $project])->set('name', 'Renamed')->call('save');
+        $this->flushDeferredNotifications();
+
+        Notification::assertNotSentTo($coordinator, ProjectCoordinatorAssigned::class);
     }
 
     public function test_assigning_a_coordinator_later_notifies_them(): void

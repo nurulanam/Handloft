@@ -46,7 +46,7 @@ class ProjectManagementTest extends TestCase
         $manager = $this->manager('Rahim');
 
         Livewire::actingAs($manager)
-            ->test('projects.create')
+            ->test('projects.form')
             ->set('name', 'Website Relaunch')
             ->set('description', 'Full redesign of the marketing site.')
             ->call('save');
@@ -63,6 +63,41 @@ class ProjectManagementTest extends TestCase
         $this->actingAs($teamMember)
             ->get(route('projects.create'))
             ->assertForbidden();
+    }
+
+    public function test_a_project_can_be_edited_with_the_same_form(): void
+    {
+        $manager = $this->manager('Rahim');
+        $project = Project::create(['name' => 'Website Relaunch', 'description' => '<p>Old brief</p>', 'created_by' => $manager->id, 'status' => ProjectStatus::Active, 'start_date' => '2026-10-01']);
+
+        $this->actingAs($manager)->get(route('projects.show', $project))->assertSee(route('projects.edit', $project), false);
+
+        Livewire::actingAs($manager)
+            ->test('projects.form', ['project' => $project])
+            ->assertSet('name', 'Website Relaunch')
+            ->assertSet('start_date', '2026-10-01')
+            ->set('name', 'Website Relaunch 2.0')
+            ->set('deadline', '2026-11-30')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertRedirect(route('projects.show', $project));
+
+        $project->refresh();
+        $this->assertSame('Website Relaunch 2.0', $project->name);
+        $this->assertSame('2026-11-30', $project->deadline->toDateString());
+        $this->assertSame($manager->id, $project->created_by);
+    }
+
+    public function test_only_people_who_can_update_a_project_can_open_its_edit_form(): void
+    {
+        $manager = $this->manager('Rahim');
+        $project = Project::create(['name' => 'Website Relaunch', 'created_by' => $manager->id, 'status' => ProjectStatus::Active]);
+
+        $teamMember = $this->teamMember('Karim');
+        $this->actingAs($teamMember)->get(route('projects.edit', $project))->assertForbidden();
+        $this->actingAs($teamMember)->get(route('projects.show', $project))->assertDontSee(route('projects.edit', $project), false);
+
+        $this->actingAs($manager)->get(route('projects.edit', $project))->assertOk()->assertSee('Edit project');
     }
 
     public function test_the_create_project_nav_link_is_hidden_from_users_who_cant_create_one(): void

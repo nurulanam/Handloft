@@ -1,12 +1,12 @@
 <?php
 
 use App\Enums\TaskPriority;
+use App\Livewire\Concerns\SearchesPickerOptions;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskCategory;
 use App\Models\User;
 use App\Services\TaskWorkflowService;
-use App\Support\FileSize;
 use App\Support\Html;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
@@ -17,7 +17,7 @@ use Livewire\WithFileUploads;
 
 new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
 {
-    use WithFileUploads;
+    use SearchesPickerOptions, WithFileUploads;
 
     public string $title = '';
 
@@ -82,6 +82,11 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
             'project_id' => ['nullable', 'exists:projects,id'],
             'notes' => ['nullable', 'string'],
             'attachments.*' => ['file', 'max:10240'],
+        ], [
+            'title.required' => 'Give the task a short title.',
+            'assigned_to.required' => 'Choose who will do this task.',
+            'deadline.after_or_equal' => 'The due date can\'t be before the start date.',
+            'attachments.*.max' => 'Each file can be up to 10 MB.',
         ]);
 
         $assignee = User::findOrFail($data['assigned_to']);
@@ -114,271 +119,130 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
     public function with(): array
     {
         return [
-            'users' => User::query()->orderBy('name')->get(),
-            'categories' => TaskCategory::query()->orderBy('name')->get(),
-            'projects' => Project::query()->orderBy('name')->get(),
+            // People and projects are searched on demand (SearchesPickerOptions); only the chosen names are needed here.
+            'names' => [
+                'people' => User::query()->whereKey(array_filter([$this->assigned_to, $this->reporter_id, $this->qa_id]))->pluck('name', 'id'),
+                'project' => $this->project_id ? Project::query()->whereKey($this->project_id)->value('name') : null,
+            ],
+            'categories' => TaskCategory::query()->orderBy('name')->get()->map(fn (TaskCategory $category) => ['value' => $category->id, 'label' => $category->name]),
         ];
     }
 };
 ?>
 
-<div>
-    <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-            <h1 class="text-xl font-semibold text-zinc-900 sm:text-2xl">Create Task</h1>
-        </div>
+@php
+    $icons = [
+        'task' => '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
+        'files' => '<path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/>',
+        'people' => '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+        'planning' => '<path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.3V14"/><circle cx="16" cy="16" r="6"/>',
+        'organise' => '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+    ];
+@endphp
 
-        <div class="hidden items-center gap-3 sm:flex">
-            <a href="{{ route('tasks.index') }}" wire:navigate class="text-sm font-medium text-zinc-600 hover:text-zinc-900">Cancel</a>
-            <button type="submit" form="create-task-form" class="whitespace-nowrap rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90" wire:loading.attr="disabled">
-                Create Task
-            </button>
-        </div>
-    </div>
+<div>
+    <x-form.header :back="route('tasks.index')" back-label="Tasks" title="Create a task" subtitle="Describe the work, choose who does it and when it's due. Everyone involved gets notified.">
+        <x-slot:actions>
+            <a href="{{ route('tasks.index') }}" wire:navigate class="btn-secondary">Cancel</a>
+            <x-form.submit form="create-task-form">Create task</x-form.submit>
+        </x-slot:actions>
+    </x-form.header>
 
     <form id="create-task-form" wire:submit="save">
-        {{-- On phones both column wrappers are display:contents so Details (assignee, priority, dates)
-             can sit right under the description instead of after attachments and notes; from lg up the
-             wrappers are real columns again and the order classes are inert. --}}
+        {{-- On phones both column wrappers are display:contents, so the cards interleave by their order-*
+             classes (the task, then people and planning, then files); from lg up they're real columns. --}}
         <div class="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-6">
-            {{-- Left: Title + Description --}}
-            <div class="contents lg:col-span-2 lg:block lg:space-y-4">
-                <div class="order-1">
-                    <input
-                        wire:model="title"
-                        type="text"
-                        placeholder="Task title"
-                        class="block w-full border-0 border-b border-zinc-200 bg-transparent px-0 py-2 text-2xl font-semibold text-zinc-900 placeholder:text-zinc-300 focus:border-brand focus:outline-none focus:ring-0"
-                    >
-                    @error('title') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-                </div>
+            <div class="contents lg:col-span-2 lg:block lg:space-y-6">
+                <x-form.card class="order-1" title="What needs doing" description="A clear title, and the details someone needs to get started." :icon="$icons['task']">
+                    <x-form.field label="Title" for="task-title" error="title" required>
+                        <input id="task-title" wire:model="title" type="text" placeholder="e.g. Fix the checkout timeout on mobile" autocomplete="off" @class(['field-input text-base font-medium', 'field-input-error' => $errors->has('title')])>
+                    </x-form.field>
 
-                <div class="order-2">
-                    <label class="block text-sm font-medium text-zinc-700">Description</label>
-                    <div wire:ignore x-data="quillEditor(@js($description))" class="mt-1">
-                        <div x-ref="editor" class="min-h-40 rounded-b-lg border sm:min-h-64 border-zinc-300 bg-surface text-sm [&_.ql-toolbar]:rounded-t-lg [&_.ql-toolbar]:border-zinc-300"></div>
-                        <input type="hidden" x-ref="input" wire:model="description">
-                    </div>
-                    @error('description') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-                </div>
+                    <x-form.field label="Description" error="description" optional>
+                        <div wire:ignore x-data="quillEditor(@js($description))" class="rich-editor">
+                            <div x-ref="editor" data-placeholder="Steps to reproduce, links, what done looks like…"></div>
+                            <input type="hidden" x-ref="input" wire:model="description">
+                        </div>
+                    </x-form.field>
+                </x-form.card>
 
-                <div class="order-4">
-                    <label class="block text-sm font-medium text-zinc-700">Attachments</label>
-                    <label class="mt-1 inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-zinc-300 bg-surface px-3 py-1.5 text-sm text-zinc-600 hover:border-brand hover:text-brand">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/></svg>
-                        Add files
-                        <input wire:model="attachments" type="file" multiple class="sr-only">
-                    </label>
-                    @error('attachments.*') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                <x-form.card class="order-4" title="Files & notes" description="Screenshots, specs, or anything else that helps." :icon="$icons['files']">
+                    <x-form.field label="Attachments" error="attachments.*" optional>
+                        <x-form.dropzone model="attachments">
+                            @if (! empty($attachments))
+                                <div class="grid gap-2 sm:grid-cols-2">
+                                    @foreach ($attachments as $index => $file)
+                                        <x-form.file-chip :file="$file" :remove="'removeAttachment('.$index.')'" />
+                                    @endforeach
+                                </div>
+                            @endif
+                        </x-form.dropzone>
+                    </x-form.field>
 
-                    @if (! empty($attachments))
-                        <div class="mt-2 flex flex-wrap gap-2">
-                            @foreach ($attachments as $index => $file)
-                                <span class="inline-flex items-center gap-2 rounded-md border border-zinc-200 bg-zinc-50 py-1 pl-2 pr-1 text-xs text-zinc-700">
-                                    @if (str($file->getMimeType())->startsWith('image/'))
-                                        <img src="{{ $file->temporaryUrl() }}" class="size-5 rounded object-cover">
-                                    @endif
-                                    {{ $file->getClientOriginalName() }}
-                                    <span class="text-zinc-400">({{ FileSize::forHumans($file->getSize()) }})</span>
-                                    <button type="button" wire:click="removeAttachment({{ $index }})" class="rounded-full p-0.5 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700" title="Remove">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3">
-                                            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-                                        </svg>
-                                    </button>
-                                </span>
+                    <x-form.field label="Notes" for="task-notes" error="notes" optional>
+                        <textarea id="task-notes" wire:model="notes" rows="3" placeholder="Anything else worth knowing…" class="field-input resize-y"></textarea>
+                    </x-form.field>
+                </x-form.card>
+            </div>
+
+            <div class="contents lg:sticky lg:top-20 lg:block lg:space-y-6 lg:self-start">
+                <x-form.card class="order-2" title="People" description="Who does it, who asked, who checks it." :icon="$icons['people']">
+                    <x-form.field label="Assignee" error="assigned_to" required>
+                        <x-form.picker model="assigned_to" :value="$assigned_to" source="people" :label="$names['people'][$assigned_to] ?? null" avatar placeholder="Who will do it?" :error="$errors->has('assigned_to')" />
+                    </x-form.field>
+
+                    <x-form.field label="Reporter" error="reporter_id">
+                        <x-form.picker model="reporter_id" :value="$reporter_id" source="people" :label="$names['people'][$reporter_id] ?? null" avatar placeholder="Who asked for it?" />
+                    </x-form.field>
+
+                    <x-form.field label="QA reviewer" error="qa_id" optional>
+                        <x-form.picker model="qa_id" :value="$qa_id" source="people" :label="$names['people'][$qa_id] ?? null" avatar clearable clear-label="No reviewer" placeholder="Add a reviewer" />
+                    </x-form.field>
+                </x-form.card>
+
+                <x-form.card class="order-3" title="Planning" description="How urgent it is, and when." :icon="$icons['planning']">
+                    <x-form.field label="Priority" error="priority">
+                        <div class="grid grid-cols-4 gap-1 rounded-xl bg-zinc-100 p-1" role="radiogroup" aria-label="Priority">
+                            @foreach (TaskPriority::cases() as $option)
+                                <label class="cursor-pointer">
+                                    <input type="radio" wire:model.live="priority" value="{{ $option->value }}" class="peer sr-only">
+                                    <span class="flex items-center justify-center gap-1.5 rounded-lg px-1.5 py-1.5 text-xs font-medium text-zinc-500 transition hover:text-zinc-900 peer-checked:bg-surface peer-checked:text-zinc-900 peer-checked:shadow-sm peer-focus-visible:ring-2 peer-focus-visible:ring-brand/30">
+                                        <span class="size-2 shrink-0 rounded-full bg-current {{ $option->colorClass() }}"></span>
+                                        {{ $option->label() }}
+                                    </span>
+                                </label>
                             @endforeach
                         </div>
-                    @endif
-                </div>
+                    </x-form.field>
 
-                <div class="order-5">
-                    <label class="block text-sm font-medium text-zinc-700">Notes</label>
-                    <textarea wire:model="notes" rows="3" class="mt-1 block w-full rounded-lg border border-zinc-300 bg-surface px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40"></textarea>
-                    @error('notes') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-                </div>
-            </div>
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                        <x-form.field label="Start date" error="start_date" optional>
+                            <x-form.date model="start_date" :value="$start_date" placeholder="Not set" />
+                        </x-form.field>
 
-            {{-- Right: Details --}}
-            <div class="contents lg:sticky lg:top-20 lg:block lg:space-y-4 lg:self-start">
-                {{-- Status (fixed — new tasks always start Pending); not worth the space on phones. --}}
-                <div class="hidden lg:block">
-                    <span class="inline-flex items-center rounded-full bg-zinc-100 px-3 py-1.5 text-sm font-medium text-zinc-700">
-                        Pending
-                    </span>
-                </div>
-
-                <div class="order-3 rounded-lg border border-zinc-200 bg-surface" x-data="{ open: true }">
-                    <button type="button" @click="open = ! open" class="flex w-full items-center gap-1.5 px-4 py-3 text-left">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5 text-zinc-400 transition-transform" :class="open ? 'rotate-90' : ''">
-                            <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
-                        </svg>
-                        <span class="text-sm font-semibold text-zinc-900">Details</span>
-                    </button>
-
-                    <div x-show="open" x-collapse class="divide-y divide-zinc-100 px-4 pb-2">
-                        {{-- Assignee --}}
-                        <div class="flex items-center justify-between gap-3 py-2.5">
-                            <span class="text-sm text-zinc-500">Assignee</span>
-
-                            <div class="relative" x-data="dropdownMenu(@js($assigned_to), @js(optional($users->firstWhere('id', $assigned_to))->name ?? 'Select assignee'))">
-                                <button type="button" @click="open = ! open" class="flex items-center gap-2 hover:opacity-75">
-                                    <template x-if="value">
-                                        <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand text-[10px] font-semibold text-white" x-text="initialsOf(label)"></span>
-                                    </template>
-                                    <span class="text-sm" :class="value ? 'text-zinc-900' : 'text-zinc-400'" x-text="label"></span>
-                                </button>
-
-                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-surface py-1 shadow-lg">
-                                    @foreach ($users as $option)
-                                        <button type="button" wire:click="$set('assigned_to', {{ $option->id }})" @click="choose('{{ $option->id }}', @js($option->name))" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50">
-                                            <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-brand text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($option->name) }}</span>
-                                            {{ $option->name }}
-                                        </button>
-                                    @endforeach
-                                </div>
-                            </div>
-                        </div>
-                        @error('assigned_to') <p class="pb-2 text-xs text-red-600">{{ $message }}</p> @enderror
-
-                        {{-- Reporter --}}
-                        <div class="flex items-center justify-between gap-3 py-2.5">
-                            <span class="text-sm text-zinc-500">Reporter</span>
-
-                            <div class="relative" x-data="dropdownMenu(@js($reporter_id), @js(optional($users->firstWhere('id', $reporter_id))->name ?? 'Select reporter'))">
-                                <button type="button" @click="open = ! open" class="flex items-center gap-2 hover:opacity-75">
-                                    <template x-if="value">
-                                        <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-ink-700 text-[10px] font-semibold text-white" x-text="initialsOf(label)"></span>
-                                    </template>
-                                    <span class="text-sm" :class="value ? 'text-zinc-900' : 'text-zinc-400'" x-text="label"></span>
-                                </button>
-
-                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-surface py-1 shadow-lg">
-                                    @foreach ($users as $option)
-                                        <button type="button" wire:click="$set('reporter_id', {{ $option->id }})" @click="choose('{{ $option->id }}', @js($option->name))" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50">
-                                            <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-ink-700 text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($option->name) }}</span>
-                                            {{ $option->name }}
-                                        </button>
-                                    @endforeach
-                                </div>
-                            </div>
-                        </div>
-                        @error('reporter_id') <p class="pb-2 text-xs text-red-600">{{ $message }}</p> @enderror
-
-                        {{-- QA / Reviewer --}}
-                        <div class="flex items-center justify-between gap-3 py-2.5">
-                            <span class="text-sm text-zinc-500">QA / Reviewer</span>
-
-                            <div class="relative" x-data="dropdownMenu(@js($qa_id), @js(optional($users->firstWhere('id', $qa_id))->name ?? 'Add reviewer'))">
-                                <button type="button" @click="open = ! open" class="flex items-center gap-2 hover:opacity-75">
-                                    <template x-if="value">
-                                        <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-ink-700 text-[10px] font-semibold text-white" x-text="initialsOf(label)"></span>
-                                    </template>
-                                    <span class="text-sm" :class="value ? 'text-zinc-900' : 'text-zinc-400'" x-text="label"></span>
-                                </button>
-
-                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 max-h-60 w-48 overflow-y-auto rounded-lg border border-zinc-200 bg-surface py-1 shadow-lg">
-                                    <button type="button" wire:click="$set('qa_id', '')" @click="choose('', 'Add reviewer')" class="block w-full px-3 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-50">None</button>
-                                    @foreach ($users as $option)
-                                        <button type="button" wire:click="$set('qa_id', {{ $option->id }})" @click="choose('{{ $option->id }}', @js($option->name))" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50">
-                                            <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-ink-700 text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($option->name) }}</span>
-                                            {{ $option->name }}
-                                        </button>
-                                    @endforeach
-                                </div>
-                            </div>
-                        </div>
-
-                        {{-- Priority --}}
-                        <div class="flex items-center justify-between gap-3 py-2.5">
-                            <span class="text-sm text-zinc-500">Priority</span>
-
-                            <div class="relative" x-data="dropdownMenu(@js($priority), @js(\App\Enums\TaskPriority::from($priority)->label()))">
-                                <button type="button" @click="open = ! open" class="flex items-center gap-1.5 text-sm text-zinc-900 hover:text-brand">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5" :class="priorityColor(value)">
-                                        <path d="M2 10a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 10z" />
-                                    </svg>
-                                    <span x-text="label"></span>
-                                </button>
-
-                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 w-40 rounded-lg border border-zinc-200 bg-surface py-1 shadow-lg">
-                                    @foreach (TaskPriority::cases() as $option)
-                                        <button type="button" wire:click="$set('priority', '{{ $option->value }}')" @click="choose('{{ $option->value }}', @js($option->label()))" class="flex w-full items-center gap-1.5 px-3 py-2 text-left text-sm hover:bg-zinc-50">
-                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5 {{ $option->colorClass() }}">
-                                                <path d="M2 10a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 10z" />
-                                            </svg>
-                                            {{ $option->label() }}
-                                        </button>
-                                    @endforeach
-                                </div>
-                            </div>
-                        </div>
-
-                        {{-- Due date --}}
-                        <div class="flex items-center justify-between gap-3 py-2.5">
-                            <span class="text-sm text-zinc-500">Due date</span>
-
-                            {{-- The native date input sits invisibly over the label, so one tap opens the device's own date picker. --}}
-                            <label class="group relative -my-1.5 cursor-pointer py-1.5">
-                                <span class="text-sm {{ $deadline ? 'text-zinc-900' : 'text-zinc-400' }} group-hover:text-brand">{{ $deadline ? \Illuminate\Support\Carbon::parse($deadline)->format('d M Y') : 'Add due date' }}</span>
-                                <input wire:model.live="deadline" type="date" class="absolute inset-0 h-full w-full cursor-pointer opacity-0" x-data @click="(() => { try { $el.showPicker() } catch (e) {} })()">
-                            </label>
-                        </div>
-                        @error('deadline') <p class="pb-2 text-xs text-red-600">{{ $message }}</p> @enderror
-
-                        {{-- Start date --}}
-                        <div class="flex items-center justify-between gap-3 py-2.5">
-                            <span class="text-sm text-zinc-500">Start date</span>
-
-                            {{-- The native date input sits invisibly over the label, so one tap opens the device's own date picker. --}}
-                            <label class="group relative -my-1.5 cursor-pointer py-1.5">
-                                <span class="text-sm {{ $start_date ? 'text-zinc-900' : 'text-zinc-400' }} group-hover:text-brand">{{ $start_date ? \Illuminate\Support\Carbon::parse($start_date)->format('d M Y') : 'Add start date' }}</span>
-                                <input wire:model.live="start_date" type="date" class="absolute inset-0 h-full w-full cursor-pointer opacity-0" x-data @click="(() => { try { $el.showPicker() } catch (e) {} })()">
-                            </label>
-                        </div>
-
-                        {{-- Category --}}
-                        <div class="flex items-center justify-between gap-3 py-2.5">
-                            <span class="text-sm text-zinc-500">Category</span>
-
-                            <div class="relative" x-data="dropdownMenu(@js($task_category_id), @js(optional($categories->firstWhere('id', $task_category_id))->name ?? 'None'))">
-                                <button type="button" @click="open = ! open" class="text-sm hover:text-brand" :class="value ? 'text-zinc-900' : 'text-zinc-400'" x-text="label"></button>
-
-                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-zinc-200 bg-surface py-1 shadow-lg">
-                                    <button type="button" wire:click="$set('task_category_id', '')" @click="choose('', 'None')" class="block w-full px-3 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-50">None</button>
-                                    @foreach ($categories as $category)
-                                        <button type="button" wire:click="$set('task_category_id', {{ $category->id }})" @click="choose('{{ $category->id }}', @js($category->name))" class="block w-full px-3 py-2 text-left text-sm hover:bg-zinc-50">
-                                            {{ $category->name }}
-                                        </button>
-                                    @endforeach
-                                </div>
-                            </div>
-                        </div>
-
-                        {{-- Project --}}
-                        <div class="flex items-center justify-between gap-3 py-2.5">
-                            <span class="text-sm text-zinc-500">Project</span>
-
-                            <div class="relative" x-data="dropdownMenu(@js($project_id), @js(optional($projects->firstWhere('id', $project_id))->name ?? 'None'))">
-                                <button type="button" @click="open = ! open" class="text-sm hover:text-brand" :class="value ? 'text-zinc-900' : 'text-zinc-400'" x-text="label"></button>
-
-                                <div x-show="open" x-cloak @click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 w-48 max-h-60 overflow-y-auto rounded-lg border border-zinc-200 bg-surface py-1 shadow-lg">
-                                    <button type="button" wire:click="$set('project_id', '')" @click="choose('', 'None')" class="block w-full px-3 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-50">None</button>
-                                    @foreach ($projects as $option)
-                                        <button type="button" wire:click="$set('project_id', {{ $option->id }})" @click="choose('{{ $option->id }}', @js($option->name))" class="block w-full px-3 py-2 text-left text-sm hover:bg-zinc-50">
-                                            {{ $option->name }}
-                                        </button>
-                                    @endforeach
-                                </div>
-                            </div>
-                        </div>
+                        <x-form.field label="Due date" error="deadline" optional>
+                            <x-form.date model="deadline" :value="$deadline" placeholder="No deadline" :error="$errors->has('deadline')" />
+                        </x-form.field>
                     </div>
-                </div>
+                </x-form.card>
+
+                <x-form.card class="order-3" title="Organise" description="Where it belongs." :icon="$icons['organise']">
+                    <x-form.field label="Project" error="project_id" optional>
+                        <x-form.picker model="project_id" :value="$project_id" source="projects" :label="$names['project']" clearable clear-label="No project" placeholder="No project" :icon="$icons['organise']" />
+                    </x-form.field>
+
+                    <x-form.field label="Category" error="task_category_id" optional>
+                        <x-form.picker model="task_category_id" :value="$task_category_id" :options="$categories" clearable clear-label="No category" placeholder="No category" icon='<path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/>' />
+                    </x-form.field>
+                </x-form.card>
+
+                <p class="order-5 flex items-baseline gap-2 px-1 text-xs text-zinc-500">
+                    <span class="size-1.5 shrink-0 -translate-y-px rounded-full bg-sky-500"></span>
+                    <span>New tasks start in <span class="font-medium text-zinc-700">{{ \App\Enums\TaskStatus::Todo->label() }}</span> and move along the board from there.</span>
+                </p>
             </div>
         </div>
-        {{-- Phones: the actions live here, where the form ends, instead of in the header. --}}
-        <div class="mt-6 flex gap-3 sm:hidden">
-            <a href="{{ route('tasks.index') }}" wire:navigate class="flex-1 rounded-lg border border-zinc-300 bg-surface px-4 py-2.5 text-center text-sm font-medium text-zinc-700 hover:bg-zinc-50">Cancel</a>
-            <button type="submit" class="flex-1 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand/90" wire:loading.attr="disabled">Create Task</button>
-        </div>
+
+        <x-form.actions :cancel="route('tasks.index')">Create task</x-form.actions>
     </form>
 </div>
