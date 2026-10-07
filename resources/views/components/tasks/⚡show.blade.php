@@ -9,6 +9,7 @@ use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\TaskWorkflowService;
+use App\Support\Attachments;
 use App\Support\Duration;
 use App\Support\Html;
 use Illuminate\Support\Facades\Gate;
@@ -325,7 +326,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         foreach ($this->commentAttachments as $file) {
             $comment->attachments()->create([
                 'uploaded_by' => auth()->id(),
-                'path' => $file->store('task-comment-attachments', 'public'),
+                'path' => Attachments::store($file, 'task-comment-attachments'),
                 'original_name' => $file->getClientOriginalName(),
                 'size' => $file->getSize(),
             ]);
@@ -350,7 +351,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         foreach ($this->newAttachments as $file) {
             $this->task->attachments()->create([
                 'uploaded_by' => auth()->id(),
-                'path' => $file->store('task-attachments', 'public'),
+                'path' => Attachments::store($file, 'task-attachments'),
                 'original_name' => $file->getClientOriginalName(),
                 'size' => $file->getSize(),
             ]);
@@ -497,6 +498,25 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         return false;
     }
 
+    /**
+     * Remove an attachment (task-level or from a comment): its uploader, or anyone who can edit the
+     * task's details. The file is deleted and the removal is recorded on the timeline.
+     */
+    public function deleteAttachment(string $kind, int $id): void
+    {
+        $attachment = $kind === 'comment'
+            ? \App\Models\TaskCommentAttachment::query()->whereHas('comment', fn ($q) => $q->where('task_id', $this->task->id))->findOrFail($id)
+            : $this->task->attachments()->findOrFail($id);
+
+        abort_unless($attachment->uploaded_by === auth()->id() || Gate::allows('updateMeta', $this->task), 403);
+
+        Attachments::delete($attachment->path);
+        $attachment->delete();
+
+        $this->logMetaChange('Attachment "'.$attachment->original_name.'" removed');
+        $this->dispatch('notify', message: 'Attachment removed.', type: 'success');
+    }
+
     private function logMetaChange(string $description): void
     {
         $this->task->activities()->create([
@@ -509,29 +529,30 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
 
     public function with(): array
     {
-        $taskAttachments = $this->task->attachments()->with('uploadedBy')->get()->map(fn ($a) => [
-            'id' => 'task-'.$a->id,
-            'path' => $a->path,
+        $canEditMeta = Gate::allows('updateMeta', $this->task);
+        $row = fn ($a, string $kind) => [
+            'id' => $kind.'-'.$a->id,
+            'kind' => $kind,
+            'key' => $a->id,
             'original_name' => $a->original_name,
             'size' => $a->size,
-            'uploaded_by' => $a->uploadedBy->name,
+            'uploaded_by' => $a->uploadedBy?->name ?? 'Someone',
             'created_at' => $a->created_at,
-            'source' => 'Task',
-        ]);
+            'source' => $kind === 'task' ? 'Task' : 'Comment',
+            'type' => Attachments::kindOf($a->original_name),
+            'extension' => Attachments::extension($a->original_name) ?: 'file',
+            'url' => route('attachments.show', ['kind' => $kind, 'id' => $a->id, 'name' => $a->original_name]),
+            'download' => route('attachments.show', ['kind' => $kind, 'id' => $a->id, 'name' => $a->original_name, 'download' => 1]),
+            'can_delete' => $a->uploaded_by === auth()->id() || $canEditMeta,
+        ];
+
+        $taskAttachments = $this->task->attachments()->with('uploadedBy')->get()->map(fn ($a) => $row($a, 'task'));
 
         $commentAttachments = $this->task->comments()
             ->with('attachments.uploadedBy')
             ->get()
             ->flatMap->attachments
-            ->map(fn ($a) => [
-                'id' => 'comment-'.$a->id,
-                'path' => $a->path,
-                'original_name' => $a->original_name,
-                'size' => $a->size,
-                'uploaded_by' => $a->uploadedBy->name,
-                'created_at' => $a->created_at,
-                'source' => 'Comment',
-            ]);
+            ->map(fn ($a) => $row($a, 'comment'));
 
         $nextStatuses = $this->nextStatuses();
 
@@ -541,7 +562,11 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
             // People, projects and parent tasks are searched on demand (SearchesPickerOptions), not listed here.
             'subtaskAssigneeName' => $this->subtask_assigned_to ? User::query()->whereKey($this->subtask_assigned_to)->value('name') : null,
             'availableStatuses' => $nextStatuses,
-            'allAttachments' => $taskAttachments->concat($commentAttachments)->sortByDesc('created_at')->values(),
+            'allAttachments' => $allAttachments = $taskAttachments->concat($commentAttachments)->sortByDesc('created_at')->values(),
+            // For the viewer: just the images and PDFs, in gallery order.
+            'attachmentPreviews' => $allAttachments->whereIn('type', ['image', 'pdf'])
+                ->map(fn ($a) => ['id' => $a['id'], 'name' => $a['original_name'], 'type' => $a['type'], 'url' => $a['url'], 'download' => $a['download']])
+                ->values(),
             'canReassign' => Gate::allows('reassign', $this->task),
             'canEditStatus' => $nextStatuses->isNotEmpty(),
             'canEditMeta' => Gate::allows('updateMeta', $this->task),
@@ -695,23 +720,40 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                 </div>
 
                 @if ($allAttachments->isNotEmpty())
-                    <div class="flex flex-wrap gap-2">
+                    {{-- Images and PDFs open in the viewer below; other files download. All links go through
+                         AttachmentController, which checks the viewer may see this task. --}}
+                    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
                         @foreach ($allAttachments as $attachment)
-                            @if (\App\Support\FileType::isImage($attachment['original_name']))
-                                <a href="{{ Storage::url($attachment['path']) }}" target="_blank" class="relative block overflow-hidden rounded-md border border-zinc-200 hover:border-brand/40">
-                                    <img src="{{ Storage::url($attachment['path']) }}" alt="{{ $attachment['original_name'] }}" class="h-20 w-20 object-cover">
-                                    <span class="absolute bottom-0 left-0 right-0 truncate bg-zinc-900/60 px-1 py-0.5 text-[10px] text-white">{{ $attachment['original_name'] }}</span>
-                                </a>
-                            @else
-                                <a href="{{ Storage::url($attachment['path']) }}" target="_blank" class="flex items-center gap-2 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs text-zinc-600 hover:border-brand/40">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4 shrink-0 text-zinc-400">
-                                        <path fill-rule="evenodd" d="M15.621 4.379a3 3 0 00-4.242 0l-7 7a3 3 0 004.241 4.243h.001l.497-.5a.75.75 0 011.064 1.057l-.498.501-.002.002a4.5 4.5 0 01-6.364-6.364l7-7a4.5 4.5 0 016.368 6.36l-3.455 3.553A2.625 2.625 0 119.52 9.52l3.45-3.451a.75.75 0 111.061 1.06l-3.45 3.451a1.125 1.125 0 001.587 1.595l3.454-3.553a3 3 0 000-4.242z" clip-rule="evenodd" />
-                                    </svg>
-                                    <span class="max-w-40 truncate">{{ $attachment['original_name'] }}</span>
-                                    <span class="shrink-0 text-zinc-400">{{ \App\Support\FileSize::forHumans($attachment['size']) }}</span>
-                                    <span class="shrink-0 rounded bg-zinc-200 px-1 text-[10px] uppercase tracking-wide text-zinc-500">{{ $attachment['source'] }}</span>
-                                </a>
-                            @endif
+                            <div wire:key="att-{{ $attachment['id'] }}" class="group relative overflow-hidden rounded-xl border border-zinc-200/80 bg-zinc-50">
+                                @if ($attachment['type'] === 'image')
+                                    <button type="button" @click="$dispatch('open-attachment', { id: @js($attachment['id']) })" class="block aspect-[4/3] w-full overflow-hidden" title="Preview {{ $attachment['original_name'] }}">
+                                        <img src="{{ $attachment['url'] }}" alt="{{ $attachment['original_name'] }}" loading="lazy" class="size-full object-cover transition duration-300 group-hover:scale-[1.04]">
+                                    </button>
+                                @else
+                                    @php $isPdf = $attachment['type'] === 'pdf'; @endphp
+                                    @if ($isPdf)
+                                        <button type="button" @click="$dispatch('open-attachment', { id: @js($attachment['id']) })" class="flex aspect-[4/3] w-full flex-col items-center justify-center gap-1.5 text-zinc-400 transition-colors hover:text-brand" title="Preview {{ $attachment['original_name'] }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="size-9"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+                                        <span class="rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide {{ $isPdf ? 'bg-red-50 text-red-600' : 'bg-zinc-200/70 text-zinc-600' }}">{{ \Illuminate\Support\Str::limit($attachment['extension'], 5, '') }}</span>
+                                        </button>
+                                    @else
+                                        <a href="{{ $attachment['download'] }}" class="flex aspect-[4/3] w-full flex-col items-center justify-center gap-1.5 text-zinc-400 transition-colors hover:text-brand" title="Download {{ $attachment['original_name'] }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="size-9"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+                                        <span class="rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide {{ $isPdf ? 'bg-red-50 text-red-600' : 'bg-zinc-200/70 text-zinc-600' }}">{{ \Illuminate\Support\Str::limit($attachment['extension'], 5, '') }}</span>
+                                        </a>
+                                    @endif
+                                @endif
+                                <div class="flex items-center gap-1 border-t border-zinc-200/80 bg-surface py-1.5 pl-2.5 pr-1">
+                                    <div class="min-w-0 flex-1">
+                                        <p class="truncate text-xs font-medium text-zinc-800" title="{{ $attachment['original_name'] }}">{{ $attachment['original_name'] }}</p>
+                                        <p class="truncate text-[11px] text-zinc-500" title="Added by {{ $attachment['uploaded_by'] }} on {{ $attachment['created_at']->format('d M Y, h:i A') }}">{{ \App\Support\FileSize::forHumans($attachment['size']) }} · {{ $attachment['source'] }}</p>
+                                    </div>
+                                    <a href="{{ $attachment['download'] }}" class="flex size-7 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700" title="Download"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4"><path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.614L6.295 8.235a.75.75 0 1 0-1.09 1.03l4.25 4.5a.75.75 0 0 0 1.09 0l4.25-4.5a.75.75 0 0 0-1.09-1.03l-2.955 3.129V2.75Z" /><path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" /></svg></a>
+                                    @if ($attachment['can_delete'])
+                                        <button type="button" wire:click="deleteAttachment('{{ $attachment['kind'] }}', {{ $attachment['key'] }})" wire:confirm="Remove “{{ $attachment['original_name'] }}”? This can't be undone." class="flex size-7 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600" title="Remove"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clip-rule="evenodd" /></svg></button>
+                                    @endif
+                                </div>
+                            </div>
                         @endforeach
                     </div>
                 @else
@@ -755,19 +797,25 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                                 </div>
                                 <p class="mt-1 whitespace-pre-line rounded-xl rounded-tl-sm bg-zinc-50 px-3.5 py-2.5 text-sm text-zinc-700">{{ $comment->body }}</p>
                                 @if ($comment->attachments->isNotEmpty())
+                                    @php $commentFiles = $allAttachments->whereIn('id', $comment->attachments->map(fn ($a) => 'comment-'.$a->id)); @endphp
                                     <div class="mt-2 flex flex-wrap gap-2">
-                                        @foreach ($comment->attachments as $attachment)
-                                            @if (\App\Support\FileType::isImage($attachment->original_name))
-                                                <a href="{{ Storage::url($attachment->path) }}" target="_blank" class="group block overflow-hidden rounded-md border border-zinc-200 hover:border-brand/40">
-                                                    <img src="{{ Storage::url($attachment->path) }}" alt="{{ $attachment->original_name }}" class="h-20 w-20 object-cover">
-                                                </a>
+                                        @foreach ($commentFiles as $attachment)
+                                            @if ($attachment['type'] === 'image')
+                                                <button type="button" @click="$dispatch('open-attachment', { id: @js($attachment['id']) })" class="block overflow-hidden rounded-lg ring-1 ring-zinc-200 transition hover:ring-brand/40" title="Preview {{ $attachment['original_name'] }}">
+                                                    <img src="{{ $attachment['url'] }}" alt="{{ $attachment['original_name'] }}" loading="lazy" class="size-20 object-cover">
+                                                </button>
                                             @else
-                                                <a href="{{ Storage::url($attachment->path) }}" target="_blank" class="flex items-center gap-1.5 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1 text-xs text-zinc-600 hover:border-brand/40">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5 shrink-0 text-zinc-400">
-                                                        <path fill-rule="evenodd" d="M15.621 4.379a3 3 0 00-4.242 0l-7 7a3 3 0 004.241 4.243h.001l.497-.5a.75.75 0 011.064 1.057l-.498.501-.002.002a4.5 4.5 0 01-6.364-6.364l7-7a4.5 4.5 0 016.368 6.36l-3.455 3.553A2.625 2.625 0 119.52 9.52l3.45-3.451a.75.75 0 111.061 1.06l-3.45 3.451a1.125 1.125 0 001.587 1.595l3.454-3.553a3 3 0 000-4.242z" clip-rule="evenodd" />
-                                                    </svg>
-                                                    {{ $attachment->original_name }}
-                                                </a>
+                                                @if ($attachment['type'] === 'pdf')
+                                                    <button type="button" @click="$dispatch('open-attachment', { id: @js($attachment['id']) })" class="flex items-center gap-2 rounded-lg bg-zinc-50 px-2.5 py-1.5 text-xs text-zinc-600 ring-1 ring-zinc-200 transition hover:text-brand hover:ring-brand/40">
+                                                    <span class="rounded px-1 text-[9px] font-bold uppercase {{ $attachment['type'] === 'pdf' ? 'bg-red-50 text-red-600' : 'bg-zinc-200/70 text-zinc-600' }}">{{ \Illuminate\Support\Str::limit($attachment['extension'], 5, '') }}</span>
+                                                    <span class="max-w-40 truncate">{{ $attachment['original_name'] }}</span>
+                                                    </button>
+                                                @else
+                                                    <a href="{{ $attachment['download'] }}" class="flex items-center gap-2 rounded-lg bg-zinc-50 px-2.5 py-1.5 text-xs text-zinc-600 ring-1 ring-zinc-200 transition hover:text-brand hover:ring-brand/40">
+                                                    <span class="rounded px-1 text-[9px] font-bold uppercase {{ $attachment['type'] === 'pdf' ? 'bg-red-50 text-red-600' : 'bg-zinc-200/70 text-zinc-600' }}">{{ \Illuminate\Support\Str::limit($attachment['extension'], 5, '') }}</span>
+                                                    <span class="max-w-40 truncate">{{ $attachment['original_name'] }}</span>
+                                                    </a>
+                                                @endif
                                             @endif
                                         @endforeach
                                     </div>
@@ -1062,4 +1110,54 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
             </div>
         </div>
     @endif
+
+    {{-- Attachment viewer: images (with previous / next) and PDFs, opened by dispatching
+         open-attachment with an attachment id. The list is read fresh from the JSON below each time,
+         so it's always in step after uploads and removals. --}}
+    <script type="application/json" id="attachment-previews">@json($attachmentPreviews)</script>
+    <div
+        x-data="{
+            items: [],
+            index: null,
+            get item() { return this.index === null ? null : this.items[this.index] },
+            open(id) {
+                this.items = JSON.parse(document.getElementById('attachment-previews')?.textContent || '[]');
+                const i = this.items.findIndex((item) => item.id === id);
+                this.index = i > -1 ? i : null;
+            },
+            close() { this.index = null },
+            step(by) { if (this.items.length > 1) this.index = (this.index + by + this.items.length) % this.items.length },
+        }"
+        @open-attachment.window="open($event.detail.id)"
+        @keydown.escape.window="close()"
+        @keydown.arrow-right.window="index !== null && step(1)"
+        @keydown.arrow-left.window="index !== null && step(-1)"
+    >
+        <template x-teleport="body">
+            <div x-show="index !== null" x-cloak x-transition.opacity.duration.200ms class="fixed inset-0 z-[80] flex flex-col bg-ink-950/90 backdrop-blur-sm" role="dialog" aria-modal="true" :aria-label="item?.name">
+                <div class="flex items-center gap-3 px-4 py-3 text-white sm:px-6">
+                    <p class="min-w-0 flex-1 truncate text-sm font-medium" x-text="item?.name"></p>
+                    <span x-show="items.length > 1" class="shrink-0 text-xs tabular-nums text-white/60" x-text="(index + 1) + ' / ' + items.length"></span>
+                    <a :href="item?.download" class="flex size-9 shrink-0 items-center justify-center rounded-full text-white/80 transition hover:bg-white/10 hover:text-white" title="Download"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4"><path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.614L6.295 8.235a.75.75 0 1 0-1.09 1.03l4.25 4.5a.75.75 0 0 0 1.09 0l4.25-4.5a.75.75 0 0 0-1.09-1.03l-2.955 3.129V2.75Z" /><path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" /></svg></a>
+                    <button type="button" @click="close()" class="flex size-9 shrink-0 items-center justify-center rounded-full text-white/80 transition hover:bg-white/10 hover:text-white" title="Close (Esc)">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" /></svg>
+                    </button>
+                </div>
+                <div class="relative flex min-h-0 flex-1 items-center justify-center px-4 pb-6 sm:px-16" @click.self="close()">
+                    <template x-if="item?.type === 'image'">
+                        <img :src="item.url" :alt="item.name" class="max-h-full max-w-full rounded-lg object-contain shadow-2xl">
+                    </template>
+                    <template x-if="item?.type === 'pdf'">
+                        <iframe :src="item.url" :title="item.name" class="h-full w-full max-w-5xl rounded-lg bg-white shadow-2xl"></iframe>
+                    </template>
+                    <button type="button" x-show="items.length > 1" @click="step(-1)" class="absolute left-2 top-1/2 flex size-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 sm:left-4" title="Previous (←)">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5"><path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" /></svg>
+                    </button>
+                    <button type="button" x-show="items.length > 1" @click="step(1)" class="absolute right-2 top-1/2 flex size-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 sm:right-4" title="Next (→)">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5"><path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>
+                    </button>
+                </div>
+            </div>
+        </template>
+    </div>
 </div>

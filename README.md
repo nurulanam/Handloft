@@ -256,7 +256,12 @@ The Modern layout's logo is loaded from `APP_URL/apple-touch-icon.png`, so `APP_
 
 ### Files
 
-Uploads go to the `public` disk under `storage/app/public`, served through `public/storage`. Profile photos are cropped in the browser and saved as 512×512 JPEGs. Any Laravel filesystem driver (for example S3) can be configured in `config/filesystems.php`.
+- **Task and comment attachments** are stored on the **private** `local` disk (`storage/app/private`) and served only through `/attachments/{task|comment}/{id}`. That route checks that the viewer is signed in and allowed to see the task (`App\Http\Controllers\AttachmentController`).
+- **What opens in the browser:** only images (PNG, JPG, GIF, WebP, BMP), PDFs and plain text, with `nosniff` and a script-blocking sandbox. Every other type, including HTML and SVG, always downloads, so an uploaded file can never run as a page on your domain. Uploads are limited to 10 MB each.
+- **On the task page,** images open in a lightbox and PDFs in a viewer. Each file can be downloaded, and the uploader or a task editor can remove it; removals are logged on the timeline.
+- **Upgrading:** the migration `move_task_attachments_to_private_storage` moves attachments uploaded before this change off the public disk.
+- **Profile photos** stay on the `public` disk (`storage/app/public`, served through `public/storage`). They're cropped in the browser and saved as 512×512 JPEGs.
+- **Back up** `storage/app/private` and `storage/app/public`. Any Laravel filesystem driver (for example S3) can be configured in `config/filesystems.php`.
 
 ### Queues
 
@@ -455,7 +460,7 @@ Only `/app` (the WebSocket) needs to be public. The app sends its pushes to `127
 - [ ] Reverb supervised, and restarted on every deploy
 - [ ] A real mailer configured and tested
 - [ ] Roles & Permissions reviewed for your organisation
-- [ ] Database and `storage/app/public` backups scheduled
+- [ ] Database, `storage/app/private` (attachments) and `storage/app/public` (photos) backups scheduled
 
 There are no scheduled commands, so no cron entry for `schedule:run` is needed.
 
@@ -577,7 +582,8 @@ The suite (235+ tests) runs on in-memory SQLite with broadcasting set to `null`,
 | Symptom | Fix |
 | --- | --- |
 | Pages look unstyled, or a Vite manifest error | Run `npm run build`, or keep `npm run dev` running. |
-| Photos or attachments return 404 | Run `php artisan storage:link`. |
+| Profile photos return 404 | Run `php artisan storage:link`. |
+| An attachment returns 403 | The viewer can't see that task (by design). A 404 means the file is missing from `storage/app/private`. |
 | Notifications only appear after a delay or a refresh | Live push is off or unreachable. **Settings → Live Notifications** → *Test connection* and check "This browser". Make sure Reverb is running, `/app` is proxied, and on HTTPS the browser uses `wss` (`VITE_REVERB_SCHEME=https`, port 443). See the browser console and `storage/logs/laravel.log`. |
 | The browser can't connect but *Test connection* passes | The browser address is wrong or blocked: check `VITE_REVERB_*` (or the Settings browser address), the proxy, and `REVERB_ALLOWED_ORIGINS`. |
 | *Test connection* fails with an SSL error locally | Set `REVERB_TLS_CA` to your local CA (Valet / Herd). |

@@ -22,6 +22,8 @@ class TaskDetailTest extends TestCase
         parent::setUp();
 
         $this->seed(RoleAndAdminSeeder::class);
+        // Attachments are stored on the private "local" disk; fake both so nothing touches real storage.
+        Storage::fake('local');
         Storage::fake('public');
     }
 

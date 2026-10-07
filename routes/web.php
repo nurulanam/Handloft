@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\MailPreviewController;
 use App\Http\Controllers\ReportExportController;
 use Illuminate\Support\Facades\Auth;
@@ -31,6 +32,8 @@ Route::middleware('auth')->group(function () {
     Route::livewire('/users/create', 'users.form')->name('users.create');
     Route::livewire('/users/{user}/edit', 'users.form')->name('users.edit');
 
+    Route::get('/attachments/{kind}/{id}/{name?}', AttachmentController::class)
+        ->whereIn('kind', ['task', 'comment'])->whereNumber('id')->name('attachments.show');
     Route::get('/settings/mail-preview', MailPreviewController::class)->name('settings.mail-preview');
     Route::livewire('/projects', 'projects.index')->name('projects.index');
     Route::livewire('/projects/create', 'projects.form')->name('projects.create');

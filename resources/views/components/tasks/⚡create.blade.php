@@ -107,9 +107,18 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
         foreach ($this->attachments as $file) {
             $task->attachments()->create([
                 'uploaded_by' => auth()->id(),
-                'path' => $file->store('task-attachments', 'public'),
+                'path' => \App\Support\Attachments::store($file, 'task-attachments'),
                 'original_name' => $file->getClientOriginalName(),
                 'size' => $file->getSize(),
+            ]);
+        }
+
+        if ($count = count($this->attachments)) {
+            $task->activities()->create([
+                'causer_id' => auth()->id(),
+                'type' => \App\Enums\TaskActivityType::MetaUpdated,
+                'description' => ($count === 1 ? '1 attachment added' : "{$count} attachments added").' by '.auth()->user()->name,
+                'occurred_at' => now(),
             ]);
         }
 
