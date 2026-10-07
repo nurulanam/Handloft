@@ -4,7 +4,6 @@ use App\Mail\SmtpTestMail;
 use App\Models\AppSetting;
 use App\Notifications\MailTemplatePreview;
 use App\Support\MailSettings;
-use App\Support\Theme;
 use App\Support\WorkSchedule;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
@@ -18,10 +17,6 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
 {
     #[Url]
     public string $tab = 'appearance';
-
-    public string $ui_style = 'glass';
-
-    public string $theme = 'forest';
 
     /** @var array<int, string> Off weekdays as strings ("0" = Sunday … "6" = Saturday), for checkbox binding. */
     public array $off_days = [];
@@ -64,9 +59,23 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
 
     public string $template_preview_email = '';
 
+    /**
+     * Everyone can open Settings for the Look tab (their own, per-browser appearance); the other tabs
+     * are app-wide and for Super Admins (manage-settings) only. Their values are only loaded for them,
+     * so nothing like the SMTP setup ever reaches anyone else's browser.
+     */
+    public function canManage(): bool
+    {
+        return auth()->user()->can('manage-settings');
+    }
+
     public function mount(): void
     {
-        abort_unless(auth()->user()->can('manage-settings'), 403);
+        if (! $this->canManage()) {
+            $this->tab = 'appearance';
+
+            return;
+        }
 
         $settings = AppSetting::current();
 
@@ -92,41 +101,9 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
         $this->mail_footer_note = (string) $settings->mail_footer_note;
         $this->template_preview_email = auth()->user()->email;
 
-        $this->ui_style = $settings->ui_style ?: 'glass';
-        $this->theme = array_key_exists((string) $settings->theme, Theme::PRESETS) ? $settings->theme : 'forest';
         $this->off_days = array_map('strval', WorkSchedule::offDays());
         $this->week_starts_on = (string) WorkSchedule::weekStartsOn();
         $this->daily_hours_target = WorkSchedule::dailyTarget() !== null ? rtrim(rtrim(number_format(WorkSchedule::dailyTarget(), 2), '0'), '.') : '';
-    }
-
-    /**
-     * Picking a visual style or theme colour applies it straight away, for everyone; there is no
-     * separate save step, so what the page shows is always what every other page will show.
-     */
-    public function updatedUiStyle(): void
-    {
-        $this->saveAppearance();
-    }
-
-    public function updatedTheme(): void
-    {
-        $this->saveAppearance();
-    }
-
-    public function saveAppearance(): void
-    {
-        abort_unless(auth()->user()->can('manage-settings'), 403);
-
-        $data = $this->validate([
-            'ui_style' => ['required', Rule::in(['glass', 'static'])],
-            'theme' => ['required', Rule::in(array_keys(Theme::PRESETS))],
-        ]);
-
-        AppSetting::current()->update($data);
-
-        $theme = Theme::PRESETS[$data['theme']];
-        $this->dispatch('appearance-saved', look: ['brand' => $theme['brand'], 'accent' => $theme['accent'], 'static' => $data['ui_style'] === 'static']);
-        $this->dispatch('notify', message: 'Appearance saved for everyone.', type: 'success');
     }
 
     /**
@@ -331,17 +308,23 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
         'smtp' => ['Email / SMTP', 'SMTP', 'Server used to send email', '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>'],
         'mail-template' => ['Email Template', 'Template', 'Colors and footer of emails', '<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 11.994 2z"/>'],
     ];
+    $canManage = $this->canManage();
+    $activeTab = $canManage ? $tab : 'appearance';
+    if (! $canManage) {
+        $tabs = array_intersect_key($tabs, ['appearance' => true]);
+    }
     $sendIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></svg>';
 @endphp
 
 <div class="space-y-4 sm:space-y-6">
     <div>
         <h1 class="text-xl font-semibold text-zinc-900 sm:text-2xl">Settings</h1>
-        <p class="hidden text-sm text-zinc-500 sm:block">Manage how {{ config('app.name') }} greets people and sends email.</p>
+        <p class="hidden text-sm text-zinc-500 sm:block">{{ $canManage ? 'Your own look, plus how '.config('app.name').' works and sends email for everyone.' : 'How '.config('app.name').' looks for you, in this browser.' }}</p>
     </div>
 
     <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-8">
-        {{-- Section nav: a 3-up icon tab bar on phones, a described side menu from lg up. --}}
+        {{-- Section nav (Super Admins, who see every tab): an icon tab bar on phones, a described side menu from lg up. --}}
+        @if (count($tabs) > 1)
         <nav class="grid shrink-0 grid-cols-5 gap-1 rounded-xl border border-zinc-200 bg-surface p-1 lg:sticky lg:top-20 lg:flex lg:w-64 lg:flex-col lg:gap-1 lg:p-2" aria-label="Settings sections">
             @foreach ($tabs as $key => [$name, $short, $hint, $icon])
                 <button
@@ -349,41 +332,40 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                     wire:click="$set('tab', '{{ $key }}')"
                     @class([
                         'flex flex-col items-center gap-1 rounded-lg px-2 py-2 text-xs font-medium transition-colors lg:flex-row lg:items-center lg:gap-3 lg:px-3 lg:py-2.5 lg:text-left',
-                        'bg-brand text-white shadow-sm lg:bg-brand/10 lg:text-brand lg:shadow-none' => $tab === $key,
-                        'text-zinc-600 hover:bg-zinc-100' => $tab !== $key,
+                        'bg-brand text-white shadow-sm lg:bg-brand/10 lg:text-brand lg:shadow-none' => $activeTab === $key,
+                        'text-zinc-600 hover:bg-zinc-100' => $activeTab !== $key,
                     ])
-                    @if ($tab === $key) aria-current="page" @endif
+                    @if ($activeTab === $key) aria-current="page" @endif
                 >
                     <span @class([
                         'flex size-5 shrink-0 items-center justify-center lg:size-9 lg:rounded-lg',
-                        'lg:bg-brand lg:text-white' => $tab === $key,
-                        'lg:bg-zinc-100 lg:text-zinc-500' => $tab !== $key,
+                        'lg:bg-brand lg:text-white' => $activeTab === $key,
+                        'lg:bg-zinc-100 lg:text-zinc-500' => $activeTab !== $key,
                     ])>
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4.5">{!! $icon !!}</svg>
                     </span>
                     <span class="min-w-0">
                         <span class="lg:hidden">{{ $short }}</span>
                         <span class="hidden text-sm font-semibold lg:block">{{ $name }}</span>
-                        <span class="hidden text-xs font-normal lg:block {{ $tab === $key ? 'text-brand/70' : 'text-zinc-400' }}">{{ $hint }}</span>
+                        <span class="hidden text-xs font-normal lg:block {{ $activeTab === $key ? 'text-brand/70' : 'text-zinc-400' }}">{{ $hint }}</span>
                     </span>
                 </button>
             @endforeach
         </nav>
+        @endif
 
         <div class="min-w-0 flex-1 space-y-4 sm:space-y-6">
-            @if ($tab === 'appearance')
-                <form
-                    wire:submit="saveAppearance"
+            @if ($activeTab === 'appearance')
+                {{-- Per person, per browser: kept in localStorage by window.appearance (layouts/partials/appearance),
+                     applied the moment it's picked; nothing is sent to the server. --}}
+                <div
                     class="overflow-hidden rounded-xl border border-zinc-200 bg-surface"
-                    x-data="{ presets: @js(\App\Support\Theme::PRESETS) }"
-                    x-effect="
-                        const t = presets[$wire.theme] ?? presets.forest;
-                        applyAppearance({ brand: t.brand, accent: t.accent, static: $wire.ui_style === 'static' });
-                    "
+                    x-data="{ look: appearance.get() }"
+                    @appearance-changed.window="look = $event.detail"
                 >
                     <div class="border-b border-zinc-100 px-4 py-4 sm:px-6">
                         <h2 class="text-base font-semibold text-zinc-900">Appearance</h2>
-                        <p class="text-sm text-zinc-500">Changes apply instantly, for everyone.</p>
+                        <p class="text-sm text-zinc-500">Applies instantly and is saved in this browser only, so it doesn't change how {{ config('app.name') }} looks for anyone else.</p>
                     </div>
 
                     <div class="space-y-6 px-4 py-5 sm:px-6">
@@ -395,7 +377,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                                     'static' => ['Static', 'Solid panels, no blur or moving colour. Calmer and lighter on older devices.'],
                                 ] as $key => [$styleName, $styleHint])
                                     <label class="group relative cursor-pointer">
-                                        <input type="radio" wire:model.live="ui_style" value="{{ $key }}" class="peer sr-only">
+                                        <input type="radio" name="look-style" value="{{ $key }}" :checked="look.style === '{{ $key }}'" @change="appearance.set('style', '{{ $key }}')" class="peer sr-only">
                                         <span class="block rounded-2xl border-2 border-zinc-200 p-3 transition peer-checked:border-brand peer-focus-visible:ring-2 peer-focus-visible:ring-brand-lime/50">
                                             {{-- Mini preview --}}
                                             <span class="style-demo relative block h-24 overflow-hidden rounded-xl {{ $key === 'glass' ? 'bg-brand' : 'bg-zinc-100' }}">
@@ -428,7 +410,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                             <div class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
                                 @foreach (\App\Support\Theme::PRESETS as $key => $preset)
                                     <label class="group cursor-pointer">
-                                        <input type="radio" wire:model.live="theme" value="{{ $key }}" class="peer sr-only">
+                                        <input type="radio" name="look-theme" value="{{ $key }}" :checked="look.theme === '{{ $key }}'" @change="appearance.set('theme', '{{ $key }}')" class="peer sr-only">
                                         <span class="flex items-center gap-3 rounded-2xl border-2 border-zinc-200 p-3 transition peer-checked:border-[var(--swatch)] peer-focus-visible:ring-2 peer-focus-visible:ring-brand-lime/50" style="--swatch: {{ $preset['brand'] }}">
                                             <span class="relative size-10 shrink-0 rounded-xl" style="background-color: {{ $preset['brand'] }}">
                                                 <span class="absolute -bottom-1 -right-1 size-4 rounded-full ring-2 ring-surface" style="background-color: {{ $preset['accent'] }}"></span>
@@ -443,10 +425,29 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                                 @endforeach
                             </div>
                         </div>
-                    </div>
 
-                </form>
-            @elseif ($tab === 'schedule')
+                        <div>
+                            <p class="text-sm font-semibold text-zinc-900">Mode</p>
+                            <p class="text-xs text-zinc-500">System follows your device's light or dark setting.</p>
+                            <div class="mt-3 grid grid-cols-3 gap-3">
+                                @foreach ([
+                                    'light' => ['Light', '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>'],
+                                    'dark' => ['Dark', '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>'],
+                                    'system' => ['System', '<rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>'],
+                                ] as $key => [$modeName, $modeIcon])
+                                    <label class="group cursor-pointer">
+                                        <input type="radio" name="look-mode" value="{{ $key }}" :checked="look.mode === '{{ $key }}'" @change="appearance.set('mode', '{{ $key }}')" class="peer sr-only">
+                                        <span class="flex flex-col items-center gap-2 rounded-2xl border-2 border-zinc-200 px-3 py-4 text-sm font-semibold text-zinc-700 transition peer-checked:border-brand peer-checked:text-brand peer-focus-visible:ring-2 peer-focus-visible:ring-brand-lime/50">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5">{!! $modeIcon !!}</svg>
+                                            {{ $modeName }}
+                                        </span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @elseif ($activeTab === 'schedule')
                 @php
                     $offSelected = collect($off_days)->map(fn ($d) => (int) $d);
                     $workingPerWeek = 7 - $offSelected->unique()->count();
@@ -532,7 +533,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                         <button type="submit" class="{{ $primary }}" wire:loading.attr="disabled" wire:target="saveSchedule">Save work schedule</button>
                     </div>
                 </form>
-            @elseif ($tab === 'loading-screen')
+            @elseif ($activeTab === 'loading-screen')
                 <form wire:submit="saveLoadingScreen" x-data class="overflow-hidden rounded-xl border border-zinc-200 bg-surface">
                     <div class="flex items-start justify-between gap-4 border-b border-zinc-100 px-4 py-4 sm:px-6">
                         <div>
@@ -648,7 +649,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                         <button type="submit" class="{{ $primary }}" wire:loading.attr="disabled" wire:target="saveLoadingScreen">Save changes</button>
                     </div>
                 </form>
-            @elseif ($tab === 'smtp')
+            @elseif ($activeTab === 'smtp')
                 <form wire:submit="saveSmtp" x-data="{ reveal: false }" class="overflow-hidden rounded-xl border border-zinc-200 bg-surface">
                     <div class="flex items-start justify-between gap-4 border-b border-zinc-100 px-4 py-4 sm:px-6">
                         <div>
@@ -765,7 +766,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                         </button>
                     </div>
                 </div>
-            @elseif ($tab === 'mail-template')
+            @elseif ($activeTab === 'mail-template')
                 <div class="grid gap-4 sm:gap-6 xl:grid-cols-2 xl:items-start">
                     <form wire:submit="saveMailTemplate" class="overflow-hidden rounded-xl border border-zinc-200 bg-surface">
                         <div class="border-b border-zinc-100 px-4 py-4 sm:px-6">

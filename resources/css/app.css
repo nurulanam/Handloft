@@ -7,9 +7,9 @@
    per person from the account menu and kept in localStorage). */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* glass: styles that apply only in the Liquid glass appearance (body without .ui-static), e.g.
-   lg:glass:bg-surface/60. Toggling .ui-static on <body> (the Settings preview) switches them live. */
-@custom-variant glass (body:not(.ui-static) &);
+/* glass: styles that apply only in the Liquid glass appearance (<html> without .ui-static), e.g.
+   lg:glass:bg-surface/60. The class is toggled per browser from Settings → Look, so they switch live. */
+@custom-variant glass (:root:not(.ui-static) &);
 
 [x-cloak] {
     display: none !important;
@@ -241,7 +241,7 @@
     --color-taupe-950: oklch(98.6% 0.002 67.8);
 }
 
-/* The theme colour (set on <body> per theme) is lifted in dark mode, so text-brand and the active
+/* The theme colour (set on <html> per browser) is lifted in dark mode, so text-brand and the active
    menu pill stay readable on near-black. */
 body {
     --color-brand: var(--brand-base, #10512a);
@@ -497,7 +497,7 @@ body {
     --glass-rim-strong: rgb(255 255 255 / 0.07);
 }
 
-body:not(.ui-static) .app-main :is(.rounded-xl, .rounded-2xl, .rounded-3xl).border-zinc-200.bg-surface:not(input, select, textarea, button, .style-demo *) {
+:root:not(.ui-static) .app-main :is(.rounded-xl, .rounded-2xl, .rounded-3xl).border-zinc-200.bg-surface:not(input, select, textarea, button, .style-demo *) {
     background-color: color-mix(in oklab, var(--color-surface) 60%, transparent);
     -webkit-backdrop-filter: blur(18px) saturate(1.6);
     backdrop-filter: blur(18px) saturate(1.6);
@@ -505,25 +505,25 @@ body:not(.ui-static) .app-main :is(.rounded-xl, .rounded-2xl, .rounded-3xl).bord
 }
 
 @layer utilities {
-    body:not(.ui-static) .app-main :is(.rounded-xl, .rounded-2xl, .rounded-3xl).border-zinc-200.bg-surface:not(input, select, textarea, button, .style-demo *) {
+    :root:not(.ui-static) .app-main :is(.rounded-xl, .rounded-2xl, .rounded-3xl).border-zinc-200.bg-surface:not(input, select, textarea, button, .style-demo *) {
         border-color: var(--glass-edge);
     }
 }
 
 /* Table headers and footers inside frosted cards stay tinted but let the glass through. */
-body:not(.ui-static) .app-main :is(.rounded-xl, .rounded-2xl, .rounded-3xl).border-zinc-200.bg-surface .bg-zinc-50:not(.style-demo *) {
+:root:not(.ui-static) .app-main :is(.rounded-xl, .rounded-2xl, .rounded-3xl).border-zinc-200.bg-surface .bg-zinc-50:not(.style-demo *) {
     background-color: color-mix(in oklab, var(--color-zinc-100) 45%, transparent);
 }
 
 /* The top bar's frosting is painted by a pseudo-element rather than the header itself: an element
    with backdrop-filter becomes the backdrop for everything inside it, so the account menu and the
    notifications panel (which open from the header) could otherwise only blur the bar, not the page. */
-body:not(.ui-static) .app-header {
+:root:not(.ui-static) .app-header {
     background-color: transparent;
     border-color: var(--glass-edge);
 }
 
-body:not(.ui-static) .app-header::before {
+:root:not(.ui-static) .app-header::before {
     content: '';
     position: absolute;
     inset: 0;
@@ -538,7 +538,7 @@ body:not(.ui-static) .app-header::before {
    plus a bright inner edge where the glass catches the light. Painted on the aside's own background,
    so it stays put while the menu scrolls. */
 @media (min-width: 1024px) {
-    body:not(.ui-static) .sidebar-notch {
+    :root:not(.ui-static) .sidebar-notch {
         background-image:
             radial-gradient(70% 38% at 15% 6%, color-mix(in oklab, var(--color-brand-lime) 26%, transparent), transparent 70%),
             radial-gradient(80% 34% at 85% 96%, color-mix(in oklab, var(--color-brand) 14%, transparent), transparent 70%),
@@ -557,7 +557,7 @@ body:not(.ui-static) .app-header::before {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    body:not(.ui-static) .sidebar-notch { animation: none; }
+    :root:not(.ui-static) .sidebar-notch { animation: none; }
 }
 
 .ui-static .glass-ambient {

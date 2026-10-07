@@ -131,14 +131,21 @@ class SettingsTest extends TestCase
         $this->assertSame('jampe', $settings->loading_screen_style);
     }
 
-    public function test_team_member_cannot_access_settings(): void
+    public function test_team_member_gets_only_the_look_tab_and_none_of_the_app_settings(): void
     {
+        AppSetting::current()->update(['mail_host' => 'smtp.secret-host.test']);
+
         $teamMember = User::factory()->create(['status' => 'active']);
         $teamMember->assignRole(Role::TeamMember->value);
 
         $this->actingAs($teamMember)
             ->get(route('settings'))
-            ->assertForbidden();
+            ->assertOk()
+            ->assertSee('Visual style')
+            ->assertDontSee('Loading Screen')
+            ->assertDontSee('smtp.secret-host.test');
+
+        Livewire::actingAs($teamMember)->test('settings')->call('saveSmtp')->assertForbidden();
     }
 
     public function test_login_flashes_loading_screen_data_when_enabled(): void

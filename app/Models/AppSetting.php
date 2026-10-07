@@ -29,8 +29,6 @@ use Illuminate\Database\Eloquent\Model;
     'off_days',
     'week_starts_on',
     'daily_hours_target',
-    'ui_style',
-    'theme',
 ])]
 class AppSetting extends Model
 {
@@ -65,8 +63,6 @@ class AppSetting extends Model
             'off_days' => [0, 6],
             'week_starts_on' => 1,
             'daily_hours_target' => 8,
-            'ui_style' => 'glass',
-            'theme' => 'forest',
         ]);
     }
 

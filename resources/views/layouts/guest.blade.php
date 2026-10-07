@@ -10,20 +10,12 @@
         <link rel="icon" href="/logo.svg" type="image/svg+xml">
         <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
-        {{-- Light/dark mode before the first paint (the choice is made from the account menu once signed in). --}}
-        <script>
-            (() => {
-                let mode = 'system';
-                try { mode = localStorage.getItem('colorMode') || 'system'; } catch {}
-                document.documentElement.classList.toggle('dark', mode === 'dark' || (mode === 'system' && matchMedia('(prefers-color-scheme: dark)').matches));
-            })();
-        </script>
+        @include('layouts.partials.appearance')
         @vite(['resources/css/app.css', 'resources/js/app.js'])
 
         @livewireStyles
-        {!! \App\Support\Theme::styleTag() !!}
     </head>
-    <body class="min-h-screen bg-surface font-sans antialiased{{ \App\Support\Theme::isStatic() ? ' ui-static' : '' }}">
+    <body class="min-h-screen bg-surface font-sans antialiased">
         <div class="flex min-h-screen">
             {{-- Brand panel — hidden below lg so the form is never squeezed
                  on a phone or tablet; the small inline logo in the form

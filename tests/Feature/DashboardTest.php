@@ -101,12 +101,15 @@ class DashboardTest extends TestCase
             ->assertViewHas('contributors', fn ($rows) => $rows->first()['user']->is($karim) && $rows->first()['hours'] === 3.0);
     }
 
-    public function test_the_sidebar_drops_the_manage_section_for_a_team_member(): void
+    public function test_a_team_members_manage_section_holds_only_settings(): void
     {
+        // Settings is open to everyone (for their own look), so Manage stays, without Team.
         $this->actingAs($this->member('Karim Hasan'))->get(route('dashboard'))
             ->assertSee('Workspace')
             ->assertSee('Insights')
-            ->assertDontSee('>Manage<', false);
+            ->assertSee('>Manage<', false)
+            ->assertSee(route('settings'), false)
+            ->assertDontSee(route('users.index'), false);
 
         $admin = User::role(Role::SuperAdmin->value)->firstOrFail();
         $this->actingAs($admin)->get(route('dashboard'))->assertSee('>Manage<', false);

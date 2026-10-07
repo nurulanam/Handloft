@@ -8,27 +8,7 @@
 
         <title>{{ $title ?? config('app.name') }}</title>
 
-        {{-- Runs before the first paint: light/dark mode (per person, from localStorage; "system" follows
-             the OS and keeps following it) and the collapsed desktop sidebar, so neither flickers in.
-             wire:navigate copies the new page's <html> attributes over the current ones, which would drop
-             these classes, so they're re-applied in the same frame as every page swap (link clicks and
-             back/forward alike), before anything is painted. --}}
-        <script>
-            (() => {
-                const root = document.documentElement;
-                const read = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
-                const system = matchMedia('(prefers-color-scheme: dark)');
-                window.applyColorMode = (mode = read('colorMode') || 'system') => root.classList.toggle('dark', mode === 'dark' || (mode === 'system' && system.matches));
-                const applyRootClasses = () => {
-                    window.applyColorMode();
-                    root.classList.toggle('sidebar-collapsed', read('sidebarCollapsed') === 'true');
-                };
-                applyRootClasses();
-                system.addEventListener('change', () => window.applyColorMode());
-                document.addEventListener('livewire:navigating', (e) => e.detail?.onSwap?.(applyRootClasses));
-                document.addEventListener('livewire:navigated', applyRootClasses);
-            })();
-        </script>
+        @include('layouts.partials.appearance')
 
         <link rel="icon" href="/favicon.ico" sizes="any">
         <link rel="icon" href="/logo.svg" type="image/svg+xml">
@@ -37,19 +17,6 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
 
         @livewireStyles
-
-        {{-- Theme colours are set on <body> (see Theme::bodyStyle), which wire:navigate replaces on every
-             page change. A page restored from the back/forward cache still carries the colours it was
-             rendered with, so the latest saved appearance is re-applied after each navigation. --}}
-        <script>
-            window.applyAppearance = (look) => {
-                document.body.style.setProperty('--brand-base', look.brand);
-                document.body.style.setProperty('--brand-accent', look.accent);
-                document.body.classList.toggle('ui-static', look.static);
-            };
-            window.addEventListener('appearance-saved', (e) => (window.savedAppearance = e.detail.look));
-            document.addEventListener('livewire:navigated', () => window.savedAppearance && window.applyAppearance(window.savedAppearance));
-        </script>
 
         {{-- Carves a notch into the sidebar's right edge around the collapse
              toggle, with rounded (filleted) shoulders so the edge flows into
@@ -477,8 +444,7 @@
         </style>
     </head>
     <body
-        class="min-h-screen bg-zinc-50 font-sans antialiased{{ \App\Support\Theme::isStatic() ? ' ui-static' : '' }}"
-        style="{{ \App\Support\Theme::bodyStyle() }}"
+        class="min-h-screen bg-zinc-50 font-sans antialiased"
         x-data="{
             sidebarOpen: false,
             drag: null,
@@ -599,7 +565,7 @@
                             ]],
                             ['heading' => 'Manage', 'items' => [
                                 ['label' => 'Team', 'route' => 'users.index', 'icon' => 'team', 'hidden' => auth()->user()->cannot('manage-users')],
-                                ['label' => 'Settings', 'route' => 'settings', 'icon' => 'settings', 'hidden' => auth()->user()->cannot('manage-settings')],
+                                ['label' => 'Settings', 'route' => 'settings', 'icon' => 'settings'],
                             ]],
                         ];
 
@@ -756,8 +722,8 @@
                  Placed before the drawer overlay (same z-index) so an open
                  drawer dims it like the rest of the page. --}}
             {{-- Shortcuts are the pages people reach for on a phone: home,
-                 what's waiting on them, all tasks, and the short list they're
-                 tracking. Calendar stays in the drawer — its month grid doesn't
+                 what's waiting on them, all tasks, the short list they're
+                 tracking, and Settings (everyone can set their own look). Calendar stays in the drawer — its month grid doesn't
                  fit a phone, and it's an occasional glance, not a daily one. --}}
             @php
                 $mobileNav = collect([
@@ -765,6 +731,7 @@
                     ['label' => 'For You', 'route' => 'for-you', 'icon' => 'for-you'],
                     ['label' => 'Tasks', 'route' => 'tasks.index', 'icon' => 'tasks'],
                     ['label' => 'Starred', 'route' => 'starred', 'icon' => 'starred'],
+                    ['label' => 'Settings', 'route' => 'settings', 'icon' => 'settings'],
                 ])->map(fn ($item) => $item + ['path' => parse_url(route($item['route']), PHP_URL_PATH)]);
             @endphp
             @persist('mobile-shortcuts')
@@ -949,9 +916,10 @@
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
                                     My profile
                                 </a>
-                                {{-- Light / Dark / System, per person on this device. --}}
+                                {{-- Light / Dark / System, per person on this browser (also in Settings → Look). --}}
                                 <div
-                                    x-data="{ mode: (() => { try { return localStorage.getItem('colorMode') || 'system'; } catch { return 'system'; } })() }"
+                                    x-data="{ mode: appearance.get().mode }"
+                                    @appearance-changed.window="mode = $event.detail.mode"
                                     class="mx-1 my-1.5 grid grid-cols-3 gap-0.5 rounded-xl bg-zinc-900/10 p-0.5 shadow-inner shadow-zinc-900/5 ring-1 ring-inset ring-zinc-900/10 backdrop-blur-md"
                                     role="radiogroup"
                                     aria-label="Colour mode"
@@ -965,7 +933,7 @@
                                             type="button"
                                             role="radio"
                                             :aria-checked="mode === '{{ $modeKey }}'"
-                                            @click="mode = '{{ $modeKey }}'; try { localStorage.setItem('colorMode', mode); } catch {} applyColorMode(mode)"
+                                            @click="appearance.set('mode', '{{ $modeKey }}')"
                                             class="flex items-center justify-center gap-1 rounded-[0.6rem] px-2 py-1.5 text-xs font-medium transition-colors"
                                             :class="mode === '{{ $modeKey }}' ? 'bg-surface text-zinc-900 shadow-sm ring-1 ring-zinc-900/10' : 'text-zinc-600 hover:bg-surface/50 hover:text-zinc-900'"
                                         >

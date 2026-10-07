@@ -113,46 +113,44 @@ class WorkScheduleAndAppearanceTest extends TestCase
         $this->assertSame(19, $person['targetRate']);
     }
 
-    public function test_appearance_is_saved_and_applied_to_every_page(): void
+    public function test_the_look_is_kept_per_browser_with_glass_forest_and_system_as_the_defaults(): void
     {
-        $admin = $this->admin();
-
-        Livewire::actingAs($admin)->test('settings')
-            ->set('ui_style', 'static')
-            ->set('theme', 'ocean')
-            ->call('saveAppearance')
-            ->assertHasNoErrors()
-            ->assertDispatched('appearance-saved', look: ['brand' => '#0b4f6c', 'accent' => '#5eead4', 'static' => true])
-            ->assertDispatched('notify', message: 'Appearance saved for everyone.', type: 'success');
-
-        // On <body>, so wire:navigate (which swaps the body) carries the new theme to the next page.
-        $this->actingAs($admin)->get(route('dashboard'))
-            ->assertSee('style="--brand-base: #0b4f6c; --brand-accent: #5eead4;"', false)
-            ->assertSee('ui-static', false);
-
-        Livewire::actingAs($admin)->test('settings')->set('theme', 'neon')->call('saveAppearance')->assertHasErrors(['theme']);
-    }
-
-    public function test_picking_a_style_or_theme_applies_it_without_a_save_step(): void
-    {
-        $admin = $this->admin();
-
-        Livewire::actingAs($admin)->test('settings')
-            ->set('theme', 'plum')
-            ->assertDispatched('appearance-saved', look: ['brand' => '#6b21a8', 'accent' => '#f0abfc', 'static' => false]);
-
-        $this->assertSame('plum', AppSetting::current()->theme);
-
-        Livewire::actingAs($admin)->test('settings')->set('ui_style', 'static');
-
-        $this->assertSame('static', AppSetting::current()->ui_style);
-    }
-
-    public function test_the_default_theme_renders_the_forest_colours(): void
-    {
+        // Nothing about the look is rendered from the server: the page carries the presets and the
+        // defaults, and the browser applies the person's own choice from localStorage.
         $this->actingAs($this->admin())->get(route('dashboard'))
-            ->assertSee('style="--brand-base: #10512a; --brand-accent: #bfef1e;"', false)
-            ->assertDontSee(' ui-static', false);
+            ->assertSee('window.appearance', false)
+            ->assertSee('localStorage.getItem(key)', false)
+            ->assertSee("presets[theme] ? theme : 'forest'", false)
+            ->assertSee("read('appearance.style') === 'static' ? 'static' : 'glass'", false)
+            ->assertSee("mode === 'light' || mode === 'dark' ? mode : 'system'", false)
+            ->assertDontSee('--brand-base: #', false)
+            ->assertDontSee(' ui-static"', false);
+    }
+
+    public function test_everyone_can_open_settings_but_only_super_admins_get_the_app_wide_tabs(): void
+    {
+        $member = User::factory()->create(['status' => 'active']);
+        $member->assignRole(Role::TeamMember->value);
+
+        $this->actingAs($member)->get(route('settings'))
+            ->assertOk()
+            ->assertSee('Visual style')
+            ->assertSee('Theme colour')
+            ->assertSee('saved in this browser only')
+            ->assertDontSee('Work Schedule')
+            ->assertDontSee('Email / SMTP');
+
+        // Asking for another tab still shows only the Look tab, and app-wide saves stay forbidden.
+        Livewire::actingAs($member)->test('settings')
+            ->set('tab', 'smtp')
+            ->assertDontSee('Save SMTP settings')
+            ->assertSee('Visual style');
+
+        Livewire::actingAs($member)->test('settings')->call('saveSchedule')->assertForbidden();
+
+        $this->actingAs($this->admin())->get(route('settings'))
+            ->assertSee('Work Schedule')
+            ->assertSee('Email / SMTP');
     }
 
     public function test_every_page_offers_light_dark_and_system_modes_but_the_print_report_stays_light(): void

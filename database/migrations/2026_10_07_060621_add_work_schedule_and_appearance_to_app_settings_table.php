@@ -16,10 +16,6 @@ return new class extends Migration
             $table->json('off_days')->nullable();
             $table->unsignedTinyInteger('week_starts_on')->default(1);
             $table->decimal('daily_hours_target', 4, 2)->nullable()->default(8);
-
-            // Appearance.
-            $table->string('ui_style')->default('glass');
-            $table->string('theme')->default('forest');
         });
     }
 
@@ -29,7 +25,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('app_settings', function (Blueprint $table) {
-            $table->dropColumn(['off_days', 'week_starts_on', 'daily_hours_target', 'ui_style', 'theme']);
+            $table->dropColumn(['off_days', 'week_starts_on', 'daily_hours_target']);
         });
     }
 };

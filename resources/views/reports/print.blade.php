@@ -12,7 +12,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $heading }} · {{ $period->label() }}</title>
     <link rel="icon" href="/favicon.ico" sizes="any">
-    {!! \App\Support\Theme::styleTag() !!}
+    @include('layouts.partials.appearance', ['themeOnly' => true])
     <style>
         @page { size: A4 {{ $landscape ? 'landscape' : 'portrait' }}; margin: {{ $landscape ? '10mm' : '14mm 12mm' }}; }
         * { box-sizing: border-box; }
