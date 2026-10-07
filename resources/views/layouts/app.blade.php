@@ -550,7 +550,7 @@
                             ]],
                             ['heading' => 'Insights', 'items' => [
                                 ['label' => 'Work History', 'route' => 'work-history.index', 'icon' => 'work-history'],
-                                ['label' => 'Reports', 'icon' => 'reports', 'disabled' => true],
+                                ['label' => 'Reports', 'route' => 'reports.index', 'icon' => 'reports', 'hidden' => auth()->user()->cannot('view-reports')],
                             ]],
                             ['heading' => 'Manage', 'items' => [
                                 ['label' => 'Team', 'route' => 'users.index', 'icon' => 'team', 'hidden' => auth()->user()->cannot('manage-users')],

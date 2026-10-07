@@ -54,6 +54,8 @@ class RoleAndAdminSeeder extends Seeder
             'manage-projects',
             'view-own-work-history',
             'view-all-work-history',
+            'view-reports',
+            'export-data',
         ]);
 
         $teamMember = Role::findOrCreate(RoleEnum::TeamMember->value);

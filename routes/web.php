@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ReportExportController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -45,6 +46,10 @@ Route::middleware('auth')->group(function () {
     Route::livewire('/settings', 'settings')->name('settings');
 
     Route::livewire('/profile', 'profile')->name('profile');
+
+    Route::livewire('/reports', 'reports.index')->name('reports.index');
+    Route::get('/reports/print', [ReportExportController::class, 'print'])->name('reports.print');
+    Route::get('/reports/export/{section}/{format}', [ReportExportController::class, 'export'])->name('reports.export');
 });
 
 // Unknown URLs land here instead of 404ing before the middleware runs, so the
