@@ -208,7 +208,7 @@ Then:
 
 1. **Change the password** under the avatar menu → **My profile** → *Change password*.
 2. **Add your team** under **Manage → Team → Add member**. There's no public sign-up.
-3. **Review Settings:** Work Schedule, Roles & Permissions, Live Notifications (press *Test connection*), and **Email / SMTP** (send a test).
+3. **Review Settings:** Work Schedule, Roles & Permissions, Notifications (press *Test connection*), and **Email / SMTP** (send a test).
 4. **Create a project**, add tasks, and start handing work off.
 
 > ⚠️ **Change or remove the default account before deploying.** Its credentials are public in this repository.
@@ -222,7 +222,7 @@ Infrastructure comes from `.env`. Business settings are edited in the app under 
 | **Look** | Everyone | Each person's browser (`localStorage`) | Liquid glass / Static, theme colour, light / dark / system. Defaults: Liquid glass, Forest, System. |
 | **Work Schedule** | Super Admin | Database | Days off, first day of the week, daily hours target. Drives reports, the calendar, the dashboard and "this week". |
 | **Roles & Permissions** | Super Admin | Database (Spatie) | See [Roles and permissions](#roles-and-permissions). |
-| **Live Notifications** | Super Admin | Database (secret encrypted) | See [Live notifications](#live-notifications-reverb). |
+| **Notifications** | Super Admin | Database (Reverb secret encrypted) | In-app notifications on/off, notification emails on/off, and the live push. See [Notifications](#live-notifications-reverb). |
 | **Loading Screen** | Super Admin | Database | Shown once after sign-in: Jumping Boxes, Equalizer, Handoff or Spinner, drawn in each viewer's theme colours, with duration, transparency and blur. |
 | **Email / SMTP** | Super Admin | Database (password encrypted) | Overrides `.env` mail settings when set. |
 | **Email Template** | Super Admin | Database | Layout (Modern, Classic, Minimal), brand and button colours with readable presets, footer note, and a live preview. See [Email templates](#email-templates). |
@@ -275,6 +275,17 @@ Both use the database by default (`SESSION_DRIVER=database`, `CACHE_STORE=databa
 
 Each notification is written to the database, pushed to the recipient's private channel `App.Models.User.{id}`, then emailed.
 
+### Turning channels on or off
+
+**Settings → Notifications** has two independent switches, both on by default (`App\Support\NotificationChannels`):
+
+| Switch | When on | When off |
+| --- | --- | --- |
+| **In-app notifications** | The bell, the Notifications page and the live push | Nothing is stored or pushed |
+| **Notification emails** | One email per notification | No notification emails; in-app notifications are still created |
+
+With both off, no notifications are sent. Emails people request themselves (password reset, the test emails in Settings) aren't notifications and are always sent.
+
 - **No worker needed.** The push is synchronous.
 - **Failures never block.** If Reverb is down, the failure is logged and the database record and email still go out (`App\Notifications\Channels\SafeBroadcastChannel`).
 - **Fallback.** While live push is off or the socket is down, the bell checks for new notifications every 15 s – 2 min (configurable), in visible tabs only. After a reconnect it catches up once.
@@ -282,7 +293,7 @@ Each notification is written to the database, pushed to the recipient's private 
 ### Two places to configure it
 
 1. **`.env`** is the default (below).
-2. **Settings → Live Notifications** can switch live push on or off, set the fallback interval, and override the Reverb app and addresses. The secret is stored encrypted and never sent to the browser. *Test connection* checks the server with a 5-second timeout without saving anything, and the page shows whether the current browser is connected. With nothing saved there, `.env` decides: live push is on when `BROADCAST_CONNECTION=reverb`.
+2. **Settings → Notifications** can switch live push on or off, set the fallback interval, and override the Reverb app and addresses. The secret is stored encrypted and never sent to the browser. *Test connection* checks the server with a 5-second timeout without saving anything, and the page shows whether the current browser is connected. With nothing saved there, `.env` decides: live push is on when `BROADCAST_CONNECTION=reverb`.
 
 Browsers get their connection details from the page at runtime (`App\Support\LiveUpdates::clientConfig()`), so changing them needs **no asset rebuild**. Despite the `VITE_` prefix, those values are no longer compiled into the bundle.
 
@@ -393,7 +404,7 @@ REVERB_TLS_KEY=
 REVERB_TLS_CA=
 ```
 
-The same values can instead be entered in **Settings → Live Notifications → Custom** after the first deploy.
+The same values can instead be entered in **Settings → Notifications → Custom** after the first deploy.
 
 ### 3. Release steps
 
@@ -448,7 +459,7 @@ Only `/app` (the WebSocket) needs to be public. The app sends its pushes to `127
 
 ### 6. Verify
 
-1. Sign in as a Super Admin → **Settings → Live Notifications** → *Test connection* should report "Reverb answered in … ms", and the page should say **This browser: connected**.
+1. Sign in as a Super Admin → **Settings → Notifications** → *Test connection* should report "Reverb answered in … ms", and the page should say **This browser: connected**.
 2. Assign a task to a second account in another browser. The bell should update without a refresh.
 3. **Email / SMTP** → *Send test*.
 
@@ -584,11 +595,11 @@ The suite (235+ tests) runs on in-memory SQLite with broadcasting set to `null`,
 | Pages look unstyled, or a Vite manifest error | Run `npm run build`, or keep `npm run dev` running. |
 | Profile photos return 404 | Run `php artisan storage:link`. |
 | An attachment returns 403 | The viewer can't see that task (by design). A 404 means the file is missing from `storage/app/private`. |
-| Notifications only appear after a delay or a refresh | Live push is off or unreachable. **Settings → Live Notifications** → *Test connection* and check "This browser". Make sure Reverb is running, `/app` is proxied, and on HTTPS the browser uses `wss` (`VITE_REVERB_SCHEME=https`, port 443). See the browser console and `storage/logs/laravel.log`. |
+| Notifications only appear after a delay or a refresh | Live push is off or unreachable. **Settings → Notifications** → *Test connection* and check "This browser". Make sure Reverb is running, `/app` is proxied, and on HTTPS the browser uses `wss` (`VITE_REVERB_SCHEME=https`, port 443). See the browser console and `storage/logs/laravel.log`. |
 | The browser can't connect but *Test connection* passes | The browser address is wrong or blocked: check `VITE_REVERB_*` (or the Settings browser address), the proxy, and `REVERB_ALLOWED_ORIGINS`. |
 | *Test connection* fails with an SSL error locally | Set `REVERB_TLS_CA` to your local CA (Valet / Herd). |
 | New Reverb credentials don't work | Restart Reverb: it reads credentials at start. |
-| Emails aren't sent | Check `MAIL_MAILER` (`log` writes to the log file) or **Settings → Email / SMTP** → *Send test*. |
+| Emails aren't sent | Check that **Settings → Notifications → Notification emails** is on, then `MAIL_MAILER` (`log` writes to the log file) or **Settings → Email / SMTP** → *Send test*. |
 | A saved SMTP password or Reverb secret stopped working | `APP_KEY` changed. Re-enter it in Settings. |
 | "This page has expired" (419) | The session expired. Sign in again, or raise `SESSION_LIFETIME`. |
 | A permission change doesn't apply | Saved from Settings, it applies immediately. After manual changes, run `php artisan permission:cache-reset`. |

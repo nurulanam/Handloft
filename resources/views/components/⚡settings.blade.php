@@ -65,7 +65,11 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
 
     public string $template_preview_email = '';
 
-    // Live notifications
+    // Notifications: which channels are on, then the live push (Reverb) behind in-app ones.
+    public bool $notify_in_app = true;
+
+    public bool $notify_email = true;
+
     public bool $live_enabled = false;
 
     public int $live_poll_seconds = 30;
@@ -122,6 +126,8 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
 
         $this->grants = $this->savedGrants();
 
+        $this->notify_in_app = $settings->app_notifications_enabled ?? true;
+        $this->notify_email = $settings->mail_notifications_enabled ?? true;
         $this->live_enabled = LiveUpdates::enabled();
         $this->live_poll_seconds = LiveUpdates::pollSeconds();
         $this->live_custom = $settings->hasCustomReverbSettings();
@@ -371,6 +377,8 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
         $host = ['regex:/^(?!-)[A-Za-z0-9.-]{1,253}$/'];
 
         return [
+            'notify_in_app' => ['boolean'],
+            'notify_email' => ['boolean'],
             'live_enabled' => ['boolean'],
             'live_poll_seconds' => ['required', 'integer', Rule::in([15, 30, 60, 120])],
             'live_custom' => ['boolean'],
@@ -433,6 +441,8 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
         $previousServer = [$settings->reverb_app_id, $settings->reverb_app_key, $settings->reverb_app_secret];
 
         $settings->update([
+            'app_notifications_enabled' => $this->notify_in_app,
+            'mail_notifications_enabled' => $this->notify_email,
             'live_updates_enabled' => $this->live_enabled,
             'live_poll_seconds' => $this->live_poll_seconds,
         ] + ($this->live_custom ? [
@@ -457,12 +467,13 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
 
         LiveUpdates::forget();
         LiveUpdates::applyFromDatabase();
+        \App\Support\NotificationChannels::reset();
 
         // Hand the open page its new connection details, so it connects (or disconnects) right away.
         $this->dispatch('live-config-changed', config: LiveUpdates::clientConfig());
         $this->dispatch('notify', message: $serverChanged
-            ? 'Live notifications saved. Restart the Reverb server so it uses the new app credentials.'
-            : 'Live notifications saved.', type: 'success');
+            ? 'Notification settings saved. Restart the Reverb server so it uses the new app credentials.'
+            : 'Notification settings saved.', type: 'success');
     }
 
     public function testLive(): void
@@ -590,7 +601,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
         'appearance' => ['Appearance', 'Look', 'Glass or static, theme colours', '<path d="m14.622 17.897-10.68-2.913"/><path d="M18.376 2.622a1 1 0 1 1 3.002 3.002L17.36 9.643a.5.5 0 0 0 0 .707l.944.944a2.41 2.41 0 0 1 0 3.408l-.944.944a.5.5 0 0 1-.707 0L8.354 7.348a.5.5 0 0 1 0-.707l.944-.944a2.41 2.41 0 0 1 3.408 0l.944.944a.5.5 0 0 0 .707 0z"/><path d="M9 8c-1.804 2.71-3.97 3.46-6.583 3.948a.507.507 0 0 0-.302.819l7.32 8.883a1 1 0 0 0 1.185.204C12.735 20.405 16 16.792 16 15"/>'],
         'schedule' => ['Work Schedule', 'Schedule', 'Days off, week start, hours', '<path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.3V14"/><circle cx="16" cy="16" r="6"/>'],
         'permissions' => ['Roles & Permissions', 'Access', 'What managers and members can do', '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>'],
-        'live' => ['Live Notifications', 'Live', 'Instant push with Reverb', '<path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/>'],
+        'live' => ['Notifications', 'Notify', 'In-app, email and live push', '<path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/>'],
         'loading-screen' => ['Loading Screen', 'Loading', 'Shown right after sign-in', '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>'],
         'smtp' => ['Email / SMTP', 'SMTP', 'Server used to send email', '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>'],
         'mail-template' => ['Email Template', 'Template', 'Layout, colours and footer', '<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 11.994 2z"/>'],
@@ -919,11 +930,45 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                 @endphp
                 <form wire:submit="saveLive" class="rounded-2xl border border-zinc-200 bg-surface">
                     <div class="px-4 pt-5 sm:px-6">
-                        <h2 class="text-base font-semibold text-zinc-900">Live notifications</h2>
-                        <p class="text-sm text-zinc-500">New notifications appear the moment they're sent, pushed by a Laravel Reverb WebSocket server. Stored notifications and emails go out either way.</p>
+                        <h2 class="text-base font-semibold text-zinc-900">Notifications</h2>
+                        <p class="text-sm text-zinc-500">Choose how people hear about work handed to them, reviews and sign-offs, and set up the live push.</p>
                     </div>
 
                     <div class="divide-y divide-zinc-100 px-4 sm:px-6">
+                        {{-- Channels: in-app and email are independent. --}}
+                        <section class="space-y-1 py-4">
+                            @foreach ([
+                                'notify_in_app' => ['In-app notifications', 'The bell, the Notifications page, and the live push to open browsers.', '<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>'],
+                                'notify_email' => ['Notification emails', 'An email for each notification. Password-reset and test emails always go out.', '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>'],
+                            ] as $field => [$channelLabel, $channelHint, $channelIcon])
+                                <label class="flex cursor-pointer items-center gap-3 rounded-xl px-1 py-3">
+                                    <span class="flex size-9 shrink-0 items-center justify-center rounded-xl {{ $this->{$field} ? 'bg-brand/10 text-brand' : 'bg-zinc-100 text-zinc-400' }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4.5">{!! $channelIcon !!}</svg>
+                                    </span>
+                                    <span class="min-w-0 flex-1">
+                                        <span class="block text-sm font-semibold text-zinc-900">{{ $channelLabel }}</span>
+                                        <span class="block text-xs text-zinc-500">{{ $channelHint }}</span>
+                                    </span>
+                                    <span class="relative inline-flex shrink-0">
+                                        <input type="checkbox" wire:model.live="{{ $field }}" class="peer sr-only">
+                                        <span class="h-7 w-12 rounded-full bg-zinc-300 transition-colors peer-checked:bg-brand peer-focus-visible:ring-4 peer-focus-visible:ring-brand/20"></span>
+                                        <span class="absolute left-1 top-1 size-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5"></span>
+                                    </span>
+                                </label>
+                            @endforeach
+
+                            @if (! $notify_in_app && ! $notify_email)
+                                <p class="flex items-start gap-2 rounded-xl bg-amber-50 px-3.5 py-3 text-xs text-amber-800">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="mt-0.5 size-4 shrink-0"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" /></svg>
+                                    <span>With both off, nobody is told when work is assigned, sent for review, rejected or ready to sign off.</span>
+                                </p>
+                            @elseif ($notify_email && ! $smtpConfigured)
+                                <p class="text-xs text-zinc-500">Emails use the mailer from .env until a server is set under <button type="button" wire:click="$set('tab', 'smtp')" class="font-semibold text-brand hover:underline">Email / SMTP</button>.</p>
+                            @endif
+                        </section>
+
+                        {{-- Live push: only matters while in-app notifications are on. --}}
+                        <div @class(['divide-y divide-zinc-100 transition-opacity', 'pointer-events-none opacity-40' => ! $notify_in_app]) @if (! $notify_in_app) aria-disabled="true" @endif>
                         {{-- On / off + status --}}
                         <section class="flex flex-col gap-4 py-6 sm:flex-row sm:items-start sm:justify-between">
                             <div class="min-w-0">
@@ -1064,6 +1109,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                                 @endif
                             </div>
                         </section>
+                        </div>
                     </div>
 
                     @if ($liveTest)

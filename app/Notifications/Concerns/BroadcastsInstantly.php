@@ -2,8 +2,7 @@
 
 namespace App\Notifications\Concerns;
 
-use App\Notifications\Channels\SafeBroadcastChannel;
-use App\Support\LiveUpdates;
+use App\Support\NotificationChannels;
 use Illuminate\Notifications\Messages\BroadcastMessage;
 
 /**
@@ -20,9 +19,8 @@ trait BroadcastsInstantly
      */
     public function via(object $notifiable): array
     {
-        // The push is skipped while live notifications are off (Settings → Live notifications);
-        // the database record and the email go out regardless.
-        return array_values(array_filter(['database', LiveUpdates::enabled() ? SafeBroadcastChannel::class : null, 'mail']));
+        // In-app (database + live push) and email can each be switched off in Settings → Notifications.
+        return NotificationChannels::for($notifiable);
     }
 
     public function toBroadcast(object $notifiable): BroadcastMessage

@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Support\LiveUpdates;
 use App\Support\MailSettings;
+use App\Support\NotificationChannels;
 use Illuminate\Foundation\DevCommands;
 use Illuminate\Support\ServiceProvider;
 
@@ -25,6 +26,7 @@ class AppServiceProvider extends ServiceProvider
         MailSettings::applyFromDatabase();
         // Fresh for every boot (long-running processes like tests or Octane boot more than once).
         LiveUpdates::reset();
+        NotificationChannels::reset();
         LiveUpdates::applyFromDatabase();
 
         // `composer dev` also starts the Reverb WebSocket server, which pushes
