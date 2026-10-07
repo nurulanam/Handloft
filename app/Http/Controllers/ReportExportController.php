@@ -32,9 +32,12 @@ class ReportExportController extends Controller
      */
     public function print(Request $request)
     {
-        Gate::authorize('view-reports');
-
         $section = in_array($request->query('section'), ReportExport::SECTIONS, true) ? $request->query('section') : 'overview';
+
+        // Everyone can print their own report; anything else needs view-reports.
+        $ownReport = $section === 'person' && (int) $request->query('user') === $request->user()->id;
+        abort_unless($ownReport || $request->user()->can('view-reports'), 403);
+
         $builder = new ReportBuilder($this->period($request));
         $export = new ReportExport($builder);
 

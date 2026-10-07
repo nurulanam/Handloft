@@ -51,7 +51,7 @@ class NotFoundPageTest extends TestCase
         $user->assignRole(RoleModel::findOrCreate(Role::TeamMember->value));
 
         $this->actingAs($user)
-            ->get(route('reports.index'))
+            ->get(route('users.index'))
             ->assertForbidden()
             ->assertSee('You don&#039;t have access to this', false)
             ->assertSee('Back to dashboard')

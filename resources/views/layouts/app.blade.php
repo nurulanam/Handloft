@@ -560,8 +560,8 @@
                                 ['label' => 'Calendar', 'route' => 'calendar.index', 'icon' => 'calendar'],
                             ]],
                             ['heading' => 'Insights', 'items' => [
-                                ['label' => 'Work History', 'route' => 'work-history.index', 'icon' => 'work-history'],
-                                ['label' => 'Reports', 'route' => 'reports.index', 'icon' => 'reports', 'hidden' => auth()->user()->cannot('view-reports')],
+                                // Everyone has Reports: the whole team with view-reports, otherwise their own report.
+                                ['label' => auth()->user()->can('view-reports') ? 'Reports' : 'My Report', 'route' => 'reports.index', 'icon' => 'reports'],
                             ]],
                             ['heading' => 'Manage', 'items' => [
                                 ['label' => 'Team', 'route' => 'users.index', 'icon' => 'team', 'hidden' => auth()->user()->cannot('manage-users')],

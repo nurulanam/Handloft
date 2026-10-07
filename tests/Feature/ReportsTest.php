@@ -239,7 +239,7 @@ class ReportsTest extends TestCase
 
         $page->set('peopleView', 'daily')->assertSee('Daily hours')->assertSee('Karim Hasan');
         $page->set('person', (string) $karim->id)
-            ->assertSee('Daily time logs')
+            ->assertSee('Time by task')
             ->assertSee('Completed tasks')
             ->assertSee('Finished on time')
             ->assertSee(route('reports.export', ['section' => 'person', 'format' => 'xlsx', 'period' => 'monthly', 'date' => '2026-10-01', 'user' => $karim->id]));
@@ -280,10 +280,11 @@ class ReportsTest extends TestCase
     {
         $karim = $this->member('Karim Hasan');
 
-        $this->actingAs($karim)->get(route('reports.index'))->assertForbidden();
+        // A team member has Reports, but only their own report: no team tabs, no team prints or exports.
+        $this->actingAs($karim)->get(route('reports.index'))->assertOk()->assertSee('My report')->assertDontSee('>Overview<', false);
         $this->actingAs($karim)->get(route('reports.print'))->assertForbidden();
         $this->actingAs($karim)->get(route('reports.export', ['section' => 'tasks', 'format' => 'csv']))->assertForbidden();
-        $this->actingAs($karim)->get(route('dashboard'))->assertDontSee(route('reports.index'));
+        $this->actingAs($karim)->get(route('dashboard'))->assertSee('My Report');
 
         $mira = $this->member('Mira Manager', Role::Manager);
         $this->actingAs($mira)->get(route('reports.index'))->assertOk();

@@ -39,8 +39,6 @@ Route::middleware('auth')->group(function () {
     Route::livewire('/tasks/create', 'tasks.create')->name('tasks.create');
     Route::livewire('/tasks/{task}', 'tasks.show')->name('tasks.show');
 
-    Route::livewire('/work-history', 'work-history.index')->name('work-history.index');
-    Route::livewire('/work-history/{user}', 'work-history.index')->name('work-history.show');
     Route::livewire('/notifications', 'notifications.index')->name('notifications.index');
     Route::livewire('/calendar', 'calendar.index')->name('calendar.index');
 

@@ -357,94 +357,96 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
         <div class="min-w-0 flex-1 space-y-4 sm:space-y-6">
             @if ($activeTab === 'appearance')
                 {{-- Per person, per browser: kept in localStorage by window.appearance (layouts/partials/appearance),
-                     applied the moment it's picked; nothing is sent to the server. --}}
+                     applied the moment it's picked; nothing is sent to the server. One panel, a row per setting,
+                     and the options themselves unboxed: the choice is shown by a ring, not another card. --}}
                 <div
-                    class="overflow-hidden rounded-xl border border-zinc-200 bg-surface"
+                    class="rounded-2xl border border-zinc-200 bg-surface"
                     x-data="{ look: appearance.get() }"
                     @appearance-changed.window="look = $event.detail"
                 >
-                    <div class="border-b border-zinc-100 px-4 py-4 sm:px-6">
+                    <div class="px-4 pt-5 sm:px-6">
                         <h2 class="text-base font-semibold text-zinc-900">Appearance</h2>
                         <p class="text-sm text-zinc-500">Applies instantly and is saved in this browser only, so it doesn't change how {{ config('app.name') }} looks for anyone else.</p>
                     </div>
 
-                    <div class="space-y-6 px-4 py-5 sm:px-6">
-                        <div>
-                            <p class="text-sm font-semibold text-zinc-900">Visual style</p>
-                            <div class="mt-3 grid gap-3 sm:grid-cols-2">
-                                @foreach ([
-                                    'glass' => ['Liquid glass', 'Frosted, translucent cards, bars and menus over soft drifting colour, on every screen size.'],
-                                    'static' => ['Static', 'Solid panels, no blur or moving colour. Calmer and lighter on older devices.'],
-                                ] as $key => [$styleName, $styleHint])
-                                    <label class="group relative cursor-pointer">
+                    <div class="divide-y divide-zinc-100 px-4 sm:px-6">
+                        {{-- Visual style --}}
+                        <section class="grid gap-4 py-6 md:grid-cols-[12rem_1fr] md:gap-8">
+                            <div>
+                                <h3 class="text-sm font-semibold text-zinc-900">Visual style</h3>
+                                <p class="text-xs text-zinc-500">Frosted glass, or calm solid panels that are lighter on older devices.</p>
+                            </div>
+                            <div class="grid max-w-md grid-cols-2 gap-4" role="radiogroup" aria-label="Visual style">
+                                @foreach (['glass' => 'Liquid glass', 'static' => 'Static'] as $key => $styleName)
+                                    <label class="group cursor-pointer">
                                         <input type="radio" name="look-style" value="{{ $key }}" :checked="look.style === '{{ $key }}'" @change="appearance.set('style', '{{ $key }}')" class="peer sr-only">
-                                        <span class="block rounded-2xl border-2 border-zinc-200 p-3 transition peer-checked:border-brand peer-focus-visible:ring-2 peer-focus-visible:ring-brand-lime/50">
-                                            {{-- Mini preview --}}
-                                            <span class="style-demo relative block h-24 overflow-hidden rounded-xl {{ $key === 'glass' ? 'bg-brand' : 'bg-zinc-100' }}">
-                                                @if ($key === 'glass')
-                                                    <span class="absolute -left-4 top-2 size-20 rounded-full bg-brand-lime/70 blur-xl"></span>
-                                                    <span class="absolute right-2 top-8 size-16 rounded-full bg-emerald-300/70 blur-xl"></span>
-                                                    <span class="absolute inset-x-4 bottom-3 top-6 rounded-xl border border-white/50 bg-surface/40 backdrop-blur-md"></span>
-                                                @else
-                                                    <span class="absolute inset-x-4 bottom-3 top-6 rounded-xl border border-zinc-200 bg-surface shadow-sm"></span>
-                                                @endif
-                                                <span class="absolute left-7 top-9 h-2 w-16 rounded-full {{ $key === 'glass' ? 'bg-surface/80' : 'bg-zinc-200' }}"></span>
-                                                <span class="absolute left-7 top-13 h-2 w-24 rounded-full {{ $key === 'glass' ? 'bg-surface/60' : 'bg-zinc-100' }}"></span>
-                                            </span>
-                                            <span class="mt-3 flex items-center justify-between gap-2">
-                                                <span class="text-sm font-semibold text-zinc-900">{{ $styleName }}</span>
-                                                <span class="flex size-5 items-center justify-center rounded-full border-2 border-zinc-300 group-has-[:checked]:border-brand group-has-[:checked]:bg-brand">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="hidden size-3 text-white group-has-[:checked]:block"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
-                                                </span>
-                                            </span>
-                                            <span class="mt-0.5 block text-xs text-zinc-500">{{ $styleHint }}</span>
+                                        <span class="style-demo relative block h-20 overflow-hidden rounded-xl ring-1 ring-zinc-200 ring-offset-2 ring-offset-surface transition group-hover:ring-zinc-300 peer-checked:ring-2 peer-checked:ring-brand! peer-focus-visible:ring-2 peer-focus-visible:ring-brand/40 {{ $key === 'glass' ? 'bg-brand' : 'bg-zinc-100' }}">
+                                            @if ($key === 'glass')
+                                                <span class="absolute -left-4 top-1 size-16 rounded-full bg-brand-lime/70 blur-xl"></span>
+                                                <span class="absolute right-2 top-6 size-14 rounded-full bg-emerald-300/70 blur-xl"></span>
+                                                <span class="absolute inset-x-3.5 bottom-2.5 top-5 rounded-lg border border-white/50 bg-surface/40 backdrop-blur-md"></span>
+                                            @else
+                                                <span class="absolute inset-x-3.5 bottom-2.5 top-5 rounded-lg bg-surface shadow-sm"></span>
+                                            @endif
+                                            <span class="absolute left-6 top-8 h-1.5 w-12 rounded-full {{ $key === 'glass' ? 'bg-surface/80' : 'bg-zinc-200' }}"></span>
+                                            <span class="absolute left-6 top-11 h-1.5 w-20 rounded-full {{ $key === 'glass' ? 'bg-surface/60' : 'bg-zinc-100' }}"></span>
+                                        </span>
+                                        <span class="mt-2.5 flex items-center gap-1.5 text-sm text-zinc-500 group-has-[:checked]:font-medium group-has-[:checked]:text-zinc-900">
+                                            {{ $styleName }}
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="hidden size-4 text-brand group-has-[:checked]:block"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" /></svg>
                                         </span>
                                     </label>
                                 @endforeach
                             </div>
-                        </div>
+                        </section>
 
-                        <div>
-                            <p class="text-sm font-semibold text-zinc-900">Theme colour</p>
-                            <p class="text-xs text-zinc-500">Recolours the logo, buttons, highlights, active menu items and focus rings.</p>
-                            <div class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        {{-- Theme colour --}}
+                        <section class="grid gap-4 py-6 md:grid-cols-[12rem_1fr] md:gap-8">
+                            <div>
+                                <h3 class="text-sm font-semibold text-zinc-900">Theme colour</h3>
+                                <p class="text-xs text-zinc-500">Recolours the logo, buttons, highlights and active menu items.</p>
+                            </div>
+                            <div class="flex flex-wrap gap-x-4 gap-y-4 sm:gap-x-6" role="radiogroup" aria-label="Theme colour">
                                 @foreach (\App\Support\Theme::PRESETS as $key => $preset)
-                                    <label class="group cursor-pointer">
+                                    <label class="group flex w-14 cursor-pointer flex-col items-center gap-2" title="{{ $preset['name'] }}">
                                         <input type="radio" name="look-theme" value="{{ $key }}" :checked="look.theme === '{{ $key }}'" @change="appearance.set('theme', '{{ $key }}')" class="peer sr-only">
-                                        <span class="flex items-center gap-3 rounded-2xl border-2 border-zinc-200 p-3 transition peer-checked:border-[var(--swatch)] peer-focus-visible:ring-2 peer-focus-visible:ring-brand-lime/50" style="--swatch: {{ $preset['brand'] }}">
-                                            <span class="relative size-10 shrink-0 rounded-xl" style="background-color: {{ $preset['brand'] }}">
-                                                <span class="absolute -bottom-1 -right-1 size-4 rounded-full ring-2 ring-surface" style="background-color: {{ $preset['accent'] }}"></span>
-                                            </span>
-                                            <span class="min-w-0 flex-1">
-                                                <span class="block text-sm font-semibold text-zinc-900">{{ $preset['name'] }}</span>
-                                                <span class="mt-1 inline-block rounded-md px-2 py-0.5 text-[10px] font-semibold text-white" style="background-color: {{ $preset['brand'] }}">Button</span>
-                                            </span>
-                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="hidden size-5 shrink-0 group-has-[:checked]:block" style="color: {{ $preset['brand'] }}"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" /></svg>
+                                        {{-- Split swatch: the main colour with a wedge of the accent. --}}
+                                        <span
+                                            class="flex size-10 items-center justify-center rounded-full ring-offset-2 ring-offset-surface transition group-hover:scale-105 peer-checked:ring-2 peer-checked:ring-(--swatch) peer-focus-visible:ring-2 peer-focus-visible:ring-brand/40"
+                                            style="--swatch: {{ $preset['brand'] }}; background: linear-gradient(135deg, {{ $preset['brand'] }} 0 62%, {{ $preset['accent'] }} 62% 100%)"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4 text-white opacity-0 drop-shadow transition-opacity group-has-[:checked]:opacity-100"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" /></svg>
                                         </span>
+                                        <span class="text-xs text-zinc-500 group-has-[:checked]:font-medium group-has-[:checked]:text-zinc-900">{{ $preset['name'] }}</span>
                                     </label>
                                 @endforeach
                             </div>
-                        </div>
+                        </section>
 
-                        <div>
-                            <p class="text-sm font-semibold text-zinc-900">Mode</p>
-                            <p class="text-xs text-zinc-500">System follows your device's light or dark setting.</p>
-                            <div class="mt-3 grid grid-cols-3 gap-3">
-                                @foreach ([
-                                    'light' => ['Light', '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>'],
-                                    'dark' => ['Dark', '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>'],
-                                    'system' => ['System', '<rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>'],
-                                ] as $key => [$modeName, $modeIcon])
-                                    <label class="group cursor-pointer">
-                                        <input type="radio" name="look-mode" value="{{ $key }}" :checked="look.mode === '{{ $key }}'" @change="appearance.set('mode', '{{ $key }}')" class="peer sr-only">
-                                        <span class="flex flex-col items-center gap-2 rounded-2xl border-2 border-zinc-200 px-3 py-4 text-sm font-semibold text-zinc-700 transition peer-checked:border-brand peer-checked:text-brand peer-focus-visible:ring-2 peer-focus-visible:ring-brand-lime/50">
-                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5">{!! $modeIcon !!}</svg>
-                                            {{ $modeName }}
-                                        </span>
-                                    </label>
-                                @endforeach
+                        {{-- Mode --}}
+                        <section class="grid gap-4 py-6 md:grid-cols-[12rem_1fr] md:gap-8">
+                            <div>
+                                <h3 class="text-sm font-semibold text-zinc-900">Mode</h3>
+                                <p class="text-xs text-zinc-500">System follows your device's light or dark setting.</p>
                             </div>
-                        </div>
+                            <div class="self-start">
+                                <div class="inline-grid grid-cols-3 gap-1 rounded-xl bg-zinc-100 p-1" role="radiogroup" aria-label="Mode">
+                                    @foreach ([
+                                        'light' => ['Light', '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>'],
+                                        'dark' => ['Dark', '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>'],
+                                        'system' => ['System', '<rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>'],
+                                    ] as $key => [$modeName, $modeIcon])
+                                        <label class="cursor-pointer">
+                                            <input type="radio" name="look-mode" value="{{ $key }}" :checked="look.mode === '{{ $key }}'" @change="appearance.set('mode', '{{ $key }}')" class="peer sr-only">
+                                            <span class="flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-medium text-zinc-500 transition hover:text-zinc-900 peer-checked:bg-surface peer-checked:text-zinc-900 peer-checked:shadow-sm peer-focus-visible:ring-2 peer-focus-visible:ring-brand/30">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4">{!! $modeIcon !!}</svg>
+                                                {{ $modeName }}
+                                            </span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </section>
                     </div>
                 </div>
             @elseif ($activeTab === 'schedule')

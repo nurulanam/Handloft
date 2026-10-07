@@ -16,7 +16,7 @@ use Livewire\Component;
 /**
  * Personal first: what's on the viewer's plate, what's waiting on them, and
  * their own logged hours. Holders of view-all-tasks also get a team overview
- * (pipeline, overdue, throughput), and view-all-work-history holders see who
+ * (pipeline, overdue, throughput), and view-reports holders see who
  * logged the most time this week. Hours come from the per-day time logs, the
  * same source as the Work History page.
  */
@@ -56,7 +56,7 @@ new #[Layout('layouts.app')] #[Title('Dashboard')] class extends Component
             'attention' => $this->attention($user, $today),
             'chart' => $this->hoursByDay($myLogs()),
             'team' => $user->can('view-all-tasks') ? $this->team($today, $weekStart, $weekEnd) : null,
-            'contributors' => $user->can('view-all-work-history') ? $this->contributors($weekStart, $weekEnd) : null,
+            'contributors' => $user->can('view-reports') ? $this->contributors($weekStart, $weekEnd) : null,
         ];
     }
 
@@ -214,7 +214,7 @@ new #[Layout('layouts.app')] #[Title('Dashboard')] class extends Component
             ['Assigned to me', $my['open'], 'open tasks', route('tasks.index', ['tab' => 'assigned-to-me', 'view' => 'list']), 'bg-brand/10 text-brand', 'tasks', false],
             ['Due this week', $my['dueThisWeek'], 'still open', route('tasks.index', ['tab' => 'assigned-to-me', 'view' => 'list']), 'bg-amber-100 text-amber-600', 'calendar', false],
             ['Overdue', $my['overdue'], $my['overdue'] > 0 ? 'needs attention' : 'all on track', route('tasks.index', ['tab' => 'assigned-to-me', 'view' => 'list']), $my['overdue'] > 0 ? 'bg-red-100 text-red-600' : 'bg-zinc-100 text-zinc-400', 'notifications', $my['overdue'] > 0],
-            ['My hours this week', \App\Support\Duration::forHumans($my['hoursWeek']), ($my['weekTarget'] ? 'of '.\App\Support\Duration::forHumans($my['weekTarget']).' target · ' : '').\App\Support\Duration::forHumans($my['hoursToday']).' today', route('work-history.index'), 'bg-brand-lime/25 text-brand', 'work-history', false],
+            ['My hours this week', \App\Support\Duration::forHumans($my['hoursWeek']), ($my['weekTarget'] ? 'of '.\App\Support\Duration::forHumans($my['weekTarget']).' target · ' : '').\App\Support\Duration::forHumans($my['hoursToday']).' today', route('reports.index', ['tab' => 'people', 'person' => auth()->id(), 'period' => 'weekly']), 'bg-brand-lime/25 text-brand', 'reports', false],
         ] as [$label, $value, $hint, $href, $tone, $icon, $alert])
             <a href="{{ $href }}" wire:navigate class="group rounded-xl border border-zinc-200 bg-surface p-4 transition hover:border-brand/30 hover:shadow-sm sm:p-5">
                 <div class="flex items-center justify-between gap-2">
@@ -344,7 +344,7 @@ new #[Layout('layouts.app')] #[Title('Dashboard')] class extends Component
                         <ul class="mt-4 space-y-3">
                             @forelse ($contributors as $row)
                                 <li>
-                                    <a href="{{ route('work-history.show', $row['user']) }}" wire:navigate class="group flex items-center gap-3">
+                                    <a href="{{ route('reports.index', ['tab' => 'people', 'person' => $row['user']->id]) }}" wire:navigate class="group flex items-center gap-3">
                                         <x-user-avatar :user="$row['user']" class="size-8 rounded-full text-[11px]" />
                                         <span class="min-w-0 flex-1">
                                             <span class="flex items-baseline justify-between gap-2">

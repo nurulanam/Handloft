@@ -3,9 +3,12 @@
 use App\Enums\Role;
 use App\Enums\TaskStatus;
 use App\Models\Project;
+use App\Models\TaskTimeLog;
 use App\Models\User;
 use App\Reports\ReportBuilder;
 use App\Reports\ReportPeriod;
+use App\Services\TaskWorkflowService;
+use App\Support\Duration;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -56,9 +59,92 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
     #[Url(except: '')]
     public string $person = '';
 
+    /** Time by task: the entry being edited (edit-completed-hours only). */
+    public ?int $editingLogId = null;
+
+    public string $edit_hours = '0';
+
+    public string $edit_minutes = '0';
+
+    public string $edit_reason = '';
+
+    /**
+     * Everyone has Reports. view-reports holders see the whole team; everyone else sees only their
+     * own report (the person view, locked to themselves), whatever the URL asks for.
+     */
+    public function canSeeEveryone(): bool
+    {
+        return auth()->user()->can('view-reports');
+    }
+
     public function mount(): void
     {
-        Gate::authorize('view-reports');
+        if (! $this->canSeeEveryone()) {
+            $this->tab = 'people';
+            $this->person = (string) auth()->id();
+        }
+    }
+
+    /**
+     * Correcting logged hours (and removing entries) is for edit-completed-hours holders (Super Admin),
+     * always with a reason; every change is recorded on the task's timeline.
+     */
+    private function editableLog(int $timeLogId): TaskTimeLog
+    {
+        abort_unless(auth()->user()->can('edit-completed-hours'), 403);
+
+        return TaskTimeLog::findOrFail($timeLogId);
+    }
+
+    public function startEditLog(int $timeLogId): void
+    {
+        $timeLog = $this->editableLog($timeLogId);
+        [$hours, $minutes] = Duration::toParts((float) $timeLog->hours);
+
+        $this->editingLogId = $timeLog->id;
+        $this->edit_hours = (string) $hours;
+        $this->edit_minutes = (string) $minutes;
+        $this->edit_reason = '';
+        $this->resetErrorBag();
+    }
+
+    public function cancelEditLog(): void
+    {
+        $this->editingLogId = null;
+        $this->resetErrorBag();
+    }
+
+    public function saveEditLog(TaskWorkflowService $workflow): void
+    {
+        $timeLog = $this->editableLog((int) $this->editingLogId);
+
+        $data = $this->validate([
+            'edit_hours' => ['required', 'integer', 'min:0', 'max:24'],
+            'edit_minutes' => ['required', 'integer', 'min:0', 'max:59'],
+            'edit_reason' => ['required', 'string', 'max:255'],
+        ], [
+            'edit_reason.required' => 'Say why the hours are being changed.',
+        ]);
+
+        $totalHours = Duration::fromParts((int) $data['edit_hours'], (int) $data['edit_minutes']);
+
+        if ($totalHours <= 0 || $totalHours > 24) {
+            $this->addError('edit_hours', 'Logged time must be between a few minutes and 24 hours.');
+
+            return;
+        }
+
+        $workflow->editTimeLog($timeLog, $totalHours, auth()->user(), $data['edit_reason']);
+
+        $this->editingLogId = null;
+        $this->dispatch('notify', message: 'Hours updated.', type: 'success');
+    }
+
+    public function deleteLog(int $timeLogId, TaskWorkflowService $workflow): void
+    {
+        $workflow->deleteTimeLog($this->editableLog($timeLogId), auth()->user());
+
+        $this->dispatch('notify', message: 'Time entry removed.', type: 'success');
     }
 
     private function current(): ReportPeriod
@@ -110,6 +196,11 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
 
     public function updated(string $property): void
     {
+        if (! $this->canSeeEveryone()) {
+            $this->tab = 'people';
+            $this->person = (string) auth()->id();
+        }
+
         if (in_array($property, ['from', 'to', 'project', 'status', 'assignee', 'q', 'tab'], true)) {
             $this->resetPage();
         }
@@ -129,6 +220,13 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
     {
         $period = $this->current();
         $builder = new ReportBuilder($period);
+        $everyone = $this->canSeeEveryone();
+
+        if (! $everyone) {
+            $this->tab = 'people';
+            $this->person = (string) auth()->id();
+        }
+
         $filters = ['project' => $this->project, 'status' => $this->status, 'assignee' => $this->assignee, 'search' => $this->q];
 
         return [
@@ -146,6 +244,8 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
                 + ($personReport ? ['user' => $personReport['user']->id] : []),
             'exportSection' => $personReport ? 'person' : $this->tab,
             'canExport' => auth()->user()->can('export-data'),
+            'everyone' => $everyone,
+            'canEditHours' => auth()->user()->can('edit-completed-hours'),
             'taskFiltering' => $this->project !== '' || $this->status !== '' || $this->assignee !== '' || trim($this->q) !== '',
         ];
     }
@@ -179,14 +279,14 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
     {{-- Header + export --}}
     <div class="flex flex-wrap items-end justify-between gap-3">
         <div>
-            <h1 class="text-xl font-semibold text-zinc-900 sm:text-2xl">Reports</h1>
-            <p class="hidden text-sm text-zinc-500 sm:block">Throughput, time and workload across tasks, projects and people.</p>
+            <h1 class="text-xl font-semibold text-zinc-900 sm:text-2xl">{{ $everyone ? 'Reports' : 'My report' }}</h1>
+            <p class="hidden text-sm text-zinc-500 sm:block">{{ $everyone ? 'Throughput, time and workload across tasks, projects and people.' : 'Your hours, time by task and completed tasks.' }}</p>
         </div>
 
         <div class="relative" x-data="{ open: false }" @keydown.escape.window="open = false">
             <button type="button" @click="open = ! open" class="inline-flex items-center gap-2 rounded-lg bg-brand px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand/90" :aria-expanded="open">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>
-                Export
+                {{ $canExport ? 'Export' : 'Print' }}
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4 opacity-70"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
             </button>
             <div
@@ -212,7 +312,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
                     @endforeach
                     <div class="my-1 border-t border-zinc-900/5"></div>
                 @endif
-                @foreach ([[$exportSection, $personReport ? 'Print '.$personReport['user']->name."'s report" : 'Print this tab'], ['all', 'Print full report']] as [$section, $label])
+                @foreach (array_filter([[$exportSection, ! $everyone ? 'Print my report' : ($personReport ? 'Print '.$personReport['user']->name."'s report" : 'Print this tab')], $everyone ? ['all', 'Print full report'] : null]) as [$section, $label])
                     <a href="{{ route('reports.print', ['section' => $section, 'autoprint' => 1] + $exportQuery) }}" target="_blank" rel="noopener" @click="open = false" class="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-surface">
                         <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-700">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>
@@ -257,12 +357,14 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
         </div>
     </div>
 
-    {{-- Tabs --}}
-    <div class="flex gap-1 overflow-x-auto border-b border-zinc-200 scrollbar-none">
-        @foreach ($tabs as $key => $label)
-            <button type="button" wire:click="$set('tab', '{{ $key }}')" class="-mb-px shrink-0 border-b-2 px-4 py-2.5 text-sm font-medium {{ $tab === $key ? 'border-brand text-brand' : 'border-transparent text-zinc-500 hover:text-zinc-800' }}">{{ $label }}</button>
-        @endforeach
-    </div>
+    {{-- Tabs (the whole-team views; someone limited to their own report has just that) --}}
+    @if ($everyone)
+        <div class="flex gap-1 overflow-x-auto border-b border-zinc-200 scrollbar-none">
+            @foreach ($tabs as $key => $label)
+                <button type="button" wire:click="$set('tab', '{{ $key }}')" class="-mb-px shrink-0 border-b-2 px-4 py-2.5 text-sm font-medium {{ $tab === $key ? 'border-brand text-brand' : 'border-transparent text-zinc-500 hover:text-zinc-800' }}">{{ $label }}</button>
+            @endforeach
+        </div>
+    @endif
 
     <div wire:loading.class="opacity-60" class="transition-opacity">
     @if ($tab === 'overview')
@@ -540,22 +642,21 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
             @php $pr = $personReport; $series = collect($pr['series']); $prMax = max($series->max('hours'), 0.01); $labelEvery = (int) ceil(count($series) / 16); @endphp
 
             {{-- One person's report --}}
-            <div class="flex flex-wrap items-center justify-between gap-3">
+            @if ($everyone)
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <button type="button" wire:click="$set('person', '')" class="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4"><path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" /></svg>
                     All people
                 </button>
             </div>
+            @endif
 
-            <div class="mt-3 flex flex-wrap items-center gap-4 rounded-2xl border border-zinc-200 bg-surface p-4 sm:p-5">
+            <div class="flex flex-wrap items-center gap-4 rounded-2xl border border-zinc-200 bg-surface p-4 sm:p-5">
                 <x-user-avatar :user="$pr['user']" class="size-14 rounded-2xl text-base" />
                 <div class="min-w-0 flex-1">
                     <h2 class="truncate text-lg font-semibold text-zinc-900">{{ $pr['user']->name }}</h2>
                     <p class="text-sm text-zinc-500">{{ $pr['role'] }}{{ $pr['user']->department ? ' · '.$pr['user']->department : '' }} · {{ $range->label() }}</p>
                 </div>
-                <a href="{{ route('work-history.show', $pr['user']) }}" wire:navigate class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 sm:w-auto">
-                    <x-nav-icon name="work-history" class="size-4" /> Work history
-                </a>
             </div>
 
             <div class="mt-3 grid grid-cols-2 gap-3 sm:mt-4 sm:gap-4 lg:grid-cols-5">
@@ -604,42 +705,133 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
             @endif
 
             <div class="mt-4 grid gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-3 lg:items-start">
-                {{-- Daily time logs, grouped by day --}}
-                <div class="overflow-hidden rounded-xl border border-zinc-200 bg-surface lg:col-span-2">
-                    <div class="flex items-baseline justify-between gap-2 border-b border-zinc-100 px-4 py-3.5 sm:px-5">
-                        <h3 class="text-sm font-semibold text-zinc-900">Daily time logs</h3>
-                        <span class="text-xs text-zinc-500">{{ $pr['timeLogs']->count() }} {{ \Illuminate\Support\Str::plural('entry', $pr['timeLogs']->count()) }}</span>
-                    </div>
-                    @forelse ($pr['logsByDay']->take(60) as $day => $logs)
-                        <div wire:key="day-{{ $day }}">
-                            <div class="flex items-center justify-between bg-zinc-50/80 px-4 py-2 text-xs sm:px-5">
-                                <span class="font-semibold text-zinc-700">{{ \Illuminate\Support\Carbon::parse($day)->format('l, d M Y') }}</span>
-                                <span class="font-semibold tabular-nums text-zinc-900">{{ $h((float) $logs->sum('hours')) }}</span>
-                            </div>
-                            <ul class="divide-y divide-zinc-100">
-                                @foreach ($logs as $log)
-                                    <li class="flex items-start gap-3 px-4 py-2.5 sm:px-5">
-                                        <div class="min-w-0 flex-1">
-                                            @if ($log->task)
-                                                <a href="{{ route('tasks.show', $log->task) }}" wire:navigate class="group flex items-center gap-2 text-sm">
-                                                    <span class="shrink-0 font-mono text-[11px] font-semibold text-violet-700">{{ $log->task->task_key }}</span>
-                                                    <span class="truncate font-medium text-zinc-900 group-hover:text-brand">{{ $log->task->title }}</span>
-                                                </a>
-                                            @else
-                                                <span class="text-sm text-zinc-400">(deleted task)</span>
-                                            @endif
-                                            <p class="mt-0.5 text-xs text-zinc-500">{{ $log->task?->project?->name ?? 'No project' }}@if ($log->note) · <span class="text-zinc-600">{{ $log->note }}</span>@endif</p>
-                                        </div>
-                                        <span class="shrink-0 text-sm font-semibold tabular-nums text-zinc-900">{{ $h((float) $log->hours) }}</span>
-                                    </li>
-                                @endforeach
-                            </ul>
+                {{-- Time by task: one row per task with this person's hours on it in the period; expand a row for
+                     its individual entries (a task often has several on different days). --}}
+                @php
+                    $byTask = $pr['timeLogs']
+                        ->groupBy('task_id')
+                        ->map(fn ($logs) => [
+                            'task' => $logs->first()->task,
+                            'logs' => $logs,
+                            'hours' => (float) $logs->sum('hours'),
+                            'last' => $logs->max(fn ($log) => $log->logged_date),
+                        ])
+                        ->sortByDesc('last')
+                        ->values();
+                    $shownTasks = $byTask->take(50);
+                @endphp
+                <div class="overflow-hidden rounded-2xl border border-zinc-200 bg-surface lg:col-span-2">
+                    <div class="flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
+                        <div>
+                            <h3 class="text-sm font-semibold text-zinc-900">Time by task</h3>
+                            <p class="text-xs text-zinc-500">{{ $byTask->count() }} {{ \Illuminate\Support\Str::plural('task', $byTask->count()) }} · {{ $pr['timeLogs']->count() }} {{ \Illuminate\Support\Str::plural('entry', $pr['timeLogs']->count()) }} · {{ $range->label() }}</p>
                         </div>
-                    @empty
-                        <p class="px-4 py-10 text-center text-sm text-zinc-500">No time logged in {{ $range->label() }}.</p>
-                    @endforelse
-                    @if ($pr['logsByDay']->count() > 60)
-                        <p class="border-t border-zinc-100 px-4 py-3 text-center text-xs text-zinc-500 sm:px-5">Showing the latest 60 days with logs — export to see all {{ $pr['logsByDay']->count() }}.</p>
+                        <span class="rounded-lg bg-brand/10 px-2.5 py-1 text-sm font-semibold tabular-nums text-brand">{{ $h($pr['hours']) }}</span>
+                    </div>
+
+                    @if ($byTask->isEmpty())
+                        <p class="border-t border-zinc-100 px-4 py-12 text-center text-sm text-zinc-500">No time logged in {{ $range->label() }}.</p>
+                    @else
+                        <div class="overflow-x-auto border-t border-zinc-100">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="text-left text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+                                        <th class="px-4 py-2.5 font-semibold sm:px-5">Task</th>
+                                        <th class="hidden px-3 py-2.5 font-semibold md:table-cell">Status</th>
+                                        <th class="hidden px-3 py-2.5 text-right font-semibold sm:table-cell">Entries</th>
+                                        <th class="hidden px-3 py-2.5 font-semibold sm:table-cell">Last logged</th>
+                                        <th class="px-4 py-2.5 text-right font-semibold sm:px-5">Hours</th>
+                                    </tr>
+                                </thead>
+                                @foreach ($shownTasks as $row)
+                                    @php $hasEditing = $editingLogId && $row['logs']->contains('id', $editingLogId); @endphp
+                                    <tbody x-data="{ open: @js($hasEditing) }" wire:key="task-row-{{ $row['task']?->id ?? 'gone-'.$loop->index }}" class="border-t border-zinc-100">
+                                        <tr @click="open = ! open" class="cursor-pointer transition-colors hover:bg-zinc-50" :class="open && 'bg-zinc-50'">
+                                            <td class="px-4 py-3 sm:px-5">
+                                                <div class="flex items-start gap-2.5">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="mt-0.5 size-4 shrink-0 text-zinc-400 transition-transform" :class="open && 'rotate-90'"><path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>
+                                                    <div class="min-w-0">
+                                                        @if ($row['task'])
+                                                            <a href="{{ route('tasks.show', $row['task']) }}" wire:navigate @click.stop class="group inline-flex max-w-full items-center gap-2">
+                                                                <span class="shrink-0 rounded-md bg-violet-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-violet-700">{{ $row['task']->task_key }}</span>
+                                                                <span class="truncate font-medium text-zinc-900 group-hover:text-brand">{{ $row['task']->title }}</span>
+                                                            </a>
+                                                            <p class="mt-0.5 truncate text-xs text-zinc-500">
+                                                                {{ $row['task']->project?->name ?? 'No project' }}
+                                                                <span class="sm:hidden"> · {{ $row['logs']->count() }} {{ \Illuminate\Support\Str::plural('entry', $row['logs']->count()) }} · {{ $row['last']->format('d M') }}</span>
+                                                            </p>
+                                                        @else
+                                                            <span class="text-zinc-400">(deleted task)</span>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="hidden whitespace-nowrap px-3 py-3 md:table-cell">
+                                                @if ($row['task'])
+                                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $row['task']->status->pillClasses() }}">{{ $row['task']->status->label() }}</span>
+                                                @endif
+                                            </td>
+                                            <td class="hidden px-3 py-3 text-right tabular-nums text-zinc-600 sm:table-cell">{{ $row['logs']->count() }}</td>
+                                            <td class="hidden whitespace-nowrap px-3 py-3 text-zinc-600 sm:table-cell">{{ $row['last']->format('d M Y') }}</td>
+                                            <td class="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-zinc-900 sm:px-5">{{ $h($row['hours']) }}</td>
+                                        </tr>
+                                        <tr x-show="open" x-cloak>
+                                            <td colspan="5" class="bg-zinc-50/60 px-4 pb-3 pt-1 sm:px-5">
+                                                <ul class="ml-6 divide-y divide-zinc-200/70 rounded-xl border border-zinc-200/80 bg-surface">
+                                                    @foreach ($row['logs']->sortByDesc('logged_date') as $log)
+                                                        <li class="group/log flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-2.5" wire:key="log-{{ $log->id }}">
+                                                            <span class="w-24 shrink-0 text-xs font-medium text-zinc-700">{{ $log->logged_date->format('D, d M') }}</span>
+                                                            <span class="min-w-0 flex-1 truncate text-xs {{ $log->note ? 'text-zinc-600' : 'text-zinc-400' }}">{{ $log->note ?: 'No note' }}</span>
+                                                            <span class="shrink-0 text-sm font-semibold tabular-nums text-zinc-900">{{ $h((float) $log->hours) }}</span>
+                                                            @if ($canEditHours)
+                                            {{-- Correct or remove an entry (Super Admin). Always visible on touch screens; on hover elsewhere. --}}
+                                            <span class="flex shrink-0 items-center gap-0.5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/log:opacity-100 [@media(hover:hover)]:focus-within:opacity-100 transition-opacity">
+                                                <button type="button" wire:click="startEditLog({{ $log->id }})" class="flex size-7 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700" title="Edit hours">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4"><path d="m5.433 13.917 1.262-3.155A4 4 0 0 1 7.58 9.42l6.92-6.918a2.121 2.121 0 0 1 3 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 0 1-.65-.65Z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0 0 10 3H4.75A2.75 2.75 0 0 0 2 5.75v9.5A2.75 2.75 0 0 0 4.75 18h9.5A2.75 2.75 0 0 0 17 15.25V10a.75.75 0 0 0-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5Z" /></svg>
+                                                </button>
+                                                <button type="button" wire:click="deleteLog({{ $log->id }})" wire:confirm="Remove this time entry? It's recorded on the task's timeline." class="flex size-7 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600" title="Remove entry">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clip-rule="evenodd" /></svg>
+                                                </button>
+                                            </span>
+
+                                            @if ($editingLogId === $log->id)
+                                                <form wire:submit="saveEditLog" class="basis-full rounded-xl bg-zinc-50 p-3">
+                                                    <div class="grid grid-cols-2 gap-2 sm:grid-cols-[6rem_6rem_1fr]">
+                                                        <label class="block">
+                                                            <span class="mb-1 block text-xs font-medium text-zinc-600">Hours</span>
+                                                            <input wire:model="edit_hours" type="number" min="0" max="24" class="field-input py-2 tabular-nums">
+                                                        </label>
+                                                        <label class="block">
+                                                            <span class="mb-1 block text-xs font-medium text-zinc-600">Minutes</span>
+                                                            <input wire:model="edit_minutes" type="number" min="0" max="59" class="field-input py-2 tabular-nums">
+                                                        </label>
+                                                        <label class="col-span-2 block sm:col-span-1">
+                                                            <span class="mb-1 block text-xs font-medium text-zinc-600">Reason</span>
+                                                            <input wire:model="edit_reason" type="text" placeholder="e.g. Logged 3h instead of 30m" class="field-input py-2">
+                                                        </label>
+                                                    </div>
+                                                    @foreach (['edit_hours', 'edit_minutes', 'edit_reason'] as $field)
+                                                        @error($field) <p class="mt-1.5 text-xs font-medium text-red-600">{{ $message }}</p> @enderror
+                                                    @endforeach
+                                                    <div class="mt-3 flex justify-end gap-2">
+                                                        <button type="button" wire:click="cancelEditLog" class="btn-secondary px-3 py-1.5">Cancel</button>
+                                                        <button type="submit" class="btn-primary px-3 py-1.5" wire:loading.attr="disabled" wire:target="saveEditLog">Save hours</button>
+                                                    </div>
+                                                </form>
+                                            @endif
+                                        @endif
+                                                        </li>
+                                                    @endforeach
+                                                </ul>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                @endforeach
+                            </table>
+                        </div>
+                        @if ($byTask->count() > $shownTasks->count())
+                            <p class="border-t border-zinc-100 px-4 py-3 text-center text-xs text-zinc-500 sm:px-5">Showing the 50 most recent tasks. Export or print to see all {{ $byTask->count() }}.</p>
+                        @endif
                     @endif
                 </div>
 
