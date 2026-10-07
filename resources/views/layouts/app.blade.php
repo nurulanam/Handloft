@@ -1100,68 +1100,79 @@
                 dismiss(toast) {
                     clearTimeout(toast.timer);
                     toast.show = false;
-                    setTimeout(() => { this.toasts = this.toasts.filter((t) => t.id !== toast.id); }, 250);
+                    setTimeout(() => { this.toasts = this.toasts.filter((t) => t.id !== toast.id); }, 400);
                 },
             }"
             x-on:notify.window="add($event.detail)"
-            class="pointer-events-none fixed inset-x-0 top-[max(0.625rem,env(safe-area-inset-top))] z-60 flex flex-col items-center gap-2 px-3 sm:inset-x-auto sm:right-5 sm:top-5 sm:items-end sm:gap-2.5 sm:px-0"
+            class="toast-stack pointer-events-none fixed inset-x-0 top-[max(0.625rem,env(safe-area-inset-top))] z-60 flex flex-col items-stretch px-3 sm:inset-x-auto sm:right-5 sm:top-5 sm:px-0"
             aria-live="polite"
         >
             <template x-for="toast in toasts" :key="toast.id">
+                {{-- The wrapper grows from zero height as a toast arrives and shrinks as it leaves, so the
+                     toasts around it glide to their new places instead of jumping. --}}
                 <div
-                    x-show="toast.show"
-                    x-transition:enter="transition duration-300 ease-[cubic-bezier(0.34,1.4,0.64,1)] sm:ease-[cubic-bezier(0.32,0.72,0,1)]"
-                    x-transition:enter-start="-translate-y-4 scale-75 opacity-0 sm:translate-x-8 sm:translate-y-0 sm:scale-95"
-                    x-transition:enter-end="translate-x-0 translate-y-0 scale-100 opacity-100"
-                    x-transition:leave="transition duration-250 ease-in"
-                    x-transition:leave-start="scale-100 opacity-100"
-                    x-transition:leave-end="-translate-y-3 scale-75 opacity-0 sm:translate-x-8 sm:translate-y-0 sm:scale-95"
-                    @click="window.innerWidth < 640 && dismiss(toast)"
-                    @mouseenter="pause(toast)"
-                    @mouseleave="resume(toast)"
-                    class="toast-island group pointer-events-auto relative flex w-[min(92vw,24rem)] items-center gap-3 overflow-hidden rounded-[1.75rem] bg-ink-950 py-2.5 pl-2.5 pr-3 text-white shadow-2xl shadow-zinc-950/40 ring-1 ring-white/10 sm:w-[22rem] sm:rounded-2xl sm:bg-surface/90 sm:py-3 sm:pl-3 sm:pr-2.5 sm:text-zinc-900 sm:shadow-[0_16px_40px_-12px_rgb(0_0_0/0.22),0_4px_10px_-4px_rgb(0_0_0/0.08)] sm:ring-zinc-900/[0.07] sm:backdrop-blur-xl"
-                    role="status"
+                    class="grid transition-[grid-template-rows] duration-400 ease-[cubic-bezier(0.32,0.72,0,1)]"
+                    :class="toast.show ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
                 >
-                    <span
-                        class="flex size-10 shrink-0 items-center justify-center rounded-full sm:size-8"
-                        :class="{
-                            'bg-red-500/20 text-red-400 sm:bg-red-500 sm:text-white': toast.type === 'error',
-                            'bg-brand-lime text-brand sm:bg-brand sm:text-white': toast.type === 'success',
-                            'bg-amber-400 text-zinc-950 sm:text-white': toast.type === 'star',
-                            'bg-white/15 text-white sm:bg-zinc-100 sm:text-zinc-500': toast.type === 'info' || toast.type === 'unstar',
-                        }"
-                    >
-                        <template x-if="toast.type === 'error'">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5 sm:size-4"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.63-1.516 2.63H3.72c-1.347 0-2.189-1.463-1.516-2.63L8.485 2.495ZM10 5.5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5.5Zm0 8a1 1 0 100-2 1 1 0 000 2Z" clip-rule="evenodd" /></svg>
-                        </template>
-                        <template x-if="toast.type === 'success'">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5 sm:size-4"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
-                        </template>
-                        <template x-if="toast.type === 'star'">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5 sm:size-4"><path d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z" /></svg>
-                        </template>
-                        <template x-if="toast.type === 'unstar'">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5 sm:size-4"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/></svg>
-                        </template>
-                        <template x-if="toast.type === 'info'">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5 sm:size-4"><path fill-rule="evenodd" d="M18 10A8 8 0 112 10a8 8 0 0116 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9zm1-4a1 1 0 100 2 1 1 0 000-2z" clip-rule="evenodd" /></svg>
-                        </template>
-                    </span>
-                    <span class="toast-island-body min-w-0 flex-1">
-                        <span
-                            class="block text-[11px] font-semibold uppercase tracking-wide sm:text-sm sm:normal-case sm:tracking-normal sm:text-zinc-900"
-                            :class="{ 'text-red-400': toast.type === 'error', 'text-amber-400': toast.type === 'star', 'text-brand-lime': toast.type === 'success', 'text-white/60': toast.type === 'info' || toast.type === 'unstar' }"
-                            x-text="titles[toast.type] ?? titles.info"
-                        ></span>
-                        <span class="line-clamp-2 block text-sm font-medium leading-snug text-white sm:text-[13px] sm:font-normal sm:text-zinc-500" x-text="toast.message"></span>
-                    </span>
-                    <button type="button" @click.stop="dismiss(toast)" class="-mr-1.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20 hover:text-white sm:mr-0 sm:size-7 sm:bg-transparent sm:text-zinc-400 sm:opacity-0 sm:transition-opacity sm:hover:bg-zinc-100 sm:hover:text-zinc-700 sm:focus-visible:opacity-100 sm:group-hover:opacity-100" title="Dismiss">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>
-                    </button>
-                    <span
-                        class="toast-timer absolute inset-x-0 bottom-0 hidden h-[3px] origin-left sm:block"
-                        :class="{ 'bg-red-500': toast.type === 'error', 'bg-amber-400': toast.type === 'star', 'bg-brand': toast.type === 'success', 'bg-zinc-300': toast.type === 'info' || toast.type === 'unstar' }"
-                    ></span>
+                    <div class="flex min-h-0 justify-center sm:justify-end" :class="! toast.show && 'overflow-hidden'">
+                        <div class="pb-2 sm:pb-2.5">
+                            <div
+                                x-show="toast.show"
+                                x-transition:enter="transition duration-400 ease-[cubic-bezier(0.32,0.72,0,1)] sm:duration-300"
+                                x-transition:enter-start="-translate-y-3 opacity-0 sm:translate-x-8 sm:translate-y-0 sm:scale-95"
+                                x-transition:enter-end="translate-x-0 translate-y-0 scale-100 opacity-100"
+                                x-transition:leave="transition duration-250 ease-in"
+                                x-transition:leave-start="scale-100 opacity-100"
+                                x-transition:leave-end="-translate-y-3 scale-95 opacity-0 sm:translate-x-8 sm:translate-y-0"
+                                @click="window.innerWidth < 640 && dismiss(toast)"
+                                @mouseenter="pause(toast)"
+                                @mouseleave="resume(toast)"
+                                class="toast-island group pointer-events-auto relative flex w-[min(92vw,24rem)] items-center gap-3 overflow-hidden rounded-[1.75rem] bg-ink-950 py-2.5 pl-2.5 pr-3 text-white ring-1 ring-white/10 sm:w-[22rem] sm:rounded-2xl sm:bg-surface/90 sm:py-3 sm:pl-3 sm:pr-2.5 sm:text-zinc-900 sm:shadow-[0_16px_40px_-12px_rgb(0_0_0/0.22),0_4px_10px_-4px_rgb(0_0_0/0.08)] sm:ring-zinc-900/[0.07] sm:backdrop-blur-xl"
+                                role="status"
+                            >
+                                <span
+                                    class="flex size-10 shrink-0 items-center justify-center rounded-full sm:size-8"
+                                    :class="{
+                                        'bg-red-500/20 text-red-400 sm:bg-red-500 sm:text-white': toast.type === 'error',
+                                        'bg-brand-lime text-brand sm:bg-brand sm:text-white': toast.type === 'success',
+                                        'bg-amber-400 text-zinc-950 sm:text-white': toast.type === 'star',
+                                        'bg-white/15 text-white sm:bg-zinc-100 sm:text-zinc-500': toast.type === 'info' || toast.type === 'unstar',
+                                    }"
+                                >
+                                    <template x-if="toast.type === 'error'">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5 sm:size-4"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.63-1.516 2.63H3.72c-1.347 0-2.189-1.463-1.516-2.63L8.485 2.495ZM10 5.5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5.5Zm0 8a1 1 0 100-2 1 1 0 000 2Z" clip-rule="evenodd" /></svg>
+                                    </template>
+                                    <template x-if="toast.type === 'success'">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5 sm:size-4"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
+                                    </template>
+                                    <template x-if="toast.type === 'star'">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5 sm:size-4"><path d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z" /></svg>
+                                    </template>
+                                    <template x-if="toast.type === 'unstar'">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5 sm:size-4"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/></svg>
+                                    </template>
+                                    <template x-if="toast.type === 'info'">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-5 sm:size-4"><path fill-rule="evenodd" d="M18 10A8 8 0 112 10a8 8 0 0116 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9zm1-4a1 1 0 100 2 1 1 0 000-2z" clip-rule="evenodd" /></svg>
+                                    </template>
+                                </span>
+                                <span class="toast-island-body min-w-0 flex-1">
+                                    <span
+                                        class="block text-[11px] font-semibold uppercase tracking-wide sm:text-sm sm:normal-case sm:tracking-normal sm:text-zinc-900"
+                                        :class="{ 'text-red-400': toast.type === 'error', 'text-amber-400': toast.type === 'star', 'text-brand-lime': toast.type === 'success', 'text-white/60': toast.type === 'info' || toast.type === 'unstar' }"
+                                        x-text="titles[toast.type] ?? titles.info"
+                                    ></span>
+                                    <span class="line-clamp-2 block text-sm font-medium leading-snug text-white sm:text-[13px] sm:font-normal sm:text-zinc-500" x-text="toast.message"></span>
+                                </span>
+                                <button type="button" @click.stop="dismiss(toast)" class="-mr-1.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20 hover:text-white sm:mr-0 sm:size-7 sm:bg-transparent sm:text-zinc-400 sm:opacity-0 sm:transition-opacity sm:hover:bg-zinc-100 sm:hover:text-zinc-700 sm:focus-visible:opacity-100 sm:group-hover:opacity-100" title="Dismiss">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>
+                                </button>
+                                <span
+                                    class="toast-timer absolute inset-x-0 bottom-0 hidden h-[3px] origin-left sm:block"
+                                    :class="{ 'bg-red-500': toast.type === 'error', 'bg-amber-400': toast.type === 'star', 'bg-brand': toast.type === 'success', 'bg-zinc-300': toast.type === 'info' || toast.type === 'unstar' }"
+                                ></span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </template>
         </div>
