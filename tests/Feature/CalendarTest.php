@@ -110,7 +110,7 @@ class CalendarTest extends TestCase
 
     public function test_a_view_all_tasks_holder_sees_every_tasks_deadline(): void
     {
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
         $rahim = $this->teamMember('Rahim');
         $karim = $this->teamMember('Karim');
 
@@ -326,7 +326,7 @@ class CalendarTest extends TestCase
             $rahim = $this->teamMember('Rahim');
             $karim = $this->teamMember('Karim');
             $qa = $this->teamMember('Qadir');
-            $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+            $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
 
             $workflow = app(TaskWorkflowService::class);
 

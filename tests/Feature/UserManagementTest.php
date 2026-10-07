@@ -23,7 +23,7 @@ class UserManagementTest extends TestCase
 
     public function test_admin_can_create_a_user(): void
     {
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
 
         Livewire::actingAs($admin)
             ->test('users.form')
@@ -95,7 +95,7 @@ class UserManagementTest extends TestCase
 
     public function test_inactive_status_prevents_login(): void
     {
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
 
         Livewire::actingAs($admin)
             ->test('users.form')
@@ -115,28 +115,28 @@ class UserManagementTest extends TestCase
 
     public function test_new_user_form_auto_generates_an_am_prefixed_unique_user_id(): void
     {
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
 
         $userId = Livewire::actingAs($admin)->test('users.form')->get('user_id');
 
-        $this->assertMatchesRegularExpression('/^AM-\d{4}$/', $userId);
+        $this->assertMatchesRegularExpression('/^HL-\d{4}$/', $userId);
     }
 
     public function test_regenerating_the_user_id_produces_a_new_valid_code(): void
     {
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
 
         $userId = Livewire::actingAs($admin)
             ->test('users.form')
             ->call('regenerateUserId')
             ->get('user_id');
 
-        $this->assertMatchesRegularExpression('/^AM-\d{4}$/', $userId);
+        $this->assertMatchesRegularExpression('/^HL-\d{4}$/', $userId);
     }
 
     public function test_duplicate_user_id_is_rejected_on_save(): void
     {
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
         User::factory()->create(['user_id' => 'AM-1234']);
 
         Livewire::actingAs($admin)
@@ -155,7 +155,7 @@ class UserManagementTest extends TestCase
 
     public function test_user_can_log_in_with_user_id_instead_of_email(): void
     {
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
         $admin->update(['password' => bcrypt('password123')]);
 
         Livewire::test('auth.login')

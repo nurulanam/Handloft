@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\MailPreviewController;
 use App\Http\Controllers\ReportExportController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -30,6 +31,7 @@ Route::middleware('auth')->group(function () {
     Route::livewire('/users/create', 'users.form')->name('users.create');
     Route::livewire('/users/{user}/edit', 'users.form')->name('users.edit');
 
+    Route::get('/settings/mail-preview', MailPreviewController::class)->name('settings.mail-preview');
     Route::livewire('/projects', 'projects.index')->name('projects.index');
     Route::livewire('/projects/create', 'projects.form')->name('projects.create');
     Route::livewire('/projects/{project}/edit', 'projects.form')->name('projects.edit');

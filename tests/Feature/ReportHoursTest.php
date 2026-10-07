@@ -38,7 +38,7 @@ class ReportHoursTest extends TestCase
 
     private function admin(): User
     {
-        return User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        return User::where('email', 'admin@handloft.test')->firstOrFail();
     }
 
     public function test_everyone_sees_their_own_logged_time_whether_assignee_reporter_or_qa(): void

@@ -49,7 +49,7 @@ trait SearchesPickerOptions
                 ->visibleTo(auth()->user())
                 ->when($except, fn (Builder $q) => $q->whereKeyNot($except))
                 ->when($query !== '', function (Builder $q) use ($query, $like) {
-                    // "AMD-42", "42" or words from the title.
+                    // "HL-42", "42" or words from the title.
                     $number = preg_match('/^(?:'.preg_quote(Task::KEY_PREFIX, '/').'-)?(\d+)$/i', $query, $m) ? (int) $m[1] : null;
                     $q->where(fn (Builder $w) => $w->where('title', 'like', $like)->when($number, fn (Builder $w) => $w->orWhereKey($number)));
                 })

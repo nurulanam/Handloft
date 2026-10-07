@@ -106,7 +106,7 @@
                                 <span class="flex size-8 items-center justify-center rounded-full bg-surface text-[11px] font-bold text-brand ring-2 ring-[#1c5a33]">AN</span>
                             </span>
                             <span class="text-xs leading-snug">
-                                <span class="block font-semibold text-white">AMD-24 handed to Anam</span>
+                                <span class="block font-semibold text-white">HL-24 handed to Anam</span>
                                 <span class="block text-white/65">Website audit · just now</span>
                             </span>
                         </div>

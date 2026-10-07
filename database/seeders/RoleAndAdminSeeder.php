@@ -35,8 +35,14 @@ class RoleAndAdminSeeder extends Seeder
             }
         }
 
+        // Installs from before the rename used admin@am2amdesk.test: move that account over instead
+        // of creating a second Super Admin.
+        if (! User::where('email', 'admin@handloft.test')->exists()) {
+            User::where('email', 'admin@am2amdesk.test')->update(['email' => 'admin@handloft.test']);
+        }
+
         $admin = User::firstOrCreate(
-            ['email' => 'admin@am2amdesk.test'],
+            ['email' => 'admin@handloft.test'],
             [
                 'name' => 'Super Admin',
                 'user_id' => 'admin',

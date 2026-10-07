@@ -1,11 +1,11 @@
-{{-- One of the post-login loading animations (styles live in layouts/app). `size` scales it: lg is the
-     real overlay, md the Settings preview, sm a Settings picker tile. --}}
+{{-- One of the post-login loading animations (styles live in layouts/app; colours follow the theme).
+     `size` scales it: lg is the real overlay, md the Settings preview, sm a Settings picker tile. --}}
 @props(['name' => 'jampe', 'size' => 'lg'])
 
 @php
     $jampe = ['sm' => '--jampe-container: 90px; --jampe-box: 14px;', 'md' => '--jampe-container: 110px; --jampe-box: 18px;', 'lg' => ''][$size];
     $bars = ['sm' => '--bars-height: 32px;', 'md' => '--bars-height: 44px;', 'lg' => ''][$size];
-    $hand = ['sm' => 'transform: scale(0.32);', 'md' => 'transform: scale(0.45);', 'lg' => ''][$size];
+    $handoff = ['sm' => '--handoff-size: 36px;', 'md' => '--handoff-size: 48px;', 'lg' => ''][$size];
     $spinner = ['sm' => 'size-8', 'md' => 'size-12', 'lg' => 'size-16'][$size];
 @endphp
 
@@ -19,21 +19,11 @@
         <span></span>
         <span></span>
     </div>
-@elseif ($name === 'hand')
-    <div class="hand-loader" style="{{ $hand }}">
-        @foreach (range(1, 4) as $finger)
-            <div class="hand-finger hand-finger-{{ $finger }}">
-                <div class="hand-finger-item">
-                    <span></span>
-                    <i></i>
-                </div>
-            </div>
-        @endforeach
-        <div class="hand-last-finger">
-            <div class="hand-last-finger-item">
-                <i></i>
-            </div>
-        </div>
+@elseif ($name === 'handoff')
+    <div class="handoff-loader" style="{{ $handoff }}" role="img" aria-label="Loading">
+        <span class="handoff-pillar"></span>
+        <span class="handoff-bar"></span>
+        <span class="handoff-pillar"></span>
     </div>
 @else
     <div class="jampe-loader" style="{{ $jampe }}">

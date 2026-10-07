@@ -23,9 +23,9 @@ class Task extends Model
     use HasFactory;
 
     /**
-     * Prefix for the human-readable task key (e.g. "AMD-42"), Jira-style.
+     * Prefix for the human-readable task key (e.g. "HL-42"), Jira-style.
      */
-    public const KEY_PREFIX = 'AMD';
+    public const KEY_PREFIX = 'HL';
 
     /**
      * @return array<string, string>
@@ -41,7 +41,7 @@ class Task extends Model
     }
 
     /**
-     * A stable, unique, human-readable identifier (e.g. "AMD-42"), Jira-style.
+     * A stable, unique, human-readable identifier (e.g. "HL-42"), Jira-style.
      * Derived from the primary key rather than a separate counter, so it's
      * always unique with no extra schema or race conditions to manage.
      */

@@ -5,6 +5,8 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta name="csrf-token" content="{{ csrf_token() }}">
         <meta name="user-id" content="{{ auth()->id() }}">
+        {{-- Live notifications (Settings → Live notifications): public connection details only. --}}
+        <meta name="live-config" content="{{ json_encode(\App\Support\LiveUpdates::clientConfig()) }}">
 
         <title>{{ $title ?? config('app.name') }}</title>
 
@@ -47,6 +49,16 @@
                flip), each picking up the brand gradient as it lands. Adapted
                from https://sm-amzad-hossain.github.io/Jampe-Slider-Loading/,
                recolored to the app's brand green → lime instead of blue. */
+            /* Loader colours follow the theme: five steps from the brand colour to its accent
+               (--color-brand / --color-brand-lime, set per browser in Settings → Look). */
+            .jampe-loader, .bars-loader, .handoff-loader {
+                --loader-1: var(--color-brand);
+                --loader-2: color-mix(in oklab, var(--color-brand) 75%, var(--color-brand-lime));
+                --loader-3: color-mix(in oklab, var(--color-brand) 50%, var(--color-brand-lime));
+                --loader-4: color-mix(in oklab, var(--color-brand) 25%, var(--color-brand-lime));
+                --loader-5: var(--color-brand-lime);
+            }
+
             .jampe-loader {
                 --jampe-duration: 1.4s;
                 --jampe-container: 140px;
@@ -82,25 +94,25 @@
             .jampe-box:nth-child(1)::after { animation: jampe-color var(--jampe-duration) ease-in-out infinite alternate; }
 
             .jampe-box:nth-child(2) { animation: jampe-flip-1 var(--jampe-duration) ease-in-out infinite alternate; }
-            .jampe-box:nth-child(2)::after { animation: jampe-squidge-1 var(--jampe-duration) ease-in-out infinite alternate; background-color: #1a6b35; }
+            .jampe-box:nth-child(2)::after { animation: jampe-squidge-1 var(--jampe-duration) ease-in-out infinite alternate; background-color: var(--loader-2); }
 
             .jampe-box:nth-child(3) { animation: jampe-flip-2 var(--jampe-duration) ease-in-out infinite alternate; }
-            .jampe-box:nth-child(3)::after { animation: jampe-squidge-2 var(--jampe-duration) ease-in-out infinite alternate; background-color: #4c9a3f; }
+            .jampe-box:nth-child(3)::after { animation: jampe-squidge-2 var(--jampe-duration) ease-in-out infinite alternate; background-color: var(--loader-3); }
 
             .jampe-box:nth-child(4) { animation: jampe-flip-3 var(--jampe-duration) ease-in-out infinite alternate; }
-            .jampe-box:nth-child(4)::after { animation: jampe-squidge-3 var(--jampe-duration) ease-in-out infinite alternate; background-color: #85c230; }
+            .jampe-box:nth-child(4)::after { animation: jampe-squidge-3 var(--jampe-duration) ease-in-out infinite alternate; background-color: var(--loader-4); }
 
             .jampe-box:nth-child(5) { animation: jampe-flip-4 var(--jampe-duration) ease-in-out infinite alternate; }
-            .jampe-box:nth-child(5)::after { animation: jampe-squidge-4 var(--jampe-duration) ease-in-out infinite alternate; background-color: #bfef1e; }
+            .jampe-box:nth-child(5)::after { animation: jampe-squidge-4 var(--jampe-duration) ease-in-out infinite alternate; background-color: var(--loader-5); }
 
             @keyframes jampe-slide {
-                0% { background-color: #10512a; transform: translateX(0); }
-                100% { background-color: #bfef1e; transform: translateX(calc(var(--jampe-container) - (var(--jampe-box) * 1.25))); }
+                0% { background-color: var(--loader-1); transform: translateX(0); }
+                100% { background-color: var(--loader-5); transform: translateX(calc(var(--jampe-container) - (var(--jampe-box) * 1.25))); }
             }
 
             @keyframes jampe-color {
-                0% { background-color: #10512a; }
-                100% { background-color: #bfef1e; }
+                0% { background-color: var(--loader-1); }
+                100% { background-color: var(--loader-5); }
             }
 
             @keyframes jampe-flip-1 { 0%, 15% { transform: rotate(0); } 35%, 100% { transform: rotate(-180deg); } }
@@ -164,15 +176,63 @@
                 animation: bars-scale var(--bars-duration) ease-in-out infinite;
             }
 
-            .bars-loader span:nth-child(1) { background: #10512a; animation-delay: 0s; }
-            .bars-loader span:nth-child(2) { background: #1a6b35; animation-delay: -0.8s; }
-            .bars-loader span:nth-child(3) { background: #4c9a3f; animation-delay: -0.7s; }
-            .bars-loader span:nth-child(4) { background: #85c230; animation-delay: -0.6s; }
-            .bars-loader span:nth-child(5) { background: #bfef1e; animation-delay: -0.5s; }
+            .bars-loader span:nth-child(1) { background: var(--loader-1); animation-delay: 0s; }
+            .bars-loader span:nth-child(2) { background: var(--loader-2); animation-delay: -0.8s; }
+            .bars-loader span:nth-child(3) { background: var(--loader-3); animation-delay: -0.7s; }
+            .bars-loader span:nth-child(4) { background: var(--loader-4); animation-delay: -0.6s; }
+            .bars-loader span:nth-child(5) { background: var(--loader-5); animation-delay: -0.5s; }
 
             @keyframes bars-scale {
                 0%, 40%, 100% { transform: scaleY(0.09); }
                 20% { transform: scaleY(1); }
+            }
+
+            /* "Handoff": the logo's H coming to life. Two pillars in the theme colours, and the
+               crossbar handed from one to the other (high on the left, low on the right, as in the
+               mark), changing colour as it crosses; the receiving pillar gives a small nod. */
+            .handoff-loader {
+                --handoff-size: 64px;
+                --handoff-duration: 1.6s;
+                position: relative;
+                width: var(--handoff-size);
+                height: var(--handoff-size);
+            }
+
+            .handoff-loader span {
+                position: absolute;
+                display: block;
+                border-radius: 999px;
+            }
+
+            .handoff-pillar {
+                top: 0;
+                width: 26%;
+                height: 100%;
+                transform-origin: bottom center;
+            }
+
+            .handoff-pillar:first-child { left: 0; background: var(--loader-1); animation: handoff-nod-left var(--handoff-duration) ease-in-out infinite; }
+            .handoff-pillar:last-child { right: 0; background: var(--loader-5); animation: handoff-nod-right var(--handoff-duration) ease-in-out infinite; }
+
+            .handoff-bar {
+                height: 22%;
+                width: 46%;
+                animation: handoff-pass var(--handoff-duration) cubic-bezier(0.65, 0, 0.35, 1) infinite;
+            }
+
+            @keyframes handoff-pass {
+                0%, 12% { left: 13%; top: 18%; width: 46%; background: var(--loader-1); }
+                38% { left: 27%; top: 39%; width: 46%; background: var(--loader-3); }
+                50%, 62% { left: 41%; top: 60%; width: 46%; background: var(--loader-5); }
+                88% { left: 27%; top: 39%; width: 46%; background: var(--loader-3); }
+                100% { left: 13%; top: 18%; width: 46%; background: var(--loader-1); }
+            }
+
+            @keyframes handoff-nod-left { 0%, 8%, 100% { transform: scaleY(1); } 4%, 96% { transform: scaleY(0.92); } }
+            @keyframes handoff-nod-right { 0%, 46%, 58%, 100% { transform: scaleY(1); } 52% { transform: scaleY(0.92); } }
+
+            @media (prefers-reduced-motion: reduce) {
+                .handoff-loader span { animation-duration: 4s; }
             }
 
             /* Mobile shortcut bar: the same curved-notch trick as
@@ -254,194 +314,6 @@
 
         </style>
 
-        <style>
-            /* Post-login loading animation: a cartoon hand with four fingers
-               and a thumb "typing", each lifting and curling in sequence.
-               Adapted from https://sm-amzad-hossain.github.io/Hand-Animation/,
-               recolored (brand green fingers, white knuckle/nail details)
-               instead of white fingers on a solid blue background, and
-               switched from page-absolute centering to sitting inline in
-               the overlay's own centered flex layout. */
-            .hand-loader {
-                position: relative;
-                width: 112px;
-                height: 70px;
-                transform: scale(0.85);
-            }
-
-            .hand-loader::before,
-            .hand-loader::after {
-                display: table;
-                content: '';
-            }
-
-            .hand-loader::after {
-                clear: both;
-            }
-
-            .hand-finger {
-                float: left;
-                margin: 0 2px 0 0;
-                width: 20px;
-                height: 100%;
-            }
-
-            .hand-finger-1 { animation: hand-finger-1-animation 2s infinite ease-out; }
-            .hand-finger-1 span { animation: hand-finger-1-animation-span 2s infinite ease-out; }
-            .hand-finger-1 i { animation: hand-finger-1-animation-i 2s infinite ease-out; }
-
-            .hand-finger-2 { animation: hand-finger-2-animation 2s infinite ease-out; }
-            .hand-finger-2 span { animation: hand-finger-2-animation-span 2s infinite ease-out; }
-            .hand-finger-2 i { animation: hand-finger-2-animation-i 2s infinite ease-out; }
-
-            .hand-finger-3 { animation: hand-finger-3-animation 2s infinite ease-out; }
-            .hand-finger-3 span { animation: hand-finger-3-animation-span 2s infinite ease-out; }
-            .hand-finger-3 i { animation: hand-finger-3-animation-i 2s infinite ease-out; }
-
-            .hand-finger-4 { animation: hand-finger-4-animation 2s infinite ease-out; }
-            .hand-finger-4 span { animation: hand-finger-4-animation-span 2s infinite ease-out; }
-            .hand-finger-4 i { animation: hand-finger-4-animation-i 2s infinite ease-out; }
-
-            .hand-finger-item {
-                position: relative;
-                width: 100%;
-                height: 100%;
-                border-radius: 6px 6px 8px 8px;
-                background: #10512a;
-            }
-
-            .hand-finger-item span {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-                height: auto;
-                padding: 5px 5px 0 5px;
-            }
-
-            .hand-finger-item span::before,
-            .hand-finger-item span::after {
-                content: '';
-                position: relative;
-                display: block;
-                margin: 0 0 2px 0;
-                width: 100%;
-                height: 2px;
-                background: #ffffff;
-            }
-
-            .hand-finger-item i {
-                position: absolute;
-                left: 3px;
-                bottom: 3px;
-                width: 14px;
-                height: 14px;
-                border-radius: 10px 10px 7px 7px;
-                background: #bfef1e;
-            }
-
-            .hand-last-finger {
-                position: relative;
-                float: left;
-                width: 24px;
-                height: 100%;
-                overflow: hidden;
-            }
-
-            .hand-last-finger-item {
-                position: absolute;
-                right: 0;
-                top: 32px;
-                width: 110%;
-                height: 20px;
-                border-radius: 0 5px 14px 0;
-                background: #10512a;
-                animation: hand-finger-5-animation 2s infinite linear;
-            }
-
-            .hand-last-finger-item i {
-                position: absolute;
-                left: 0;
-                top: -8px;
-                width: 22px;
-                height: 8px;
-                background: #10512a;
-                overflow: hidden;
-            }
-
-            .hand-last-finger-item i::after {
-                content: '';
-                position: absolute;
-                left: 0;
-                bottom: 0;
-                width: 34px;
-                height: 20px;
-                border-radius: 0 0 15px 15px;
-                /* Matches the overlay's own backdrop (not the hand's brand
-                   color) so this reads as a notch carved out of the thumb,
-                   revealing what's behind it — the actual illusion this
-                   shape is for, same trick the original used against its
-                   page background. */
-                background: #ffffff;
-            }
-
-            @keyframes hand-finger-1-animation {
-                0%, 20%, 41%, 100% { padding: 12px 0 5px 0; }
-                29%, 35% { padding: 4px 0 24px 0; }
-            }
-            @keyframes hand-finger-1-animation-span {
-                0%, 20%, 41%, 100% { top: 0; }
-                29%, 35% { top: -7px; }
-            }
-            @keyframes hand-finger-1-animation-i {
-                0%, 20%, 41%, 100% { bottom: 3px; height: 14px; border-radius: 10px 10px 7px 7px; }
-                29%, 35% { bottom: 8px; height: 12px; border-radius: 7px 7px 4px 4px; }
-            }
-
-            @keyframes hand-finger-2-animation {
-                0%, 24%, 45%, 100% { padding: 6px 0 2px 0; }
-                33%, 39% { padding: 2px 0 16px 0; }
-            }
-            @keyframes hand-finger-2-animation-span {
-                0%, 24%, 45%, 100% { top: 0; }
-                33%, 39% { top: -7px; }
-            }
-            @keyframes hand-finger-2-animation-i {
-                0%, 24%, 45%, 100% { bottom: 3px; height: 14px; border-radius: 10px 10px 7px 7px; }
-                33%, 39% { bottom: 8px; height: 12px; border-radius: 7px 7px 4px 4px; }
-            }
-
-            @keyframes hand-finger-3-animation {
-                0%, 28%, 49%, 100% { padding: 0 0 0 0; }
-                37%, 43% { padding: 0 0 12px 0; }
-            }
-            @keyframes hand-finger-3-animation-span {
-                0%, 28%, 49%, 100% { top: 0; }
-                37%, 43% { top: -7px; }
-            }
-            @keyframes hand-finger-3-animation-i {
-                0%, 28%, 49%, 100% { bottom: 3px; height: 14px; border-radius: 10px 10px 7px 7px; }
-                37%, 43% { bottom: 8px; height: 12px; border-radius: 7px 7px 4px 4px; }
-            }
-
-            @keyframes hand-finger-4-animation {
-                0%, 32%, 53%, 100% { padding: 8px 0 3px 0; }
-                41%, 47% { padding: 4px 0 20px 0; }
-            }
-            @keyframes hand-finger-4-animation-span {
-                0%, 32%, 53%, 100% { top: 0; }
-                41%, 47% { top: -7px; }
-            }
-            @keyframes hand-finger-4-animation-i {
-                0%, 32%, 53%, 100% { bottom: 3px; height: 14px; border-radius: 10px 10px 7px 7px; }
-                41%, 47% { bottom: 8px; height: 12px; border-radius: 7px 7px 4px 4px; }
-            }
-
-            @keyframes hand-finger-5-animation {
-                0%, 34%, 60%, 100% { top: 32px; right: 0; border-radius: 0 5px 14px 0; transform: rotate(0deg); }
-                43%, 50% { top: 20px; right: 2px; border-radius: 0 8px 20px 0; transform: rotate(-12deg); }
-            }
-        </style>
     </head>
     <body
         class="min-h-screen bg-zinc-50 font-sans antialiased"

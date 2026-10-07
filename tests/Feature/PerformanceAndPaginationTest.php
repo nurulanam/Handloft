@@ -73,7 +73,7 @@ class PerformanceAndPaginationTest extends TestCase
 
     public function test_kanban_board_caps_results_and_flags_when_truncated(): void
     {
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
 
         Task::factory()->count(210)->create(['created_by' => $admin->id]);
 
@@ -90,7 +90,7 @@ class PerformanceAndPaginationTest extends TestCase
 
     public function test_kanban_board_does_not_flag_truncation_under_the_limit(): void
     {
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
 
         Task::factory()->count(5)->create(['created_by' => $admin->id]);
 

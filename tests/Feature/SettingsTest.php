@@ -29,7 +29,7 @@ class SettingsTest extends TestCase
 
     public function test_super_admin_can_update_the_loading_screen_settings(): void
     {
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
 
         Livewire::actingAs($admin)
             ->test('settings')
@@ -49,7 +49,7 @@ class SettingsTest extends TestCase
 
     public function test_loading_screen_duration_must_be_within_range(): void
     {
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
 
         Livewire::actingAs($admin)
             ->test('settings')
@@ -60,7 +60,7 @@ class SettingsTest extends TestCase
 
     public function test_loading_screen_opacity_and_blur_must_be_within_range(): void
     {
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
 
         Livewire::actingAs($admin)
             ->test('settings')
@@ -72,7 +72,7 @@ class SettingsTest extends TestCase
 
     public function test_super_admin_can_switch_the_loading_screen_animation_style(): void
     {
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
 
         Livewire::actingAs($admin)
             ->test('settings')
@@ -85,7 +85,7 @@ class SettingsTest extends TestCase
 
     public function test_super_admin_can_switch_to_the_equalizer_bars_animation(): void
     {
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
 
         Livewire::actingAs($admin)
             ->test('settings')
@@ -96,22 +96,29 @@ class SettingsTest extends TestCase
         $this->assertSame('bars', AppSetting::current()->loading_screen_style);
     }
 
-    public function test_super_admin_can_switch_to_the_typing_hand_animation(): void
+    public function test_super_admin_can_switch_to_the_handoff_animation_and_typing_hand_is_gone(): void
     {
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
 
         Livewire::actingAs($admin)
             ->test('settings')
-            ->set('loading_screen_style', 'hand')
+            ->set('loading_screen_style', 'handoff')
             ->call('saveLoadingScreen')
             ->assertHasNoErrors();
 
-        $this->assertSame('hand', AppSetting::current()->loading_screen_style);
+        $this->assertSame('handoff', AppSetting::current()->loading_screen_style);
+
+        Livewire::actingAs($admin)->test('settings')->set('loading_screen_style', 'hand')->call('saveLoadingScreen')->assertHasErrors(['loading_screen_style']);
+
+        $this->actingAs($admin)->get(route('settings', ['tab' => 'loading-screen']))
+            ->assertSee('Handoff')
+            ->assertSee('handoff-loader', false)
+            ->assertDontSee('Typing Hand');
     }
 
     public function test_the_loading_screen_style_must_be_a_known_option(): void
     {
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
 
         Livewire::actingAs($admin)
             ->test('settings')
@@ -179,7 +186,7 @@ class SettingsTest extends TestCase
 
     public function test_super_admin_can_save_smtp_settings(): void
     {
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
 
         Livewire::actingAs($admin)
             ->test('settings')
@@ -207,7 +214,7 @@ class SettingsTest extends TestCase
 
     public function test_leaving_the_password_blank_keeps_the_previously_saved_one(): void
     {
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
 
         AppSetting::current()->update([
             'mail_host' => 'smtp.example.test',
@@ -228,7 +235,7 @@ class SettingsTest extends TestCase
 
     public function test_the_saved_password_is_never_sent_back_to_the_browser(): void
     {
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
 
         AppSetting::current()->update([
             'mail_host' => 'smtp.example.test',
@@ -245,7 +252,7 @@ class SettingsTest extends TestCase
     {
         Mail::fake();
 
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
 
         Livewire::actingAs($admin)
             ->test('settings')
@@ -265,7 +272,7 @@ class SettingsTest extends TestCase
 
     public function test_a_failed_test_send_reports_the_error_without_crashing(): void
     {
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
 
         Livewire::actingAs($admin)
             ->test('settings')
@@ -279,7 +286,7 @@ class SettingsTest extends TestCase
 
     public function test_super_admin_can_save_the_mail_template_colors(): void
     {
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
 
         Livewire::actingAs($admin)
             ->test('settings')
@@ -299,7 +306,7 @@ class SettingsTest extends TestCase
 
     public function test_mail_template_colors_must_be_valid_hex(): void
     {
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
 
         Livewire::actingAs($admin)
             ->test('settings')
@@ -313,7 +320,7 @@ class SettingsTest extends TestCase
     {
         Notification::fake();
 
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
 
         Livewire::actingAs($admin)
             ->test('settings')

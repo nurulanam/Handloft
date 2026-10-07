@@ -108,7 +108,7 @@ class TaskWorkflowTest extends TestCase
 
     public function test_reassignment_preserves_full_history_across_three_hops(): void
     {
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
         $rahim = $this->teamMember('Rahim');
         $karim = $this->teamMember('Karim');
         $hasan = $this->teamMember('Hasan');

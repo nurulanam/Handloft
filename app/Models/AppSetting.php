@@ -26,9 +26,21 @@ use Illuminate\Database\Eloquent\Model;
     'mail_brand_color',
     'mail_button_text_color',
     'mail_footer_note',
+    'mail_layout',
     'off_days',
     'week_starts_on',
     'daily_hours_target',
+    'live_updates_enabled',
+    'live_poll_seconds',
+    'reverb_app_id',
+    'reverb_app_key',
+    'reverb_app_secret',
+    'reverb_host',
+    'reverb_port',
+    'reverb_scheme',
+    'reverb_client_host',
+    'reverb_client_port',
+    'reverb_client_scheme',
 ])]
 class AppSetting extends Model
 {
@@ -46,6 +58,11 @@ class AppSetting extends Model
             'off_days' => 'array',
             'week_starts_on' => 'integer',
             'daily_hours_target' => 'float',
+            'live_updates_enabled' => 'boolean',
+            'live_poll_seconds' => 'integer',
+            'reverb_app_secret' => 'encrypted',
+            'reverb_port' => 'integer',
+            'reverb_client_port' => 'integer',
         ];
     }
 
@@ -70,6 +87,14 @@ class AppSetting extends Model
      * Whether a custom SMTP server has been configured here, as opposed to
      * falling back to whatever's in .env.
      */
+    /**
+     * Whether a custom Reverb app has been saved here, as opposed to using .env.
+     */
+    public function hasCustomReverbSettings(): bool
+    {
+        return filled($this->reverb_app_key) && filled($this->reverb_app_id) && filled($this->reverb_app_secret);
+    }
+
     public function hasCustomMailSettings(): bool
     {
         return filled($this->mail_host);

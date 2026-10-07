@@ -46,9 +46,9 @@ new #[Layout('layouts.app')] #[Title('User')] class extends Component
     public bool $autoUserId = true;
 
     /**
-     * Prefix for the auto-generated User ID (e.g. "AM-9546").
+     * Prefix for the auto-generated User ID (e.g. "HL-9546").
      */
-    private const USER_ID_PREFIX = 'AM-';
+    private const USER_ID_PREFIX = 'HL-';
 
     public function mount(?User $user = null): void
     {

@@ -331,7 +331,7 @@ class TaskTimeLogTest extends TestCase
         // A SuperAdmin has every permission, including reassign-task, but
         // there is no permission-based override for logging time — only
         // being the assignee, Reporter, or QA/Reviewer grants that.
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
 
         Livewire::actingAs($admin)
             ->test('tasks.show', ['task' => $task])

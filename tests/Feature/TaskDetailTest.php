@@ -69,7 +69,7 @@ class TaskDetailTest extends TestCase
 
     public function test_the_creator_can_view_but_only_the_assignee_or_reassign_permission_holder_edits_metadata(): void
     {
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
         $rahim = $this->teamMember('Rahim');
         $karim = $this->teamMember('Karim');
 

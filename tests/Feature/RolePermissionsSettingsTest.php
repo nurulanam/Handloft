@@ -24,7 +24,7 @@ class RolePermissionsSettingsTest extends TestCase
 
     private function admin(): User
     {
-        return User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        return User::where('email', 'admin@handloft.test')->firstOrFail();
     }
 
     private function user(string $name, Role $role): User

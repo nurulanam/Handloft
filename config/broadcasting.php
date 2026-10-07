@@ -46,6 +46,14 @@ return [
                 // A local CA (e.g. Valet's) to trust Reverb's certificate when the system doesn't.
                 'verify' => env('REVERB_TLS_CA'),
             ]),
+            // Where browsers connect (sent to the page by App\Support\LiveUpdates; blank host = the
+            // site's own host, blank scheme = match the page). Read here rather than via env() at
+            // runtime, so it keeps working with `config:cache`.
+            'client' => [
+                'host' => env('VITE_REVERB_HOST'),
+                'port' => env('VITE_REVERB_PORT'),
+                'scheme' => env('VITE_REVERB_SCHEME'),
+            ],
         ],
 
         'pusher' => [

@@ -213,54 +213,95 @@ function mountQuill(editorEl, inputEl, initialValue) {
  * allow your team to quickly build robust real-time web applications.
  */
 
-import './echo';
+import { liveConfig, liveState, syncEcho } from './echo';
 
 // Live notifications: Reverb pushes each new notification to the signed-in
 // user's private channel the moment it's sent; this announces it, and the bell
 // component reacts by fetching what's new, flashing the notch and refreshing
 // its badge. It (re)checks after every page change, not just on first load:
 // the app usually boots on the sign-in page and reaches the dashboard via
-// wire:navigate, which doesn't re-run scripts. It subscribes once per user and
-// leaves the channel again after logout.
+// wire:navigate, which doesn't re-run scripts. It subscribes once per user,
+// leaves the channel after logout, and connects or disconnects as the setting
+// (Settings → Live notifications, delivered in <meta name="live-config">) says.
 let liveUserId = null;
+let liveWasConnected = false;
+const announce = () => window.dispatchEvent(new CustomEvent('notification-received'));
 
 function listenForLiveNotifications() {
-    const userId = document.querySelector('meta[name="user-id"]')?.content || null;
+    const config = liveConfig();
+    const userId = (config?.enabled && document.querySelector('meta[name="user-id"]')?.content) || null;
+    const before = window.Echo;
+    const echo = syncEcho(config);
 
-    if (! window.Echo || userId === liveUserId) {
+    if (echo !== before) {
+        liveUserId = null;
+        liveWasConnected = false;
+
+        // After the live connection drops and comes back, check once for anything sent
+        // while it was down (the push for it was missed); a healthy connection costs nothing.
+        echo?.connector?.pusher?.connection?.bind('state_change', ({ current }) => {
+            if (current !== 'connected') {
+                return;
+            }
+
+            if (liveWasConnected) {
+                announce();
+            }
+
+            liveWasConnected = true;
+        });
+    }
+
+    if (! echo || userId === liveUserId) {
         return;
     }
 
     if (liveUserId) {
-        window.Echo.leave(`App.Models.User.${liveUserId}`);
+        echo.leave(`App.Models.User.${liveUserId}`);
     }
 
     liveUserId = userId;
 
     if (userId) {
-        window.Echo.private(`App.Models.User.${userId}`).notification(() => {
-            window.dispatchEvent(new CustomEvent('notification-received'));
-        });
+        echo.private(`App.Models.User.${userId}`).notification(announce);
     }
 }
 
+listenForLiveNotifications();
 document.addEventListener('livewire:navigated', listenForLiveNotifications);
 
-// After the live connection drops and comes back, check once for anything sent
-// while it was down (the push for it was missed); a healthy connection costs nothing.
-let liveWasConnected = false;
+// Saving Settings → Live notifications hands the page its new connection details, so it connects
+// (or disconnects) right away instead of on the next page load.
+window.addEventListener('live-config-changed', (event) => {
+    document.querySelector('meta[name="live-config"]')?.setAttribute('content', JSON.stringify(event.detail.config));
+    listenForLiveNotifications();
+});
 
-window.Echo?.connector?.pusher?.connection?.bind('state_change', ({ current }) => {
-    if (current !== 'connected') {
+// Fallback: while live notifications are off, or the socket is down, the bell checks for new
+// notifications every few seconds instead (the interval is part of the setting). Only for a
+// signed-in page that's actually visible, so background tabs cost nothing.
+let lastFallbackCheck = Date.now();
+
+setInterval(() => {
+    const config = liveConfig();
+
+    if (! config || document.hidden || ! document.querySelector('meta[name="user-id"]')?.content) {
         return;
     }
 
-    if (liveWasConnected) {
-        window.dispatchEvent(new CustomEvent('notification-received'));
+    if (config.enabled && liveState() === 'connected') {
+        lastFallbackCheck = Date.now();
+
+        return;
     }
 
-    liveWasConnected = true;
-});
+    if (Date.now() - lastFallbackCheck >= (config.poll || 30) * 1000) {
+        lastFallbackCheck = Date.now();
+        announce();
+    }
+}, 5000);
+
+window.liveState = liveState;
 
 // Profile photo cropper: drag to position, zoom (slider, wheel or pinch), then
 // the browser crops a 512px square and uploads only that via Livewire, which

@@ -102,7 +102,7 @@ class NotificationTest extends TestCase
         $rahim = $this->teamMember('Rahim');
         $karim = $this->teamMember('Karim');
         $hasan = $this->teamMember('Hasan');
-        $admin = User::where('email', 'admin@am2amdesk.test')->firstOrFail();
+        $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
 
         $workflow = app(TaskWorkflowService::class);
         $task = $workflow->createTask(['title' => 'Website Audit'], $rahim, $karim);

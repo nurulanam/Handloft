@@ -3,11 +3,13 @@
 namespace Tests\Feature;
 
 use App\Enums\Role;
+use App\Models\AppSetting;
 use App\Models\Task;
 use App\Models\User;
 use App\Notifications\Channels\SafeBroadcastChannel;
 use App\Notifications\TaskAssigned;
 use App\Services\TaskWorkflowService;
+use App\Support\LiveUpdates;
 use Database\Seeders\RoleAndAdminSeeder;
 use Illuminate\Broadcasting\BroadcastManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -25,6 +27,14 @@ class LiveNotificationTest extends TestCase
         parent::setUp();
 
         $this->seed(RoleAndAdminSeeder::class);
+
+        // Live notifications on, with a Reverb app of its own (the test environment's .env has none).
+        AppSetting::current()->update([
+            'live_updates_enabled' => true,
+            'reverb_app_id' => 'test-app', 'reverb_app_key' => 'test-key', 'reverb_app_secret' => 'test-secret',
+            'reverb_host' => '127.0.0.1', 'reverb_port' => 8080, 'reverb_scheme' => 'http',
+        ]);
+        LiveUpdates::forget();
     }
 
     private function teamMember(string $name): User
@@ -51,6 +61,11 @@ class LiveNotificationTest extends TestCase
         $notification = new TaskAssigned($this->task($rahim), $rahim);
 
         $this->assertSame(['database', SafeBroadcastChannel::class, 'mail'], $notification->via($karim));
+
+        // With live notifications switched off, nothing goes to Reverb; the record and the email still do.
+        AppSetting::current()->update(['live_updates_enabled' => false]);
+        LiveUpdates::forget();
+        $this->assertSame(['database', 'mail'], $notification->via($karim));
 
         $message = $notification->toBroadcast($karim);
         $this->assertInstanceOf(BroadcastMessage::class, $message);

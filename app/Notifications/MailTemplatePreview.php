@@ -23,12 +23,12 @@ class MailTemplatePreview extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
+        // A realistic sample, so the preview looks like the emails people actually get.
         return (new MailMessage)
-            ->subject('Preview: '.config('app.name').' notification email')
+            ->subject('Preview: Rahim assigned you "Redesign the onboarding emails"')
             ->greeting('Hi there,')
-            ->line('This is a preview of what your team sees when a task or project notification goes out.')
-            ->line('The header, button and footer below reflect your current Email Template settings.')
-            ->action('Sample Button', url('/'))
-            ->line('Thanks for using '.config('app.name').'!');
+            ->line('Rahim assigned you **Redesign the onboarding emails** in *Website Relaunch*. It\'s due on Friday.')
+            ->action('View task', url('/'))
+            ->line('You\'re getting this because work in '.config('app.name').' was handed to you.');
     }
 }
