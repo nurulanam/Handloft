@@ -4,6 +4,8 @@ use App\Mail\SmtpTestMail;
 use App\Models\AppSetting;
 use App\Notifications\MailTemplatePreview;
 use App\Support\MailSettings;
+use App\Support\Theme;
+use App\Support\WorkSchedule;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rule;
@@ -15,7 +17,18 @@ use Livewire\Component;
 new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
 {
     #[Url]
-    public string $tab = 'loading-screen';
+    public string $tab = 'appearance';
+
+    public string $ui_style = 'glass';
+
+    public string $theme = 'forest';
+
+    /** @var array<int, string> Off weekdays as strings ("0" = Sunday … "6" = Saturday), for checkbox binding. */
+    public array $off_days = [];
+
+    public string $week_starts_on = '1';
+
+    public string $daily_hours_target = '8';
 
     public bool $show_loading_screen = true;
 
@@ -78,6 +91,65 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
         $this->mail_button_text_color = $settings->mailButtonTextColor();
         $this->mail_footer_note = (string) $settings->mail_footer_note;
         $this->template_preview_email = auth()->user()->email;
+
+        $this->ui_style = $settings->ui_style ?: 'glass';
+        $this->theme = array_key_exists((string) $settings->theme, Theme::PRESETS) ? $settings->theme : 'forest';
+        $this->off_days = array_map('strval', WorkSchedule::offDays());
+        $this->week_starts_on = (string) WorkSchedule::weekStartsOn();
+        $this->daily_hours_target = WorkSchedule::dailyTarget() !== null ? rtrim(rtrim(number_format(WorkSchedule::dailyTarget(), 2), '0'), '.') : '';
+    }
+
+    public function saveAppearance(): void
+    {
+        abort_unless(auth()->user()->can('manage-settings'), 403);
+
+        $data = $this->validate([
+            'ui_style' => ['required', Rule::in(['glass', 'static'])],
+            'theme' => ['required', Rule::in(array_keys(Theme::PRESETS))],
+        ]);
+
+        AppSetting::current()->update($data);
+
+        $theme = Theme::PRESETS[$data['theme']];
+        $this->dispatch('appearance-saved', look: ['brand' => $theme['brand'], 'accent' => $theme['accent'], 'static' => $data['ui_style'] === 'static']);
+        $this->dispatch('notify', message: 'Appearance saved for everyone.', type: 'success');
+    }
+
+    /**
+     * Quick presets for the off-day picker.
+     */
+    public function setOffDays(string $preset): void
+    {
+        $this->off_days = match ($preset) {
+            'sat-sun' => ['6', '0'],
+            'fri' => ['5'],
+            'fri-sat' => ['5', '6'],
+            'sun' => ['0'],
+            default => [],
+        };
+        $this->resetErrorBag('off_days');
+    }
+
+    public function saveSchedule(): void
+    {
+        abort_unless(auth()->user()->can('manage-settings'), 403);
+
+        $data = $this->validate([
+            'off_days' => ['array', 'max:6'],
+            'off_days.*' => ['integer', 'between:0,6', 'distinct'],
+            'week_starts_on' => ['required', Rule::in(['0', '1', '6'])],
+            'daily_hours_target' => ['nullable', 'numeric', 'between:0.5,24'],
+        ], [
+            'off_days.max' => 'Keep at least one working day in the week.',
+        ]);
+
+        AppSetting::current()->update([
+            'off_days' => collect($data['off_days'] ?? [])->map(fn ($day) => (int) $day)->unique()->sort()->values()->all(),
+            'week_starts_on' => (int) $data['week_starts_on'],
+            'daily_hours_target' => $data['daily_hours_target'] !== null && $data['daily_hours_target'] !== '' ? (float) $data['daily_hours_target'] : null,
+        ]);
+
+        $this->dispatch('notify', message: 'Work schedule saved.', type: 'success');
     }
 
     public function saveLoadingScreen(): void
@@ -239,6 +311,8 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
     $primary = 'inline-flex w-full items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand/90 disabled:opacity-60 sm:w-auto sm:py-2';
     $secondary = 'inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-60 sm:w-auto sm:py-2';
     $tabs = [
+        'appearance' => ['Appearance', 'Look', 'Glass or static, theme colours', '<path d="m14.622 17.897-10.68-2.913"/><path d="M18.376 2.622a1 1 0 1 1 3.002 3.002L17.36 9.643a.5.5 0 0 0 0 .707l.944.944a2.41 2.41 0 0 1 0 3.408l-.944.944a.5.5 0 0 1-.707 0L8.354 7.348a.5.5 0 0 1 0-.707l.944-.944a2.41 2.41 0 0 1 3.408 0l.944.944a.5.5 0 0 0 .707 0z"/><path d="M9 8c-1.804 2.71-3.97 3.46-6.583 3.948a.507.507 0 0 0-.302.819l7.32 8.883a1 1 0 0 0 1.185.204C12.735 20.405 16 16.792 16 15"/>'],
+        'schedule' => ['Work Schedule', 'Schedule', 'Days off, week start, hours', '<path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.3V14"/><circle cx="16" cy="16" r="6"/>'],
         'loading-screen' => ['Loading Screen', 'Loading', 'Shown right after sign-in', '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>'],
         'smtp' => ['Email / SMTP', 'SMTP', 'Server used to send email', '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>'],
         'mail-template' => ['Email Template', 'Template', 'Colors and footer of emails', '<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 11.994 2z"/>'],
@@ -254,7 +328,7 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
 
     <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-8">
         {{-- Section nav: a 3-up icon tab bar on phones, a described side menu from lg up. --}}
-        <nav class="grid shrink-0 grid-cols-3 gap-1 rounded-xl border border-zinc-200 bg-white p-1 lg:sticky lg:top-20 lg:flex lg:w-64 lg:flex-col lg:gap-1 lg:p-2" aria-label="Settings sections">
+        <nav class="grid shrink-0 grid-cols-5 gap-1 rounded-xl border border-zinc-200 bg-white p-1 lg:sticky lg:top-20 lg:flex lg:w-64 lg:flex-col lg:gap-1 lg:p-2" aria-label="Settings sections">
             @foreach ($tabs as $key => [$name, $short, $hint, $icon])
                 <button
                     type="button"
@@ -283,7 +357,171 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
         </nav>
 
         <div class="min-w-0 flex-1 space-y-4 sm:space-y-6">
-            @if ($tab === 'loading-screen')
+            @if ($tab === 'appearance')
+                <form
+                    wire:submit="saveAppearance"
+                    class="overflow-hidden rounded-xl border border-zinc-200 bg-white"
+                    x-data="{ presets: @js(\App\Support\Theme::PRESETS) }"
+                    x-effect="
+                        const t = presets[$wire.theme] ?? presets.forest;
+                        applyAppearance({ brand: t.brand, accent: t.accent, static: $wire.ui_style === 'static' });
+                    "
+                >
+                    <div class="border-b border-zinc-100 px-4 py-4 sm:px-6">
+                        <h2 class="text-base font-semibold text-zinc-900">Appearance</h2>
+                        <p class="text-sm text-zinc-500">Changes preview instantly on this page; save to apply them for everyone.</p>
+                    </div>
+
+                    <div class="space-y-6 px-4 py-5 sm:px-6">
+                        <div>
+                            <p class="text-sm font-semibold text-zinc-900">Visual style</p>
+                            <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                                @foreach ([
+                                    'glass' => ['Liquid glass', 'Frosted, translucent panels with soft colour behind them.'],
+                                    'static' => ['Static', 'Solid panels, no blur or drifting — calmer and lighter on older devices.'],
+                                ] as $key => [$styleName, $styleHint])
+                                    <label class="group relative cursor-pointer">
+                                        <input type="radio" wire:model.live="ui_style" value="{{ $key }}" class="peer sr-only">
+                                        <span class="block rounded-2xl border-2 border-zinc-200 p-3 transition peer-checked:border-brand peer-focus-visible:ring-2 peer-focus-visible:ring-brand-lime/50">
+                                            {{-- Mini preview --}}
+                                            <span class="relative block h-24 overflow-hidden rounded-xl {{ $key === 'glass' ? 'bg-brand' : 'bg-zinc-100' }}">
+                                                @if ($key === 'glass')
+                                                    <span class="absolute -left-4 top-2 size-20 rounded-full bg-brand-lime/70 blur-xl"></span>
+                                                    <span class="absolute right-2 top-8 size-16 rounded-full bg-emerald-300/70 blur-xl"></span>
+                                                    <span class="absolute inset-x-4 bottom-3 top-6 rounded-xl border border-white/50 bg-white/40 backdrop-blur-md"></span>
+                                                @else
+                                                    <span class="absolute inset-x-4 bottom-3 top-6 rounded-xl border border-zinc-200 bg-white shadow-sm"></span>
+                                                @endif
+                                                <span class="absolute left-7 top-9 h-2 w-16 rounded-full {{ $key === 'glass' ? 'bg-white/80' : 'bg-zinc-200' }}"></span>
+                                                <span class="absolute left-7 top-13 h-2 w-24 rounded-full {{ $key === 'glass' ? 'bg-white/60' : 'bg-zinc-100' }}"></span>
+                                            </span>
+                                            <span class="mt-3 flex items-center justify-between gap-2">
+                                                <span class="text-sm font-semibold text-zinc-900">{{ $styleName }}</span>
+                                                <span class="flex size-5 items-center justify-center rounded-full border-2 border-zinc-300 group-has-[:checked]:border-brand group-has-[:checked]:bg-brand">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="hidden size-3 text-white group-has-[:checked]:block"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
+                                                </span>
+                                            </span>
+                                            <span class="mt-0.5 block text-xs text-zinc-500">{{ $styleHint }}</span>
+                                        </span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+
+                        <div>
+                            <p class="text-sm font-semibold text-zinc-900">Theme colour</p>
+                            <p class="text-xs text-zinc-500">Recolours the logo, buttons, highlights, active menu items and focus rings.</p>
+                            <div class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                @foreach (\App\Support\Theme::PRESETS as $key => $preset)
+                                    <label class="group cursor-pointer">
+                                        <input type="radio" wire:model.live="theme" value="{{ $key }}" class="peer sr-only">
+                                        <span class="flex items-center gap-3 rounded-2xl border-2 border-zinc-200 p-3 transition peer-checked:border-[var(--swatch)] peer-focus-visible:ring-2 peer-focus-visible:ring-brand-lime/50" style="--swatch: {{ $preset['brand'] }}">
+                                            <span class="relative size-10 shrink-0 rounded-xl" style="background-color: {{ $preset['brand'] }}">
+                                                <span class="absolute -bottom-1 -right-1 size-4 rounded-full ring-2 ring-white" style="background-color: {{ $preset['accent'] }}"></span>
+                                            </span>
+                                            <span class="min-w-0 flex-1">
+                                                <span class="block text-sm font-semibold text-zinc-900">{{ $preset['name'] }}</span>
+                                                <span class="mt-1 inline-block rounded-md px-2 py-0.5 text-[10px] font-semibold text-white" style="background-color: {{ $preset['brand'] }}">Button</span>
+                                            </span>
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="hidden size-5 shrink-0 group-has-[:checked]:block" style="color: {{ $preset['brand'] }}"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" /></svg>
+                                        </span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end border-t border-zinc-100 bg-zinc-50/70 px-4 py-3 sm:px-6">
+                        <button type="submit" class="{{ $primary }}" wire:loading.attr="disabled" wire:target="saveAppearance">Save appearance</button>
+                    </div>
+                </form>
+            @elseif ($tab === 'schedule')
+                @php
+                    $offSelected = collect($off_days)->map(fn ($d) => (int) $d);
+                    $workingPerWeek = 7 - $offSelected->unique()->count();
+                    $targetValue = is_numeric($daily_hours_target) ? (float) $daily_hours_target : null;
+                @endphp
+                <form wire:submit="saveSchedule" class="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+                    <div class="border-b border-zinc-100 px-4 py-4 sm:px-6">
+                        <h2 class="text-base font-semibold text-zinc-900">Work schedule</h2>
+                        <p class="text-sm text-zinc-500">Used by the calendar, dashboard, work history and reports.</p>
+                    </div>
+
+                    <div class="divide-y divide-zinc-100">
+                        <div class="grid gap-4 px-4 py-5 sm:px-6 lg:grid-cols-3 lg:gap-6">
+                            <div>
+                                <h3 class="text-sm font-semibold text-zinc-900">Weekly days off</h3>
+                                <p class="text-xs text-zinc-500">Shaded in the calendar and reports, and left out of hour targets.</p>
+                            </div>
+                            <div class="lg:col-span-2">
+                                <div class="grid grid-cols-7 gap-1.5">
+                                    @foreach (\App\Support\WorkSchedule::DAY_NAMES as $dayNumber => $dayName)
+                                        <label class="cursor-pointer">
+                                            <input type="checkbox" wire:model.live="off_days" value="{{ $dayNumber }}" class="peer sr-only">
+                                            <span class="flex flex-col items-center rounded-xl border-2 border-zinc-200 py-2 text-center transition peer-checked:border-brand peer-checked:bg-brand peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-brand-lime/50">
+                                                <span class="text-sm font-semibold">{{ substr($dayName, 0, 3) }}</span>
+                                                <span class="text-[10px] opacity-70">{{ $offSelected->contains($dayNumber) ? 'Off' : 'Work' }}</span>
+                                            </span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                                <div class="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
+                                    <span class="text-zinc-500">Quick pick:</span>
+                                    @foreach (['sat-sun' => 'Sat + Sun', 'fri' => 'Friday only', 'fri-sat' => 'Fri + Sat', 'sun' => 'Sunday only', 'none' => 'No days off'] as $preset => $presetLabel)
+                                        <button type="button" wire:click="setOffDays('{{ $preset }}')" class="rounded-full border border-zinc-300 px-2.5 py-1 font-medium text-zinc-600 hover:border-brand hover:text-brand">{{ $presetLabel }}</button>
+                                    @endforeach
+                                </div>
+                                @error('off_days') <p class="mt-2 text-xs text-red-600">{{ $message }}</p> @enderror
+                            </div>
+                        </div>
+
+                        <div class="grid gap-4 px-4 py-5 sm:px-6 lg:grid-cols-3 lg:gap-6">
+                            <div>
+                                <h3 class="text-sm font-semibold text-zinc-900">Week starts on</h3>
+                                <p class="text-xs text-zinc-500">The first column of the calendar, and where "this week" begins.</p>
+                            </div>
+                            <div class="lg:col-span-2">
+                                <div class="grid grid-cols-3 rounded-lg border border-zinc-300 bg-white p-0.5 sm:inline-grid sm:w-80">
+                                    @foreach (['6' => 'Saturday', '0' => 'Sunday', '1' => 'Monday'] as $value => $startLabel)
+                                        <label class="cursor-pointer">
+                                            <input type="radio" wire:model.live="week_starts_on" value="{{ $value }}" class="peer sr-only">
+                                            <span class="block rounded-md py-1.5 text-center text-sm font-medium text-zinc-600 peer-checked:bg-brand peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-brand-lime/50">{{ $startLabel }}</span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                                @error('week_starts_on') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                            </div>
+                        </div>
+
+                        <div class="grid gap-4 px-4 py-5 sm:px-6 lg:grid-cols-3 lg:gap-6">
+                            <div>
+                                <h3 class="text-sm font-semibold text-zinc-900">Daily hours target</h3>
+                                <p class="text-xs text-zinc-500">Expected hours per working day. Leave empty for no target.</p>
+                            </div>
+                            <div class="lg:col-span-2">
+                                <div class="flex items-center gap-3">
+                                    <div class="relative w-32">
+                                        <input wire:model.live.debounce.400ms="daily_hours_target" type="number" min="0.5" max="24" step="0.5" inputmode="decimal" placeholder="—" class="{{ $input }} pr-8">
+                                        <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-zinc-400">h</span>
+                                    </div>
+                                    <p class="text-sm text-zinc-600">
+                                        @if ($targetValue)
+                                            {{ $workingPerWeek }} working {{ \Illuminate\Support\Str::plural('day', $workingPerWeek) }} × {{ rtrim(rtrim(number_format($targetValue, 2), '0'), '.') }}h = <b class="text-zinc-900">{{ \App\Support\Duration::forHumans($workingPerWeek * $targetValue) }}</b> a week
+                                        @else
+                                            {{ $workingPerWeek }} working {{ \Illuminate\Support\Str::plural('day', $workingPerWeek) }} a week, no hours target
+                                        @endif
+                                    </p>
+                                </div>
+                                @error('daily_hours_target') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end border-t border-zinc-100 bg-zinc-50/70 px-4 py-3 sm:px-6">
+                        <button type="submit" class="{{ $primary }}" wire:loading.attr="disabled" wire:target="saveSchedule">Save work schedule</button>
+                    </div>
+                </form>
+            @elseif ($tab === 'loading-screen')
                 <form wire:submit="saveLoadingScreen" x-data class="overflow-hidden rounded-xl border border-zinc-200 bg-white">
                     <div class="flex items-start justify-between gap-4 border-b border-zinc-100 px-4 py-4 sm:px-6">
                         <div>

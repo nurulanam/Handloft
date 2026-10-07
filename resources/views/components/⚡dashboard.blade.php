@@ -7,6 +7,7 @@ use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Models\TaskTimeLog;
 use App\Models\User;
+use App\Support\WorkSchedule;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -25,8 +26,8 @@ new #[Layout('layouts.app')] #[Title('Dashboard')] class extends Component
     {
         $user = auth()->user();
         $today = now()->startOfDay();
-        $weekStart = now()->startOfWeek();
-        $weekEnd = now()->endOfWeek();
+        $weekStart = WorkSchedule::startOfWeek(now());
+        $weekEnd = WorkSchedule::endOfWeek(now());
 
         $mine = fn (): Builder => Task::query()
             ->where('status', '!=', TaskStatus::Done)
@@ -49,6 +50,8 @@ new #[Layout('layouts.app')] #[Title('Dashboard')] class extends Component
                 'overdue' => $mine()->whereNotNull('deadline')->whereDate('deadline', '<', $today)->count(),
                 'hoursWeek' => (float) $myLogs()->whereDate('logged_date', '>=', $weekStart)->whereDate('logged_date', '<=', $weekEnd)->sum('hours'),
                 'hoursToday' => (float) $myLogs()->whereDate('logged_date', $today)->sum('hours'),
+                // The week's target: working days this week × the daily target (null when no target is set).
+                'weekTarget' => WorkSchedule::dailyTarget() !== null ? WorkSchedule::dailyTarget() * WorkSchedule::workingDaysBetween($weekStart, $weekEnd) : null,
             ],
             'attention' => $this->attention($user, $today),
             'chart' => $this->hoursByDay($myLogs()),
@@ -211,7 +214,7 @@ new #[Layout('layouts.app')] #[Title('Dashboard')] class extends Component
             ['Assigned to me', $my['open'], 'open tasks', route('tasks.index', ['tab' => 'assigned-to-me', 'view' => 'list']), 'bg-brand/10 text-brand', 'tasks', false],
             ['Due this week', $my['dueThisWeek'], 'still open', route('tasks.index', ['tab' => 'assigned-to-me', 'view' => 'list']), 'bg-amber-100 text-amber-600', 'calendar', false],
             ['Overdue', $my['overdue'], $my['overdue'] > 0 ? 'needs attention' : 'all on track', route('tasks.index', ['tab' => 'assigned-to-me', 'view' => 'list']), $my['overdue'] > 0 ? 'bg-red-100 text-red-600' : 'bg-zinc-100 text-zinc-400', 'notifications', $my['overdue'] > 0],
-            ['My hours this week', \App\Support\Duration::forHumans($my['hoursWeek']), \App\Support\Duration::forHumans($my['hoursToday']).' today', route('work-history.index'), 'bg-brand-lime/25 text-brand', 'work-history', false],
+            ['My hours this week', \App\Support\Duration::forHumans($my['hoursWeek']), ($my['weekTarget'] ? 'of '.\App\Support\Duration::forHumans($my['weekTarget']).' target · ' : '').\App\Support\Duration::forHumans($my['hoursToday']).' today', route('work-history.index'), 'bg-brand-lime/25 text-brand', 'work-history', false],
         ] as [$label, $value, $hint, $href, $tone, $icon, $alert])
             <a href="{{ $href }}" wire:navigate class="group rounded-xl border border-zinc-200 bg-white p-4 transition hover:border-brand/30 hover:shadow-sm sm:p-5">
                 <div class="flex items-center justify-between gap-2">

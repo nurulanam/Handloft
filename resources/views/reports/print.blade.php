@@ -12,6 +12,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $heading }} · {{ $period->label() }}</title>
     <link rel="icon" href="/favicon.ico" sizes="any">
+    {!! \App\Support\Theme::styleTag() !!}
     <style>
         @page { size: A4 {{ $landscape ? 'landscape' : 'portrait' }}; margin: {{ $landscape ? '10mm' : '14mm 12mm' }}; }
         * { box-sizing: border-box; }
@@ -22,7 +23,7 @@
         .btn-primary { background: #10512a; border-color: #10512a; color: #fff; }
         header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding-bottom: 12px; border-bottom: 2px solid #10512a; }
         .brand { display: flex; align-items: center; gap: 10px; }
-        .brand img { width: 34px; height: 34px; }
+        .brand .logo { width: 34px; height: 34px; flex-shrink: 0; }
         .brand strong { display: block; font-size: 16px; }
         .brand span, .meta { color: #71717a; font-size: 10.5px; }
         .meta { text-align: right; }
@@ -77,7 +78,7 @@
     <main class="sheet">
         <header>
             <div class="brand">
-                <img src="/logo.svg" alt="">
+                <x-logo-mark class="logo" />
                 <div>
                     <strong>{{ $heading }}</strong>
                     <span>{{ config('app.name') }} · {{ ucfirst($period->type === 'custom' ? 'custom range' : $period->type) }} report</span>
@@ -107,7 +108,7 @@
         @if ($person)
             <div class="kpis">
                 @foreach ([
-                    ['Hours logged', \App\Support\Duration::forHumans($person['hours']), $person['activeDays'].' active '.\Illuminate\Support\Str::plural('day', $person['activeDays'])],
+                    ['Hours logged', \App\Support\Duration::forHumans($person['hours']), $person['targetHours'] ? 'of '.\App\Support\Duration::forHumans($person['targetHours']).' target ('.$person['targetRate'].'%)' : $person['activeDays'].' active '.\Illuminate\Support\Str::plural('day', $person['activeDays'])],
                     ['Average / active day', \App\Support\Duration::forHumans($person['avgPerActiveDay']), $person['role']],
                     ['Tasks worked on', $person['tasksWorked'], 'with time logged'],
                     ['Tasks completed', $person['completedCount'], $person['onTimeRate'] !== null ? $person['onTimeRate'].'% on time' : 'no deadlines'],

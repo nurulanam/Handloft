@@ -16,6 +16,19 @@
 
         @livewireStyles
 
+        {{-- Theme colours are set on <body> (see Theme::bodyStyle), which wire:navigate replaces on every
+             page change. A page restored from the back/forward cache still carries the colours it was
+             rendered with, so the latest saved appearance is re-applied after each navigation. --}}
+        <script>
+            window.applyAppearance = (look) => {
+                document.body.style.setProperty('--color-brand', look.brand);
+                document.body.style.setProperty('--color-brand-lime', look.accent);
+                document.body.classList.toggle('ui-static', look.static);
+            };
+            window.addEventListener('appearance-saved', (e) => (window.savedAppearance = e.detail.look));
+            document.addEventListener('livewire:navigated', () => window.savedAppearance && window.applyAppearance(window.savedAppearance));
+        </script>
+
         {{-- Carves a notch into the sidebar's right edge around the collapse
              toggle, with rounded (filleted) shoulders so the edge flows into
              the notch instead of meeting it at a sharp corner. The cut shape
@@ -442,7 +455,8 @@
         </style>
     </head>
     <body
-        class="min-h-screen bg-zinc-50 font-sans antialiased"
+        class="min-h-screen bg-zinc-50 font-sans antialiased{{ \App\Support\Theme::isStatic() ? ' ui-static' : '' }}"
+        style="{{ \App\Support\Theme::bodyStyle() }}"
         x-data="{
             sidebarOpen: false,
             drag: null,

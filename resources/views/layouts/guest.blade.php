@@ -13,8 +13,9 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
 
         @livewireStyles
+        {!! \App\Support\Theme::styleTag() !!}
     </head>
-    <body class="min-h-screen bg-white font-sans antialiased">
+    <body class="min-h-screen bg-white font-sans antialiased{{ \App\Support\Theme::isStatic() ? ' ui-static' : '' }}">
         <div class="flex min-h-screen">
             {{-- Brand panel — hidden below lg so the form is never squeezed
                  on a phone or tablet; the small inline logo in the form

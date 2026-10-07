@@ -560,8 +560,8 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
 
             <div class="mt-3 grid grid-cols-2 gap-3 sm:mt-4 sm:gap-4 lg:grid-cols-5">
                 @foreach ([
-                    ['Hours logged', $h($pr['hours']), null],
-                    ['Active days', $pr['activeDays'], 'of '.$range->days().' in period'],
+                    ['Hours logged', $h($pr['hours']), $pr['targetHours'] ? 'of '.$h($pr['targetHours']).' target · '.$pr['targetRate'].'%' : null],
+                    ['Active days', $pr['activeDays'], 'of '.$pr['workingDays'].' working '.\Illuminate\Support\Str::plural('day', $pr['workingDays']).' so far'],
                     ['Avg / active day', $pr['activeDays'] > 0 ? $h($pr['avgPerActiveDay']) : '—', null],
                     ['Tasks worked on', $pr['tasksWorked'], 'with time logged'],
                     ['Tasks completed', $pr['completedCount'], $pr['onTimeRate'] !== null ? $pr['onTimeRate'].'% on time' : null],
@@ -701,7 +701,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
                             <tr>
                                 <th class="sticky left-0 z-10 border-b border-zinc-200 bg-zinc-50 px-4 py-2.5 text-left font-semibold text-zinc-600">Person</th>
                                 @foreach ($grid['buckets'] as $bucket)
-                                    @php $weekend = $byDay && \Illuminate\Support\Carbon::parse($bucket['key'])->isWeekend(); @endphp
+                                    @php $weekend = $byDay && \App\Support\WorkSchedule::isOffDay(\Illuminate\Support\Carbon::parse($bucket['key'])); @endphp
                                     <th class="min-w-11 border-b border-zinc-200 px-1 py-2 text-center font-medium {{ $weekend ? 'bg-zinc-100 text-zinc-400' : 'bg-zinc-50 text-zinc-600' }}" title="{{ $bucket['long'] }}">
                                         @if ($byDay)
                                             <span class="block text-[10px] font-normal">{{ \Illuminate\Support\Carbon::parse($bucket['key'])->format('D') }}</span>{{ \Illuminate\Support\Carbon::parse($bucket['key'])->format('j') }}
@@ -741,7 +741,7 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
                         </tfoot>
                     </table>
                 </div>
-                <p class="mt-2 text-xs text-zinc-500">Hours per {{ $range->granularity() }} (decimal). Darker cells mean more hours.{{ $byDay ? ' Weekends are shaded.' : '' }}</p>
+                <p class="mt-2 text-xs text-zinc-500">Hours per {{ $range->granularity() }} (decimal). Darker cells mean more hours.{{ $byDay ? ' Days off are shaded.' : '' }}</p>
             @else
             @php $peopleMax = max($peopleRows->max('hours'), 0.01); @endphp
             @if ($peopleRows->isEmpty())

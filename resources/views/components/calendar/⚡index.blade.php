@@ -3,6 +3,7 @@
 use App\Enums\ProjectStatus;
 use App\Models\Project;
 use App\Models\Task;
+use App\Support\WorkSchedule;
 use Illuminate\Support\Carbon;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -126,12 +127,12 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
 
         return match ($this->view) {
             'month' => [
-                $anchor->copy()->startOfMonth()->startOfWeek(Carbon::SUNDAY),
-                $anchor->copy()->endOfMonth()->endOfWeek(Carbon::SATURDAY),
+                WorkSchedule::startOfWeek($anchor->copy()->startOfMonth()),
+                WorkSchedule::endOfWeek($anchor->copy()->endOfMonth()),
             ],
             'week' => [
-                $anchor->copy()->startOfWeek(Carbon::SUNDAY),
-                $anchor->copy()->endOfWeek(Carbon::SATURDAY),
+                WorkSchedule::startOfWeek($anchor),
+                WorkSchedule::endOfWeek($anchor),
             ],
             default => [$anchor->copy()->startOfDay(), $anchor->copy()->endOfDay()],
         };
@@ -365,8 +366,8 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
 
         <div class="overflow-hidden rounded-lg border border-zinc-200 bg-white {{ $view === 'week' ? 'hidden sm:block' : '' }}">
             <div class="grid grid-cols-7 border-b border-zinc-200 bg-zinc-50">
-                @foreach (['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as $weekday)
-                    <div class="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">{{ $weekday }}</div>
+                @foreach (WorkSchedule::weekdays() as $weekday)
+                    <div class="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wide text-zinc-500 {{ $weekday['off'] ? 'text-zinc-400' : '' }}" title="{{ $weekday['off'] ? 'Day off' : '' }}">{{ $weekday['short'] }}</div>
                 @endforeach
             </div>
 
@@ -380,7 +381,7 @@ new #[Layout('layouts.app')] #[Title('Calendar')] class extends Component
                     @endphp
                     <div
                         wire:click="openDay('{{ $day->toDateString() }}')"
-                        class="min-h-16 cursor-pointer border-b border-r border-zinc-100 p-1 hover:bg-zinc-50 sm:min-h-28 sm:p-1.5 {{ $isCurrentMonth ? 'bg-white' : 'bg-zinc-50' }} {{ $isToday ? 'ring-2 ring-inset ring-brand' : '' }}"
+                        class="min-h-16 cursor-pointer border-b border-r border-zinc-100 p-1 hover:bg-zinc-50 sm:min-h-28 sm:p-1.5 {{ ! $isCurrentMonth ? 'bg-zinc-50' : (WorkSchedule::isOffDay($day) ? 'bg-zinc-50/70' : 'bg-white') }} {{ $isToday ? 'ring-2 ring-inset ring-brand' : '' }}"
                         title="Show everything on {{ $day->format('d M Y') }}"
                     >
                         <span class="inline-flex size-6 items-center justify-center rounded-full text-xs font-medium {{ $isToday ? 'bg-brand text-white' : ($isCurrentMonth ? 'text-zinc-700' : 'text-zinc-300') }}">

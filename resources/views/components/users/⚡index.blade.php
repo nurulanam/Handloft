@@ -87,8 +87,8 @@ new #[Layout('layouts.app')] #[Title('Team')] class extends Component
 
         $hoursThisWeek = TaskTimeLog::query()
             ->whereIn('user_id', $ids)
-            ->whereDate('logged_date', '>=', now()->startOfWeek())
-            ->whereDate('logged_date', '<=', now()->endOfWeek())
+            ->whereDate('logged_date', '>=', \App\Support\WorkSchedule::startOfWeek(now()))
+            ->whereDate('logged_date', '<=', \App\Support\WorkSchedule::endOfWeek(now()))
             ->selectRaw('user_id, sum(hours) as total')
             ->groupBy('user_id')
             ->toBase()

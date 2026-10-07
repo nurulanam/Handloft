@@ -11,6 +11,7 @@ use App\Models\TaskActivity;
 use App\Models\TaskAssignment;
 use App\Models\TaskTimeLog;
 use App\Models\User;
+use App\Support\WorkSchedule;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -443,6 +444,11 @@ final class ReportBuilder
 
         $hours = (float) $timeLogs->sum('hours');
         $activeDays = $timeLogs->map(fn ($log) => $log->logged_date->toDateString())->unique()->count();
+
+        // Expected hours: the working days elapsed so far in the period (days off and future days don't count) × the daily target.
+        $elapsedEnd = $end->lessThan(now()) ? $end : now()->endOfDay();
+        $workingDays = $elapsedEnd->lessThan($start) ? 0 : WorkSchedule::workingDaysBetween($start, $elapsedEnd);
+        $target = WorkSchedule::dailyTarget() !== null ? WorkSchedule::dailyTarget() * $workingDays : null;
         $withDeadline = $completed->filter(fn (Task $task) => $task->deadline);
         $onTime = $withDeadline->filter(fn (Task $task) => substr((string) $task->completed_at, 0, 10) <= $task->deadline->toDateString());
 
@@ -451,6 +457,9 @@ final class ReportBuilder
             'role' => Role::tryFrom($user->getRoleNames()->first() ?? '')?->label() ?? '—',
             'hours' => $hours,
             'activeDays' => $activeDays,
+            'workingDays' => $workingDays,
+            'targetHours' => $target,
+            'targetRate' => $target ? (int) round($hours / $target * 100) : null,
             'avgPerActiveDay' => $activeDays > 0 ? $hours / $activeDays : 0.0,
             'tasksWorked' => $timeLogs->pluck('task_id')->unique()->count(),
             'completedCount' => $completed->count(),
@@ -482,6 +491,9 @@ final class ReportBuilder
                     ['Department', $user->department ?: '—'],
                     ['Hours logged', round($person['hours'], 2)],
                     ['Active days', $person['activeDays']],
+                    ['Working days (so far)', $person['workingDays']],
+                    ['Target hours', $person['targetHours'] !== null ? round($person['targetHours'], 2) : '—'],
+                    ['Of target %', $person['targetRate'] ?? '—'],
                     ['Average per active day', round($person['avgPerActiveDay'], 2)],
                     ['Tasks worked on', $person['tasksWorked']],
                     ['Tasks completed', $person['completedCount']],

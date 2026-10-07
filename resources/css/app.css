@@ -223,3 +223,46 @@
 @media (prefers-reduced-motion: reduce) {
     .auth-sheet, .auth-hero, .auth-sheet > div > *, .auth-sheet form > * { animation: none; }
 }
+
+/* Settings → Appearance → Static: solid surfaces instead of liquid glass. Blur is switched off
+   everywhere; frosted white panels turn solid white (the dark phone toast and the translucent
+   cards on green backgrounds keep their own colours); decorative drifting stops. */
+.ui-static [class*="backdrop-blur"],
+.ui-static .notch-glass {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+}
+
+.ui-static [class*="bg-white/"][class*="backdrop-blur"]:not([class*="bg-white/1"]):not([class*="bg-zinc-950"]):not([class*="lg:bg-"]) {
+    background-color: #fff;
+}
+
+/* Panels that switch to their own background from lg up (the sidebar is frosted white as a phone
+   drawer but dark zinc on desktop) only turn solid white below lg, so the desktop colours stay. */
+@media (max-width: 1023.98px) {
+    .ui-static [class*="bg-white/"][class*="backdrop-blur"][class*="lg:bg-"] {
+        background-color: #fff;
+    }
+}
+
+@media (min-width: 640px) {
+    .ui-static [class*="sm:bg-white/"][class*="backdrop-blur"] {
+        background-color: #fff;
+    }
+}
+
+.ui-static .notch-glass {
+    background-color: rgb(255 255 255 / 0.97);
+}
+
+.ui-static .notch-backdrop {
+    display: none;
+}
+
+.ui-static .glow-drift,
+.ui-static .glow-drift-alt,
+.ui-static .float-slow,
+.ui-static .float-slower,
+.ui-static .notch-backdrop span {
+    animation: none;
+}

@@ -2,6 +2,7 @@
 
 namespace App\Reports;
 
+use App\Support\WorkSchedule;
 use Carbon\CarbonImmutable;
 
 /**
@@ -49,7 +50,7 @@ final class ReportPeriod
     {
         return match ($type) {
             'daily' => new self($type, $anchor->startOfDay(), $anchor->endOfDay()),
-            'weekly' => new self($type, $anchor->startOfWeek(), $anchor->endOfWeek()),
+            'weekly' => new self($type, WorkSchedule::startOfWeek($anchor), WorkSchedule::endOfWeek($anchor)),
             'yearly' => new self($type, $anchor->startOfYear(), $anchor->endOfYear()),
             default => new self('monthly', $anchor->startOfMonth(), $anchor->endOfMonth()),
         };

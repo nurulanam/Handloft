@@ -65,7 +65,7 @@ new #[Layout('layouts.app')] #[Title('Work History')] class extends Component
     public function periodBounds(): array
     {
         return match ($this->range) {
-            'week' => [now()->startOfWeek(), now()->endOfWeek()],
+            'week' => [\App\Support\WorkSchedule::startOfWeek(now()), \App\Support\WorkSchedule::endOfWeek(now())],
             'month' => [now()->startOfMonth(), now()->endOfMonth()],
             'custom' => [
                 $this->from ? \Illuminate\Support\Carbon::parse($this->from)->startOfDay() : now()->startOfDay(),

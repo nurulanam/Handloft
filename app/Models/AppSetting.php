@@ -26,6 +26,11 @@ use Illuminate\Database\Eloquent\Model;
     'mail_brand_color',
     'mail_button_text_color',
     'mail_footer_note',
+    'off_days',
+    'week_starts_on',
+    'daily_hours_target',
+    'ui_style',
+    'theme',
 ])]
 class AppSetting extends Model
 {
@@ -40,6 +45,9 @@ class AppSetting extends Model
             // Laravel transparently encrypts/decrypts this on save/read, so
             // the SMTP password is never stored or logged in plain text.
             'mail_password' => 'encrypted',
+            'off_days' => 'array',
+            'week_starts_on' => 'integer',
+            'daily_hours_target' => 'float',
         ];
     }
 
@@ -54,6 +62,11 @@ class AppSetting extends Model
             'loading_screen_opacity' => 10,
             'loading_screen_blur' => 64,
             'loading_screen_style' => 'jampe',
+            'off_days' => [0, 6],
+            'week_starts_on' => 1,
+            'daily_hours_target' => 8,
+            'ui_style' => 'glass',
+            'theme' => 'forest',
         ]);
     }
 
