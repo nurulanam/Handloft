@@ -18,8 +18,11 @@ final class ReportExport
     public function __construct(private readonly ReportBuilder $builder) {}
 
     /**
+     * The named tables for a section. A table may also carry print-only hints: "print_headers" (shorter
+     * column labels), "blank_zero" (print zero cells as blank) and "page_break" (start a new printed page).
+     *
      * @param  array<string, mixed>  $filters  task filters (project, status, assignee, search) and, for "person", the user id
-     * @return list<array{name: string, title: string, headers: list<string>, rows: list<list<mixed>>}>
+     * @return list<array{name: string, title: string, headers: list<string>, rows: list<list<mixed>>, print_headers?: list<string>, blank_zero?: bool, page_break?: bool}>
      */
     public function tables(string $section, array $filters = []): array
     {
@@ -29,17 +32,14 @@ final class ReportExport
             return $this->builder->personTables($this->person($filters));
         }
 
+        // The printed full report is paged: summary + status · trend + projects · tasks · people + daily hours.
+        $full = $section === 'all';
+
         if (in_array($section, ['overview', 'all'], true)) {
             $overview = $this->builder->overview();
             $summary = $this->builder->summaryRows($overview);
 
             $tables[] = ['name' => 'Summary', 'title' => 'Summary', 'headers' => array_shift($summary), 'rows' => $summary];
-            $tables[] = [
-                'name' => 'Trend',
-                'title' => 'Trend by '.$this->builder->period->granularity(),
-                'headers' => ['Period', 'Hours logged', 'Tasks created', 'Tasks completed'],
-                'rows' => array_map(fn ($b) => [$b['long'], round($b['hours'], 2), $b['created'], $b['completed']], $overview['series']),
-            ];
             $tables[] = [
                 'name' => 'Status of new tasks',
                 'title' => 'Current status of tasks created in the period',
@@ -47,26 +47,36 @@ final class ReportExport
                 'rows' => $overview['statusBreakdown']->map(fn ($row) => [$row['status']->label(), $row['count']])->all(),
             ];
             $tables[] = [
-                'name' => 'Hours by project',
-                'title' => 'Hours by project',
-                'headers' => ['Project', 'Hours'],
-                'rows' => $this->builder->hoursByProject()->map(fn ($row) => [$row['name'], round($row['hours'], 2)])->all(),
+                'name' => 'Trend',
+                'page_break' => $full,
+                'title' => 'Trend by '.$this->builder->period->granularity(),
+                'headers' => ['Period', 'Hours logged', 'Tasks created', 'Tasks completed'],
+                'rows' => array_map(fn ($b) => [$b['long'], round($b['hours'], 2), $b['created'], $b['completed']], $overview['series']),
             ];
         }
 
-        if (in_array($section, ['tasks', 'all'], true)) {
-            $tables[] = ['name' => 'Tasks', 'title' => 'Tasks', 'headers' => ReportBuilder::TASK_COLUMNS, 'rows' => $this->builder->taskRows($section === 'all' ? [] : $filters)];
-        }
-
+        // Per-project hours live in the Projects table's "Hours (period)" column (there is no separate
+        // "hours by project" table); in the full report it follows the trend, before Tasks.
         if (in_array($section, ['projects', 'all'], true)) {
             $tables[] = ['name' => 'Projects', 'title' => 'Projects', 'headers' => ReportBuilder::PROJECT_COLUMNS, 'rows' => $this->builder->projectRows()];
         }
 
+        if (in_array($section, ['tasks', 'all'], true)) {
+            $tables[] = ['name' => 'Tasks', 'title' => 'Tasks', 'page_break' => $full, 'headers' => ReportBuilder::TASK_COLUMNS, 'rows' => $this->builder->taskRows($section === 'all' ? [] : $filters)];
+        }
+
         if (in_array($section, ['people', 'all'], true)) {
-            $tables[] = ['name' => 'People', 'title' => 'People', 'headers' => ReportBuilder::PEOPLE_COLUMNS, 'rows' => $this->builder->peopleRows()];
+            $tables[] = ['name' => 'People', 'title' => 'People', 'page_break' => $full, 'headers' => ReportBuilder::PEOPLE_COLUMNS, 'rows' => $this->builder->peopleRows()];
 
             $grid = $this->builder->dailyHoursTable();
-            $tables[] = ['name' => 'Daily hours', 'title' => 'Hours per person by '.$this->builder->period->granularity(), 'headers' => $grid['headers'], 'rows' => $grid['rows']];
+            $tables[] = [
+                'name' => 'Daily hours',
+                'title' => 'Hours per person by '.$this->builder->period->granularity().' ('.$grid['scope'].')',
+                'headers' => $grid['headers'],
+                'print_headers' => $grid['labels'],
+                'blank_zero' => true,
+                'rows' => $grid['rows'],
+            ];
         }
 
         return $tables;

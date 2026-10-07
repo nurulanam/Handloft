@@ -11,6 +11,7 @@ use App\Models\TaskActivity;
 use App\Models\TaskAssignment;
 use App\Models\TaskTimeLog;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -372,11 +373,17 @@ final class ReportBuilder
     }
 
     /**
-     * @return array{headers: list<string>, rows: list<list<mixed>>}
+     * The person × day grid as a table. "headers" keep full dates (Y-m-d / Y-m) for CSV and Excel; "labels"
+     * are the short column labels for print (01, 02 … within one month; 28/09 across months; Jan, Feb … by
+     * month), and "scope" names the span those short labels belong to, e.g. "October 2026".
+     *
+     * @return array{headers: list<string>, labels: list<string>, scope: string, rows: list<list<mixed>>}
      */
     public function dailyHoursTable(): array
     {
         $grid = $this->dailyHours();
+        $byDay = $this->period->granularity() === 'day';
+        $oneMonth = $this->period->start->isSameMonth($this->period->end);
 
         $rows = $grid['rows']->map(fn ($row) => [
             $row['user']->name,
@@ -385,7 +392,22 @@ final class ReportBuilder
         ])->all();
         $rows[] = ['Total', ...array_map(fn ($hours) => round($hours, 2), array_values($grid['totals'])), round(array_sum($grid['totals']), 2)];
 
-        return ['headers' => ['Person', ...array_column($grid['buckets'], 'key'), 'Total'], 'rows' => $rows];
+        $labels = array_map(function (array $bucket) use ($byDay, $oneMonth) {
+            $date = CarbonImmutable::parse($byDay ? $bucket['key'] : $bucket['key'].'-01');
+
+            return match (true) {
+                ! $byDay => $date->format('M'),
+                $oneMonth => $date->format('d'),
+                default => $date->format('d/m'),
+            };
+        }, $grid['buckets']);
+
+        return [
+            'headers' => ['Person', ...array_column($grid['buckets'], 'key'), 'Total'],
+            'labels' => ['Person', ...$labels, 'Total'],
+            'scope' => $byDay && $oneMonth ? $this->period->start->format('F Y') : $this->period->label(),
+            'rows' => $rows,
+        ];
     }
 
     /* ------------------------------------------------------------------ */
