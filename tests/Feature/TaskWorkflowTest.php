@@ -580,7 +580,7 @@ class TaskWorkflowTest extends TestCase
         $this->assertTrue($taskIds->contains($unrelatedTask->id));
     }
 
-    public function test_board_card_shows_a_sub_pill_for_subtasks_and_role_pills_for_the_viewer(): void
+    public function test_board_card_shows_the_parent_for_subtasks_and_role_pills_for_the_viewer(): void
     {
         $rahim = $this->teamMember('Rahim');
 
@@ -593,7 +593,7 @@ class TaskWorkflowTest extends TestCase
         Livewire::actingAs($rahim)
             ->test('tasks.index')
             ->set('tab', 'all')
-            ->assertSee("SUB-{$parent->id}")
+            ->assertSee("Subtask of {$parent->task_key}")
             ->assertSee('Assignee')
             ->assertSee('Reporter');
     }

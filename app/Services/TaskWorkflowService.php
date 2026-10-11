@@ -240,6 +240,38 @@ class TaskWorkflowService
     }
 
     /**
+     * A Super Admin moving a task straight to any status, outside the normal workflow (e.g. from Done
+     * back to In Progress, or past QA when there's no reviewer). It's recorded on the timeline as an
+     * override, and the people the target status concerns are notified as usual.
+     */
+    public function overrideStatus(Task $task, TaskStatus $to, User $admin): void
+    {
+        $from = $task->status;
+
+        if ($from === $to) {
+            return;
+        }
+
+        DB::transaction(function () use ($task, $from, $to, $admin) {
+            $task->update(['status' => $to]);
+
+            $this->recordActivity(
+                $task,
+                $to === TaskStatus::Done ? TaskActivityType::Completed : TaskActivityType::StatusChanged,
+                $admin,
+                "{$admin->name} moved this from {$from->label()} to {$to->label()} (Super Admin)",
+                now(),
+            );
+        });
+
+        if ($to === TaskStatus::QaTesting && $task->qa) {
+            $this->notifyUnlessSelf($task->qa, $admin, new TaskSubmittedForQa($task, $admin));
+        }
+
+        $this->notifyStatusChange($task, $to, $admin);
+    }
+
+    /**
      * Skip notifying someone about their own action (e.g. a self-assigned
      * task, or a QA/Reviewer who is also the task's Reporter).
      */

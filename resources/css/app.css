@@ -712,3 +712,22 @@ body {
     background: var(--color-surface);
     padding: 0.25rem 0.5rem;
 }
+
+/* Rich text shown read-only (task and project descriptions). Quill's .ql-editor styles give the box
+   its own height and scrollbar, so those are reset; collapsing uses a fixed height with a soft fade
+   rather than line-clamp, which can't cut through paragraphs, lists and headings cleanly and left
+   lines overlapping. The fade only shows when there's more to read (.is-overflowing). */
+.ql-editor.rich-text {
+    height: auto;
+    overflow: visible;
+}
+
+.ql-editor.rich-text.rich-clamp {
+    max-height: var(--rich-clamp, 15rem);
+    overflow: hidden;
+}
+
+.ql-editor.rich-text.rich-clamp.is-overflowing {
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 3.5rem), transparent);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 3.5rem), transparent);
+}

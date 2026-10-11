@@ -75,6 +75,14 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
             return;
         }
 
+        // Allowed, but not as this person's step in the workflow: a Super Admin override, applied
+        // directly (no QA submission window, no reviewer required).
+        if (Gate::denies('followWorkflow', [$task, $newStatus])) {
+            app(TaskWorkflowService::class)->overrideStatus($task, $newStatus, auth()->user());
+
+            return;
+        }
+
         // Submitting for QA testing always requires a reviewer to already be
         // assigned (someone has to approve/reject it) and logs the assignee's
         // hours worked so far, so open a modal instead of updating directly.
@@ -243,79 +251,57 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
 };
 ?>
 
-<div class="space-y-6">
-    <div class="flex flex-wrap items-center justify-between gap-3">
+<div class="space-y-5">
+    <div class="flex flex-wrap items-end justify-between gap-3">
         @unless ($projectId)
             <div>
-                <h1 class="text-2xl font-semibold text-zinc-900">Tasks</h1>
+                <h1 class="text-2xl font-semibold tracking-tight text-zinc-900">Tasks</h1>
                 <p class="hidden text-sm text-zinc-500 sm:block">Create, assign, and track work across the team.</p>
             </div>
         @else
-            <h2 class="text-lg font-semibold text-zinc-900">Tasks</h2>
+            <h2 class="text-base font-semibold text-zinc-900">Tasks</h2>
         @endunless
 
-        <div class="flex items-center gap-3">
-            @if ($projectId)
-                <div class="flex rounded-lg border border-zinc-200 p-0.5">
+        <div class="flex items-center gap-2">
+            <div class="inline-flex rounded-xl bg-zinc-100 p-1" role="tablist" aria-label="View">
+                @foreach (['list' => ['List', '<path d="M3 5h.01"/><path d="M3 12h.01"/><path d="M3 19h.01"/><path d="M8 5h13"/><path d="M8 12h13"/><path d="M8 19h13"/>'], 'board' => ['Board', '<rect width="6" height="16" x="3" y="4" rx="1.5"/><rect width="6" height="10" x="10" y="4" rx="1.5"/><rect width="5" height="13" x="16.5" y="4" rx="1.5"/>']] as $key => [$viewLabel, $viewIcon])
                     <button
                         type="button"
-                        wire:click="$set('view', 'list')"
-                        class="rounded-md px-3 py-1 text-xs font-medium {{ $view === 'list' ? 'bg-brand text-white' : 'text-zinc-500 hover:text-zinc-700' }}"
+                        role="tab"
+                        aria-selected="{{ $view === $key ? 'true' : 'false' }}"
+                        wire:click="$set('view', '{{ $key }}')"
+                        class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition {{ $view === $key ? 'bg-surface text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-900' }}"
                     >
-                        List
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4">{!! $viewIcon !!}</svg>
+                        <span class="hidden sm:inline">{{ $viewLabel }}</span>
                     </button>
-                    <button
-                        type="button"
-                        wire:click="$set('view', 'board')"
-                        class="rounded-md px-3 py-1 text-xs font-medium {{ $view === 'board' ? 'bg-brand text-white' : 'text-zinc-500 hover:text-zinc-700' }}"
-                    >
-                        Board
-                    </button>
-                </div>
-            @endif
+                @endforeach
+            </div>
 
-            <a href="{{ route('tasks.create', $projectId ? ['project' => $projectId] : []) }}" wire:navigate class="shrink-0 whitespace-nowrap rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90">
-                Create Task
+            <a href="{{ route('tasks.create', $projectId ? ['project' => $projectId] : []) }}" wire:navigate class="btn-primary py-2">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" /></svg>
+                Create task
             </a>
         </div>
     </div>
 
     @unless ($projectId)
-        <div class="flex items-center justify-between border-b border-zinc-200">
-            <div class="flex gap-2">
-                @foreach ($this->tabs() as $key => $label)
-                    <button
-                        type="button"
-                        wire:click="$set('tab', '{{ $key }}')"
-                        class="border-b-2 px-3 py-2 text-sm font-medium {{ $tab === $key ? 'border-brand text-brand' : 'border-transparent text-zinc-500 hover:text-zinc-700' }}"
-                    >
-                        {{ $label }}
-                    </button>
-                @endforeach
-            </div>
-
-            <div class="mb-2 flex rounded-lg border border-zinc-200 p-0.5">
+        <div class="flex gap-1 border-b border-zinc-200">
+            @foreach ($this->tabs() as $key => $label)
                 <button
                     type="button"
-                    wire:click="$set('view', 'list')"
-                    class="rounded-md px-3 py-1 text-xs font-medium {{ $view === 'list' ? 'bg-brand text-white' : 'text-zinc-500 hover:text-zinc-700' }}"
+                    wire:click="$set('tab', '{{ $key }}')"
+                    class="-mb-px border-b-2 px-3 py-2.5 text-sm font-medium transition-colors {{ $tab === $key ? 'border-brand text-brand' : 'border-transparent text-zinc-500 hover:text-zinc-800' }}"
                 >
-                    List
+                    {{ $label }}
                 </button>
-                <button
-                    type="button"
-                    wire:click="$set('view', 'board')"
-                    class="rounded-md px-3 py-1 text-xs font-medium {{ $view === 'board' ? 'bg-brand text-white' : 'text-zinc-500 hover:text-zinc-700' }}"
-                >
-                    Board
-                </button>
-            </div>
+            @endforeach
         </div>
     @endunless
 
     @if ($view === 'board')
         @if ($boardTruncated)
-            <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+            <div class="rounded-xl bg-amber-50 px-4 py-2.5 text-sm text-amber-800 ring-1 ring-inset ring-amber-200">
                 Showing the {{ $boardShown }} most recent of {{ $boardTotal }} matching tasks on the board.
                 <button type="button" wire:click="$set('view', 'list')" class="font-medium underline hover:text-amber-900">Switch to List view</button>
                 to see and page through all of them.
@@ -358,72 +344,83 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
             x-on:mousemove.window="onMove($event)"
             x-on:mouseup.window="onUp()"
             x-on:mouseleave="overStatus = null"
-            class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
+            {{-- Phones: columns stack. From sm up: a row of fixed-width lanes that scrolls sideways. --}}
+            class="-mx-1 flex flex-col gap-3 px-1 sm:flex-row sm:items-start sm:gap-4 sm:overflow-x-auto sm:pb-3 sm:[scrollbar-width:thin]"
             :class="draggingId !== null && moved ? 'cursor-grabbing select-none' : ''"
         >
+            @php
+                $laneDots = ['todo' => 'bg-zinc-400', 'in_progress' => 'bg-sky-500', 'qa_testing' => 'bg-amber-500', 'rejected' => 'bg-red-500', 'ready_to_deploy' => 'bg-lime-500', 'done' => 'bg-brand'];
+            @endphp
             @foreach ($statuses as $status)
-                <div
-                    class="flex flex-col rounded-lg border border-zinc-200 bg-zinc-100/60 transition-colors"
+                @php $lane = $board[$status->value]; $columnEmpty = $lane->isEmpty(); @endphp
+                <section
+                    class="flex shrink-0 flex-col rounded-2xl bg-zinc-100/70 ring-1 ring-inset ring-zinc-200/70 transition sm:w-[17.5rem]"
                     x-on:mouseenter="if (draggingId !== null) overStatus = '{{ $status->value }}'"
-                    :class="draggingId !== null && moved && overStatus === '{{ $status->value }}' ? 'ring-2 ring-brand-lime' : ''"
+                    :class="draggingId !== null && moved && overStatus === '{{ $status->value }}' ? 'bg-brand/5! ring-2! ring-brand/40!' : ''"
+                    aria-label="{{ $status->label() }}"
                 >
-                    @php $columnEmpty = $board[$status->value]->isEmpty(); @endphp
-                    <div class="flex items-center justify-between border-zinc-200 px-3 py-2 {{ $columnEmpty ? 'sm:border-b' : 'border-b' }}">
-                        <h3 class="text-sm font-semibold {{ $columnEmpty ? 'text-zinc-500 sm:text-zinc-900' : 'text-zinc-900' }}">{{ $status->label() }}</h3>
-                        <span class="rounded-full px-2 py-0.5 text-xs font-semibold {{ $status->pillClasses() }}">{{ $board[$status->value]->count() }}</span>
-                    </div>
+                    <header class="flex items-center gap-2 px-3.5 pb-2 pt-3">
+                        <span class="size-2.5 rounded-full {{ $laneDots[$status->value] ?? 'bg-zinc-400' }}"></span>
+                        <h3 class="flex-1 text-sm font-semibold text-zinc-900">{{ $status->label() }}</h3>
+                        <span class="rounded-full bg-surface px-2 py-0.5 text-xs font-semibold tabular-nums text-zinc-600 ring-1 ring-zinc-200/80">{{ $lane->count() }}</span>
+                    </header>
 
-                    {{-- On phones the columns stack, so an empty one shows only its header rather than a whole "No tasks" box. --}}
-                    <div class="flex-1 space-y-2 p-2 {{ $columnEmpty ? 'hidden sm:block' : '' }}">
-                        @forelse ($board[$status->value] as $task)
-                            <div
+                    {{-- On phones an empty column shows only its header rather than a whole empty box. --}}
+                    <div class="flex-1 space-y-2 px-2 pb-2 {{ $columnEmpty ? 'hidden sm:block' : '' }}">
+                        @foreach ($lane as $task)
+                            @php $assignee = $task->currentAssignment?->assignedTo; @endphp
+                            <article
+                                wire:key="card-{{ $task->id }}"
                                 x-on:mousedown.prevent="startDrag({{ $task->id }}, $event)"
-                                :class="draggingId === {{ $task->id }} && moved ? 'opacity-40' : ''"
-                                class="cursor-grab select-none rounded-lg border border-zinc-200 bg-surface p-3 hover:border-brand/40 active:cursor-grabbing {{ $this->connectionAccentClass($task, auth()->user()) }}"
+                                :class="draggingId === {{ $task->id }} && moved ? 'opacity-40 rotate-1' : ''"
+                                class="group cursor-grab select-none rounded-xl border border-zinc-200/80 bg-surface p-3 shadow-xs transition hover:-translate-y-px hover:border-brand/30 hover:shadow-md hover:shadow-zinc-900/5 active:cursor-grabbing {{ $this->connectionAccentClass($task, auth()->user()) }}"
                             >
-                                <div class="mb-1 flex items-center justify-between gap-1">
-                                    <div class="flex flex-wrap items-center gap-1">
-                                        <span class="inline-block rounded-full bg-violet-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-violet-700">{{ $task->task_key }}</span>
-                                        @if ($task->parent_task_id)
-                                            <span class="inline-block rounded-full bg-zinc-200 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-zinc-600">SUB-{{ $task->parent_task_id }}</span>
-                                        @endif
-                                    </div>
-
-                                    <button type="button" x-on:mousedown.stop wire:click="toggleStar({{ $task->id }})" class="shrink-0 {{ $task->starredBy->isNotEmpty() ? 'text-amber-400' : 'text-zinc-300 hover:text-amber-400' }}">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5">
-                                            <path d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z" />
-                                        </svg>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="rounded-md bg-violet-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-violet-700">{{ $task->task_key }}</span>
+                                    <span class="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-500" title="{{ $task->priority->label() }} priority">
+                                        <span class="size-1.5 rounded-full bg-current {{ $task->priority->colorClass() }}"></span>{{ $task->priority->label() }}
+                                    </span>
+                                    <button type="button" x-on:mousedown.stop wire:click="toggleStar({{ $task->id }})" class="-mr-1 ml-auto flex size-6 shrink-0 items-center justify-center rounded-md transition hover:bg-amber-50 {{ $task->starredBy->isNotEmpty() ? 'text-amber-400' : 'text-zinc-300 hover:text-amber-400' }}" title="{{ $task->starredBy->isNotEmpty() ? 'Unstar' : 'Star' }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5"><path d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z" /></svg>
                                     </button>
                                 </div>
-                                <p class="text-sm font-medium text-zinc-900">{{ $task->title }}</p>
-                                <p class="mt-1 text-xs text-zinc-500">{{ $task->currentAssignment?->assignedTo?->name ?? 'Unassigned' }}</p>
 
-                                @if ($task->isConnectedTo(auth()->user()))
-                                    <div class="mt-1.5 flex flex-wrap gap-1">
-                                        @if ($task->isReportedBy(auth()->user()))
-                                            <span class="rounded-full bg-ink-800 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">Reporter</span>
+                                <p class="mt-1.5 line-clamp-2 text-sm font-medium leading-snug text-zinc-900 group-hover:text-brand">{{ $task->title }}</p>
+
+                                @if ($task->parent_task_id || $task->isConnectedTo(auth()->user()))
+                                    <div class="mt-1.5 flex flex-wrap items-center gap-1">
+                                        @if ($task->parent_task_id)
+                                            <span class="rounded-md bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500">Subtask of {{ \App\Models\Task::KEY_PREFIX }}-{{ $task->parent_task_id }}</span>
                                         @endif
-                                        @if ($task->isAssignedTo(auth()->user()))
-                                            <span class="rounded-full bg-ink-800 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">Assignee</span>
-                                        @endif
-                                        @if ($task->isReviewedBy(auth()->user()))
-                                            <span class="rounded-full bg-ink-800 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">QA</span>
-                                        @endif
+                                        @foreach (['Reporter' => $task->isReportedBy(auth()->user()), 'Assignee' => $task->isAssignedTo(auth()->user()), 'QA' => $task->isReviewedBy(auth()->user())] as $role => $isMine)
+                                            @if ($isMine)
+                                                <span class="rounded-md bg-brand/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand">{{ $role }}</span>
+                                            @endif
+                                        @endforeach
                                     </div>
                                 @endif
 
-                                <div class="mt-2 flex items-center justify-between">
-                                    <span class="text-xs text-zinc-400">{{ $task->deadline?->format('d M') ?? '—' }}</span>
-                                    @if ($task->isOverdue())
-                                        <span class="rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-600">Overdue</span>
+                                <div class="mt-2.5 flex items-center justify-between gap-2">
+                                    @if ($assignee)
+                                        <span class="flex min-w-0 items-center gap-1.5" title="Assigned to {{ $assignee->name }}">
+                                            <x-user-avatar :user="$assignee" class="size-5 shrink-0 rounded-full text-[9px]" />
+                                            <span class="truncate text-xs text-zinc-500">{{ $assignee->name }}</span>
+                                        </span>
+                                    @else
+                                        <span class="text-xs text-zinc-400">Unassigned</span>
                                     @endif
+                                    <x-due-date :date="$task->deadline" :done="$status === \App\Enums\TaskStatus::Done" class="shrink-0" />
                                 </div>
-                            </div>
-                        @empty
-                            <p class="px-2 py-4 text-center text-xs text-zinc-400">No tasks</p>
-                        @endforelse
+                            </article>
+                        @endforeach
+
+                        @if ($columnEmpty)
+                            <p class="rounded-xl border border-dashed border-zinc-300/80 px-2 py-6 text-center text-xs text-zinc-400" x-text="draggingId !== null && moved ? 'Drop here' : 'No tasks'">No tasks</p>
+                        @else
+                            <p x-show="draggingId !== null && moved && overStatus === '{{ $status->value }}'" x-cloak class="rounded-xl border border-dashed border-brand/40 px-2 py-3 text-center text-xs font-medium text-brand">Drop here</p>
+                        @endif
                     </div>
-                </div>
+                </section>
             @endforeach
         </div>
 

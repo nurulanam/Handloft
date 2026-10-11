@@ -150,7 +150,12 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
      */
     private function nextStatuses(): \Illuminate\Support\Collection
     {
-        return collect($this->task->status->nextStatuses())
+        // A Super Admin can pick any other status; everyone else the workflow's next steps.
+        $candidates = auth()->user()->hasRole(\App\Enums\Role::SuperAdmin->value)
+            ? array_filter(TaskStatus::cases(), fn (TaskStatus $status) => $status !== $this->task->status)
+            : $this->task->status->nextStatuses();
+
+        return collect($candidates)
             ->filter(fn (TaskStatus $status) => Gate::allows('transitionStatus', [$this->task, $status]))
             ->values();
     }
@@ -164,6 +169,15 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         $newStatus = TaskStatus::from($data['status_value']);
 
         Gate::authorize('transitionStatus', [$this->task, $newStatus]);
+
+        // Not this person's step in the workflow, but they may move it: a Super Admin override.
+        if (Gate::denies('followWorkflow', [$this->task, $newStatus])) {
+            $workflow->overrideStatus($this->task, $newStatus, auth()->user());
+            $this->task->refresh();
+            $this->dispatch('notify', message: "Moved to {$newStatus->label()}.", type: 'success');
+
+            return;
+        }
 
         if ($newStatus === TaskStatus::QaTesting) {
             if (! $this->task->qa_id) {
@@ -666,7 +680,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
 
                 <div x-show="!editing">
                     @if ($task->description)
-                        <div x-data="{ expanded: false, overflowing: false }" x-init="$nextTick(() => { overflowing = $refs.descriptionContent.scrollHeight > $refs.descriptionContent.clientHeight })">
+                        <div x-data="{ expanded: false, overflowing: false }" x-init="$nextTick(() => { overflowing = $refs.descriptionContent.scrollHeight > $refs.descriptionContent.clientHeight + 2 })">
                             {{-- The `ql-editor` class sets `white-space: pre-wrap` so intentional
                                  blank lines in the description render correctly — which means any
                                  whitespace *outside* the description itself (e.g. this template's own
@@ -674,8 +688,8 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                                  hug the interpolation with no whitespace in between. --}}
                             <div
                                 x-ref="descriptionContent"
-                                class="ql-editor p-0! text-sm! leading-relaxed text-zinc-700 [&_a]:text-brand [&_a]:underline [&_blockquote]:text-zinc-500 [&_code]:rounded [&_code]:bg-zinc-100 [&_code]:px-1"
-                                :class="expanded ? '' : 'line-clamp-10'"
+                                class="ql-editor rich-text p-0! text-sm! leading-relaxed text-zinc-700 [&_a]:text-brand [&_a]:underline [&_blockquote]:text-zinc-500 [&_code]:rounded [&_code]:bg-zinc-100 [&_code]:px-1"
+                                :class="expanded ? '' : (overflowing ? 'rich-clamp is-overflowing' : 'rich-clamp')"
                             >{!! $task->description !!}</div>
 
                             <div x-show="overflowing" class="mt-2 flex justify-center">

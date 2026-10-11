@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Enums\Role;
 use App\Enums\TaskStatus;
 use App\Models\Task;
 use App\Models\User;
@@ -61,6 +62,21 @@ class TaskPolicy
      *   ReadyToDeploy -> Done      : the Reporter closes it out
      */
     public function transitionStatus(User $user, Task $task, TaskStatus $to): bool
+    {
+        // A Super Admin can move any task to any other status (an override, see
+        // TaskWorkflowService::overrideStatus()); everyone else follows the workflow.
+        if ($to !== $task->status && $user->hasRole(Role::SuperAdmin->value)) {
+            return true;
+        }
+
+        return $this->followWorkflow($user, $task, $to);
+    }
+
+    /**
+     * Whether this move is the user's own step in the normal workflow (above), as opposed to a
+     * Super Admin override.
+     */
+    public function followWorkflow(User $user, Task $task, TaskStatus $to): bool
     {
         $isAssignee = $task->currentAssignee()?->id === $user->id;
         $isQa = $task->qa_id !== null && $task->qa_id === $user->id;

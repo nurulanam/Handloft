@@ -36,10 +36,13 @@ new #[Layout('layouts.app')] #[Title('Dashboard')] class extends Component
         $myLogs = fn (): Builder => TaskTimeLog::query()->where('user_id', $user->id);
 
         return [
+            // Server-side fallback; the page swaps in the viewer's own local time of day (see the view).
             'greeting' => match (true) {
+                now()->hour < 5 => 'Good night',
                 now()->hour < 12 => 'Good morning',
                 now()->hour < 17 => 'Good afternoon',
-                default => 'Good evening',
+                now()->hour < 22 => 'Good evening',
+                default => 'Good night',
             },
             'firstName' => \Illuminate\Support\Str::before($user->name.' ', ' '),
             'canCreateTask' => $user->can('create', Task::class),
@@ -188,9 +191,23 @@ new #[Layout('layouts.app')] #[Title('Dashboard')] class extends Component
 <div class="space-y-4 sm:space-y-6">
     {{-- Greeting + quick actions --}}
     <div class="flex flex-wrap items-end justify-between gap-3">
-        <div>
-            <p class="text-xs font-medium uppercase tracking-wide text-zinc-400">{{ now()->format('l, d F') }}</p>
-            <h1 class="mt-0.5 text-xl font-semibold text-zinc-900 sm:text-2xl">{{ $greeting }}, {{ $firstName }}</h1>
+        {{-- Greeting by the viewer's own clock (morning 5–12, afternoon 12–17, evening 17–22, night
+             22–5), not the server's timezone; refreshed every minute so it turns over on its own. --}}
+        <div
+            x-data="{
+                greeting: @js($greeting),
+                today: @js(now()->format('l, d F')),
+                tick() {
+                    const now = new Date();
+                    const hour = now.getHours();
+                    this.greeting = hour < 5 ? 'Good night' : hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : hour < 22 ? 'Good evening' : 'Good night';
+                    this.today = now.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'long' }).replace(',', '');
+                },
+            }"
+            x-init="tick(); setInterval(() => tick(), 60000)"
+        >
+            <p class="text-xs font-medium uppercase tracking-wide text-zinc-400" x-text="today">{{ now()->format('l, d F') }}</p>
+            <h1 class="mt-0.5 text-xl font-semibold text-zinc-900 sm:text-2xl"><span x-text="greeting">{{ $greeting }}</span>, {{ $firstName }}</h1>
         </div>
         <div class="flex items-center gap-2">
             @if ($canCreateProject)
