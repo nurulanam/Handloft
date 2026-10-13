@@ -752,6 +752,7 @@
                     </a>
 
                     <div class="flex flex-1 items-center justify-end gap-2 sm:gap-3">
+                        <livewire:tasks.timer />
                         <livewire:notifications.bell />
 
                         @php $role = auth()->user()->getRoleNames()->first(); @endphp

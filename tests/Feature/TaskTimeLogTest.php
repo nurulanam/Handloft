@@ -71,53 +71,50 @@ class TaskTimeLogTest extends TestCase
         $this->assertEquals(5.5, $task->fresh()->total_logged_hours);
     }
 
-    public function test_logging_time_twice_for_the_same_day_updates_that_entry_instead_of_adding_a_second_one(): void
+    public function test_logging_time_twice_for_the_same_day_adds_a_second_entry(): void
     {
         $rahim = $this->teamMember('Rahim');
         $karim = $this->teamMember('Karim');
         $task = $this->createTask($rahim, $karim);
 
-        Livewire::actingAs($karim)
-            ->test('tasks.show', ['task' => $task])
-            ->set('log_date', '2026-09-27')
-            ->set('log_hours', '3')
-            ->set('log_minutes', '0')
-            ->call('logTime');
+        foreach ([['3', 'Morning'], ['4', 'Afternoon']] as [$hours, $note]) {
+            Livewire::actingAs($karim)
+                ->test('tasks.show', ['task' => $task])
+                ->set('log_date', '2026-09-27')
+                ->set('log_hours', $hours)
+                ->set('log_minutes', '0')
+                ->set('log_note', $note)
+                ->call('logTime')
+                ->assertHasNoErrors();
+        }
 
-        Livewire::actingAs($karim)
-            ->test('tasks.show', ['task' => $task])
-            ->set('log_date', '2026-09-27')
-            ->set('log_hours', '4')
-            ->set('log_minutes', '0')
-            ->call('logTime');
-
-        $this->assertSame(1, TaskTimeLog::where('task_id', $task->id)->count());
-        $this->assertEquals(4, TaskTimeLog::where('task_id', $task->id)->first()->hours);
+        $logs = TaskTimeLog::where('task_id', $task->id)->orderBy('id')->get();
+        $this->assertSame(2, $logs->count());
+        $this->assertSame(['Morning', 'Afternoon'], $logs->pluck('note')->all());
+        $this->assertSame(7.0, $task->fresh()->total_logged_hours);
+        // Each entry is on the timeline.
+        $this->assertSame(2, $task->activities()->where('description', 'like', 'Karim logged %')->count());
     }
 
-    public function test_re_logging_the_same_day_does_not_add_a_duplicate_activity_timeline_entry(): void
+    public function test_a_days_entries_together_cannot_go_past_24_hours(): void
     {
         $rahim = $this->teamMember('Rahim');
         $karim = $this->teamMember('Karim');
         $task = $this->createTask($rahim, $karim);
+        app(TaskWorkflowService::class)->logTime($task, $karim, now()->subDay(), 20);
 
         Livewire::actingAs($karim)
             ->test('tasks.show', ['task' => $task])
-            ->set('log_date', '2026-09-27')
-            ->set('log_hours', '3')
+            ->set('log_date', now()->subDay()->toDateString())
+            ->set('log_hours', '5')
             ->set('log_minutes', '0')
-            ->call('logTime');
-
-        $countAfterFirstLog = $task->activities()->count();
-
-        Livewire::actingAs($karim)
-            ->test('tasks.show', ['task' => $task])
-            ->set('log_date', '2026-09-27')
+            ->call('logTime')
+            ->assertHasErrors('log_hours')
             ->set('log_hours', '4')
-            ->set('log_minutes', '0')
-            ->call('logTime');
+            ->call('logTime')
+            ->assertHasNoErrors();
 
-        $this->assertSame($countAfterFirstLog, $task->activities()->count());
+        $this->assertSame(24.0, $task->fresh()->total_logged_hours);
     }
 
     public function test_hours_must_be_within_range(): void

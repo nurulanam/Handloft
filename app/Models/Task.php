@@ -147,7 +147,17 @@ class Task extends Model
      */
     public function timeLogs(): HasMany
     {
-        return $this->hasMany(TaskTimeLog::class)->latest('logged_date');
+        return $this->hasMany(TaskTimeLog::class)->latest('logged_date')->latest('id');
+    }
+
+    /**
+     * Work timers running on this task right now (one per person working on it).
+     *
+     * @return HasMany<TaskTimer, $this>
+     */
+    public function timers(): HasMany
+    {
+        return $this->hasMany(TaskTimer::class);
     }
 
     /**

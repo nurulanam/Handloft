@@ -123,6 +123,30 @@ class ReportHoursTest extends TestCase
             ->assertSet('edit_minutes', '30');
     }
 
+    public function test_an_edit_cannot_push_the_days_entries_past_24_hours(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+
+        $workflow = app(TaskWorkflowService::class);
+        $task = $workflow->createTask(['title' => 'Create Client List'], $rahim, $karim);
+        $workflow->logTime($task, $karim, Carbon::parse('2026-09-27'), 20);
+        $log = $workflow->logTime($task, $karim, Carbon::parse('2026-09-27'), 2);
+
+        Livewire::actingAs($this->admin())
+            ->test('reports.index')
+            ->call('startEditLog', $log->id)
+            ->set('edit_hours', '5')
+            ->set('edit_reason', 'Typo')
+            ->call('saveEditLog')
+            ->assertHasErrors('edit_hours')
+            ->set('edit_hours', '4')
+            ->call('saveEditLog')
+            ->assertHasNoErrors();
+
+        $this->assertEquals(4.0, $log->fresh()->hours);
+    }
+
     public function test_an_admin_edit_needs_a_reason_persists_and_is_audit_logged_and_on_the_task_timeline(): void
     {
         $admin = $this->admin();

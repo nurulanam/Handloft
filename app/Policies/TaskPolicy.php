@@ -6,6 +6,7 @@ use App\Enums\Role;
 use App\Enums\TaskStatus;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\WorkTimer;
 
 class TaskPolicy
 {
@@ -104,6 +105,33 @@ class TaskPolicy
         return $user->can('reassign-task')
             || $task->created_by === $user->id
             || $task->currentAssignee()?->id === $user->id;
+    }
+
+    /**
+     * Whether the user can log time on the task (by hand or with the work timer). Only someone
+     * actually connected to it: the assignee doing the work, the QA/Reviewer once it reaches QA
+     * Testing, or the Reporter once it's Ready to Deploy. There's no permission-based override: an
+     * uninvolved Manager/Admin has no reason to log hours on work they're not party to.
+     */
+    public function logTime(User $user, Task $task): bool
+    {
+        return match (true) {
+            $task->isAssignedTo($user) => true,
+            $task->isReviewedBy($user) => $task->status->isAtLeast(TaskStatus::QaTesting),
+            $task->isReportedBy($user) => $task->status->isAtLeast(TaskStatus::ReadyToDeploy),
+            default => false,
+        };
+    }
+
+    /**
+     * Whether the user can start the work timer on the task: they can log time on it, the timer is
+     * switched on in Settings, and the task isn't finished.
+     */
+    public function startTimer(User $user, Task $task): bool
+    {
+        return WorkTimer::enabled()
+            && $task->status !== TaskStatus::Done
+            && $this->logTime($user, $task);
     }
 
     /**

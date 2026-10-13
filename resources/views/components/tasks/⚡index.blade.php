@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Concerns\SubmitsForQa;
 use App\Livewire\Concerns\TogglesStars;
 use App\Enums\TaskActivityType;
 use App\Enums\TaskStatus;
@@ -15,7 +16,7 @@ use Livewire\WithPagination;
 
 new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
 {
-    use WithPagination, TogglesStars;
+    use SubmitsForQa, TogglesStars, WithPagination;
 
     #[Url]
     public string $tab = 'all';
@@ -95,6 +96,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
 
             $this->submittingTaskId = $task->id;
             $this->submission_note = '';
+            $this->resetQaTimeLog();
 
             return;
         }
@@ -138,26 +140,18 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
 
     public function submitForQa(TaskWorkflowService $workflow): void
     {
-        $task = Task::findOrFail($this->submittingTaskId);
-
-        Gate::authorize('transitionStatus', [$task, TaskStatus::QaTesting]);
-
-        $data = $this->validate([
-            'submission_note' => ['nullable', 'string'],
-        ]);
-
-        // Hours are no longer asked for here — they're already captured via
-        // the daily Time Logs, so the total worked so far is used as-is.
-        $workflow->submitForQa($task, auth()->user(), $task->total_logged_hours, $data['submission_note'] ?: null);
+        if (! $this->submitTaskForQa(Task::findOrFail($this->submittingTaskId), $workflow)) {
+            return;
+        }
 
         $this->submittingTaskId = null;
-        $this->submission_note = '';
     }
 
     public function cancelSubmitForQa(): void
     {
         $this->submittingTaskId = null;
         $this->submission_note = '';
+        $this->resetQaTimeLog();
         $this->resetErrorBag();
     }
 
@@ -201,7 +195,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
         $userId = auth()->id();
 
         $query = Task::query()
-            ->with(['category', 'currentAssignment.assignedTo', 'creator', 'starredBy' => fn ($q) => $q->where('users.id', $userId)])
+            ->with(['category', 'currentAssignment.assignedTo', 'creator', 'timers.user', 'starredBy' => fn ($q) => $q->where('users.id', $userId)])
             ->latest();
 
         $query->when($this->projectId, fn ($q) => $q->where('project_id', $this->projectId));
@@ -380,6 +374,12 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                                     <span class="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-500" title="{{ $task->priority->label() }} priority">
                                         <span class="size-1.5 rounded-full bg-current {{ $task->priority->colorClass() }}"></span>{{ $task->priority->label() }}
                                     </span>
+                                    @if ($task->timers->isNotEmpty())
+                                        <span class="inline-flex items-center gap-1 rounded-md bg-brand/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand" title="{{ $task->timers->pluck('user.name')->join(', ', ' and ') }} working on this now">
+                                            <span class="relative flex size-1.5"><span class="absolute inline-flex size-full animate-ping rounded-full bg-brand opacity-60"></span><span class="relative inline-flex size-1.5 rounded-full bg-brand"></span></span>
+                                            Live
+                                        </span>
+                                    @endif
                                     <button type="button" x-on:mousedown.stop wire:click="toggleStar({{ $task->id }})" class="-mr-1 ml-auto flex size-6 shrink-0 items-center justify-center rounded-md transition hover:bg-amber-50 {{ $task->starredBy->isNotEmpty() ? 'text-amber-400' : 'text-zinc-300 hover:text-amber-400' }}" title="{{ $task->starredBy->isNotEmpty() ? 'Unstar' : 'Star' }}">
                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5"><path d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z" /></svg>
                                     </button>
@@ -425,23 +425,22 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
         </div>
 
         {{-- Submit for QA Testing modal (opened by dropping a card on the QA Testing column) --}}
-        @if ($submittingTaskId)
-            <div class="fixed inset-0 z-40 flex items-center justify-center bg-zinc-900/50 px-4">
-                <div class="w-full max-w-md rounded-lg bg-surface p-6 shadow-lg">
+        @if ($submittingTaskId && ($submittingTask = \App\Models\Task::find($submittingTaskId)))
+            <div class="fixed inset-0 z-40 flex items-center justify-center bg-zinc-900/50 px-4" wire:keydown.escape.window="cancelSubmitForQa">
+                <div class="w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
                     <h3 class="text-lg font-semibold text-zinc-900">Submit for QA Testing</h3>
+                    <p class="mt-1 truncate text-sm text-zinc-500"><span class="font-mono text-xs font-semibold text-violet-700">{{ $submittingTask->task_key }}</span> {{ $submittingTask->title }}</p>
 
-                    <p class="mt-4 text-sm text-zinc-500">
-                        Time logged so far: <span class="font-semibold text-zinc-900">{{ \App\Support\Duration::forHumans((float) (\App\Models\Task::find($submittingTaskId)?->total_logged_hours ?? 0)) }}</span>
-                    </p>
+                    <x-tasks.qa-time-log :task="$submittingTask" :error="$errors->first('qa_log_date') ?: ($errors->first('qa_log_hours') ?: $errors->first('qa_log_minutes'))" />
 
                     <div class="mt-4">
                         <label class="block text-sm font-medium text-zinc-700">Note (Optional)</label>
-                        <textarea wire:model="submission_note" rows="2" autofocus class="mt-1 block w-full rounded-lg border border-zinc-300 bg-surface px-3 py-2 text-sm text-zinc-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-lime/40"></textarea>
+                        <textarea wire:model="submission_note" rows="2" class="field-input mt-1.5"></textarea>
                     </div>
 
                     <div class="mt-6 flex justify-end gap-3">
-                        <button type="button" wire:click="cancelSubmitForQa" class="text-sm font-medium text-zinc-600 hover:text-zinc-900">Cancel</button>
-                        <button type="button" wire:click="submitForQa" wire:loading.attr="disabled" wire:target="submitForQa" class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand/90 disabled:opacity-60">
+                        <button type="button" wire:click="cancelSubmitForQa" class="btn-secondary">Cancel</button>
+                        <button type="button" wire:click="submitForQa" wire:loading.attr="disabled" wire:target="submitForQa" class="btn-primary">
                             <span wire:loading.remove wire:target="submitForQa">Submit</span>
                             <span wire:loading wire:target="submitForQa">Submitting…</span>
                         </button>

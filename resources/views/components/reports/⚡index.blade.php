@@ -134,6 +134,15 @@ new #[Layout('layouts.app')] #[Title('Reports')] class extends Component
             return;
         }
 
+        // The day's other entries for this person and task count towards the same 24 hours.
+        $otherEntries = $workflow->hoursLoggedOn($timeLog->task, $timeLog->user, $timeLog->logged_date, $timeLog->id);
+
+        if ($otherEntries + $totalHours > 24) {
+            $this->addError('edit_hours', 'Other entries that day already have '.Duration::forHumans($otherEntries).", so this one can be at most ".Duration::forHumans(24 - $otherEntries).'.');
+
+            return;
+        }
+
         $workflow->editTimeLog($timeLog, $totalHours, auth()->user(), $data['edit_reason']);
 
         $this->editingLogId = null;

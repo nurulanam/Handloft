@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Concerns\SearchesPickerOptions;
+use App\Livewire\Concerns\SubmitsForQa;
 use App\Livewire\Concerns\TogglesStars;
 use App\Enums\TaskActivityType;
 use App\Enums\TaskPriority;
@@ -17,13 +18,14 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
 new #[Layout('layouts.app')] #[Title('Task')] class extends Component
 {
-    use SearchesPickerOptions, TogglesStars, WithFileUploads;
+    use SearchesPickerOptions, SubmitsForQa, TogglesStars, WithFileUploads;
 
     public Task $task;
 
@@ -86,15 +88,9 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
 
     public function submitForQa(TaskWorkflowService $workflow): void
     {
-        Gate::authorize('transitionStatus', [$this->task, TaskStatus::QaTesting]);
-
-        $data = $this->validate([
-            'submission_note' => ['nullable', 'string'],
-        ]);
-
-        // Hours are no longer asked for here — they're already captured via
-        // the daily Time Logs, so the total worked so far is used as-is.
-        $workflow->submitForQa($this->task, auth()->user(), $this->task->total_logged_hours, $data['submission_note'] ?: null);
+        if (! $this->submitTaskForQa($this->task, $workflow)) {
+            return;
+        }
 
         $this->showSubmitQaModal = false;
         $this->task->refresh();
@@ -104,7 +100,48 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
     {
         $this->showSubmitQaModal = false;
         $this->submission_note = '';
+        $this->resetQaTimeLog();
         $this->resetErrorBag();
+    }
+
+    /**
+     * Mark this task as being worked on now: the work timer runs until it's stopped, then the time is
+     * logged for each day it ran.
+     */
+    public function startTimer(TaskWorkflowService $workflow): void
+    {
+        Gate::authorize('startTimer', $this->task);
+
+        $previous = auth()->user()->runningTimer()->with('task')->first();
+        $workflow->startTimer($this->task, auth()->user());
+
+        $this->task->refresh();
+        $this->dispatch('timer-changed');
+        $this->dispatch('notify', message: $previous && $previous->task_id !== $this->task->id
+            ? "Timer started. {$previous->task->task_key} was stopped and its time logged."
+            : 'Timer started. Stop it when you take a break or finish.', type: 'success');
+    }
+
+    public function stopTimer(TaskWorkflowService $workflow): void
+    {
+        $timer = $this->task->timers()->where('user_id', auth()->id())->first();
+
+        if (! $timer) {
+            return;
+        }
+
+        $logged = $workflow->stopTimer($timer);
+
+        $this->task->refresh();
+        $this->dispatch('timer-changed');
+        $this->dispatch('notify', message: $logged > 0 ? 'Logged '.Duration::forHumans($logged).'.' : 'Under a minute, so nothing was logged.', type: $logged > 0 ? 'success' : 'info');
+    }
+
+    /** The header's timer pill stopped (or started) a timer: show the new time log. */
+    #[On('timer-changed')]
+    public function refreshAfterTimerChange(): void
+    {
+        $this->task->refresh();
     }
 
     public function saveDescription(): void
@@ -187,6 +224,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
             }
 
             $this->submission_note = '';
+            $this->resetQaTimeLog();
             $this->showSubmitQaModal = true;
 
             return;
@@ -433,8 +471,13 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
             return;
         }
 
-        if ($totalHours > 24) {
-            $this->addError('log_hours', "A single day can't have more than 24 hours logged.");
+        $logDate = \Illuminate\Support\Carbon::parse($data['log_date']);
+        $alreadyThatDay = $workflow->hoursLoggedOn($this->task, auth()->user(), $logDate);
+
+        if ($alreadyThatDay + $totalHours > 24) {
+            $this->addError('log_hours', $alreadyThatDay > 0
+                ? 'You already logged '.Duration::forHumans($alreadyThatDay)." on this task that day; a day can't go past 24 hours."
+                : "A single day can't have more than 24 hours logged.");
 
             return;
         }
@@ -442,7 +485,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         $workflow->logTime(
             $this->task,
             auth()->user(),
-            \Illuminate\Support\Carbon::parse($data['log_date']),
+            $logDate,
             $totalHours,
             $data['log_note'] ?: null
         );
@@ -476,40 +519,14 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         $this->task->refresh();
     }
 
-    /**
-     * Only someone actually connected to the task — the assignee doing the
-     * work, the QA/Reviewer testing it, or the Reporter who filed it — may
-     * log time on it. There is no permission-based override: an uninvolved
-     * Manager/Admin can still view and manage the task's metadata, but has no
-     * reason to be logging hours on work they're not party to.
-     *
-     * The QA/Reviewer and Reporter's own time only makes sense once the task
-     * has actually reached their stage of the workflow — a reviewer isn't
-     * testing anything before QA Testing, and a reporter isn't signing off on
-     * anything before Ready to Deploy.
-     */
     private function authorizeTimeLogging(): void
     {
-        abort_unless($this->canCurrentUserLogTime(), 403);
+        Gate::authorize('logTime', $this->task);
     }
 
     private function canCurrentUserLogTime(): bool
     {
-        $user = auth()->user();
-
-        if ($this->task->isAssignedTo($user)) {
-            return true;
-        }
-
-        if ($this->task->isReviewedBy($user)) {
-            return $this->task->status->isAtLeast(TaskStatus::QaTesting);
-        }
-
-        if ($this->task->isReportedBy($user)) {
-            return $this->task->status->isAtLeast(TaskStatus::ReadyToDeploy);
-        }
-
-        return false;
+        return Gate::allows('logTime', $this->task);
     }
 
     /**
@@ -589,6 +606,9 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
             'timeLogs' => $this->task->timeLogs()->with('user')->get(),
             'totalLoggedHours' => $this->task->timeLogs()->sum('hours'),
             'canLogTime' => $this->canCurrentUserLogTime(),
+            'myTimer' => $myTimer = $this->task->timers()->where('user_id', auth()->id())->first(),
+            'canStartTimer' => ! $myTimer && Gate::allows('startTimer', $this->task),
+            'othersWorking' => $this->task->timers()->where('user_id', '!=', auth()->id())->with('user')->get()->pluck('user'),
         ];
     }
 };
@@ -625,7 +645,32 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                 <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-ink-700 text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($task->creator->name) }}</span>
                 <span>Created by <span class="font-medium text-zinc-700">{{ $task->creator->name }}</span> on {{ $task->created_at->format('d M Y') }}</span>
             </p>
+            @if ($othersWorking->isNotEmpty())
+                <p class="mt-2 inline-flex items-center gap-2 rounded-full bg-brand/[0.07] py-1 pl-2.5 pr-3 text-xs font-medium text-brand">
+                    <span class="relative flex size-2"><span class="absolute inline-flex size-full animate-ping rounded-full bg-brand opacity-60"></span><span class="relative inline-flex size-2 rounded-full bg-brand"></span></span>
+                    {{ $othersWorking->pluck('name')->join(', ', ' and ') }} {{ $othersWorking->count() === 1 ? 'is' : 'are' }} working on this now
+                </p>
+            @endif
         </div>
+
+        <div class="flex min-w-0 max-w-full flex-wrap items-center gap-2">
+        {{-- Work timer: "I'm working on this now". Stopping it logs the time (see TaskWorkflowService::stopTimer()). --}}
+        @if ($myTimer)
+            <div class="inline-flex items-center gap-2.5 rounded-xl bg-brand py-1.5 pl-3 pr-1.5 text-sm font-semibold text-white shadow-sm shadow-brand/20">
+                <span class="relative flex size-2"><span class="absolute inline-flex size-full animate-ping rounded-full bg-white opacity-70"></span><span class="relative inline-flex size-2 rounded-full bg-white"></span></span>
+                <span>Working</span>
+                <span x-data="elapsedClock({{ (int) $myTimer->started_at->diffInSeconds(now(), true) }})" x-text="text" class="min-w-[4.25rem] font-mono text-[13px] tabular-nums"></span>
+                <button type="button" wire:click="stopTimer" wire:loading.attr="disabled" wire:target="stopTimer" class="inline-flex items-center gap-1.5 rounded-lg bg-white/15 px-2.5 py-1 text-xs font-semibold transition hover:bg-white/25 disabled:opacity-60" title="Stop and log the time">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="size-3"><rect x="3" y="3" width="10" height="10" rx="2" /></svg>
+                    Stop
+                </button>
+            </div>
+        @elseif ($canStartTimer)
+            <button type="button" wire:click="startTimer" wire:loading.attr="disabled" wire:target="startTimer" class="btn-secondary py-2" title="Start the work timer; the time is logged when you stop it">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="size-3.5 text-brand"><path d="M4.5 2.9v10.2a.8.8 0 0 0 1.2.7l8.3-5.1a.8.8 0 0 0 0-1.4L5.7 2.2a.8.8 0 0 0-1.2.7Z" /></svg>
+                Start working
+            </button>
+        @endif
 
         {{-- Status: moves the task along the board (only to the statuses its workflow allows). --}}
         <div class="relative shrink-0" x-data="dropdownMenu()" @click.outside="open = false">
@@ -656,6 +701,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                     @endforelse
                 </div>
             @endif
+        </div>
         </div>
     </div>
 
@@ -1100,14 +1146,12 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
 
     {{-- Submit for QA Testing modal --}}
     @if ($showSubmitQaModal)
-        <div class="fixed inset-0 z-40 flex items-center justify-center bg-zinc-900/50 px-4">
+        <div class="fixed inset-0 z-40 flex items-center justify-center bg-zinc-900/50 px-4" wire:keydown.escape.window="cancelSubmitForQa">
             <div class="w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
                 <h3 class="text-lg font-semibold text-zinc-900">Submit for QA Testing</h3>
                 <p class="mt-1 text-sm text-zinc-500">{{ $task->title }}</p>
 
-                <p class="mt-4 text-sm text-zinc-500">
-                    Time logged so far: <span class="font-semibold text-zinc-900">{{ Duration::forHumans($task->total_logged_hours) }}</span>
-                </p>
+                <x-tasks.qa-time-log :task="$task" :error="$errors->first('qa_log_date') ?: ($errors->first('qa_log_hours') ?: $errors->first('qa_log_minutes'))" />
 
                 <div class="mt-4">
                     <label class="block text-sm font-medium text-zinc-700">Note (Optional)</label>

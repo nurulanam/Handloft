@@ -49,13 +49,13 @@ An open-source team, project and task tracker built on Laravel 13 and Livewire 4
 | **Accounts and roles** | Sign-in by email or User ID, with no public registration. Three roles (Super Admin, Manager, Team Member). What Managers and Team Members can do is adjustable in **Settings → Roles & Permissions**. Everyone edits their own profile, password and photo. |
 | **Projects** | Status, start date and deadline, a Coordinator, and progress rolled up from top-level tasks. One form for creating and editing. |
 | **Tasks** | Each task gets a key such as `HL-42`. Kanban and list views, subtasks, categories, attachments, comments and stars. A QA workflow runs *To Do → In Progress → QA Testing → Rejected / Ready to Deploy → Done*. Reassignments are kept as history. |
-| **Daily time logs** | Hours and minutes per person, per task, per day. A task can have many entries per person. |
+| **Daily time logs** | Hours and minutes per person, per task, per day. Each log is its own entry, so a person can log the same task several times a day; the day's time is the sum. Or press **Start working** on a task: the work timer runs (shown in the header on every page and as *Live* on the board) and logs the time when stopped, split across days if it runs past midnight. Submitting for QA with no time logged asks for it in the same window. |
 | **Reports** | Daily, weekly, monthly, yearly or custom periods across tasks, projects and people, with trends, per-person reports (hours, time by task, completed tasks) and a daily hours grid. Export to CSV and Excel, or print a ready-made A4 report. Team members get their own report only. Super Admins can correct logged hours, with a reason, from a person's report. |
 | **Dashboard** | What's assigned to you, what's due or overdue, a "needs your attention" queue and your hours against your weekly target. Report holders also see team throughput and top contributors. |
 | **For You and Starred** | Your personal queue grouped by stage (why each task is waiting on you, priority, due date), and the tasks you've starred. |
 | **Calendar** | Month, week and day views that follow the configured work week and shade days off. |
 | **Notifications** | In-app bell and page plus email, pushed **live** over WebSockets (Laravel Reverb). It can be switched off in Settings; the bell then checks on a timer. |
-| **Settings** | Per-person look (Liquid glass or Static, six theme colours, light/dark/system), work schedule (days off, week start, daily hours target), roles and permissions, live notifications, the post-login loading screen (four theme-coloured animations), an SMTP override with a test email, and email templates (three layouts, colour presets, live preview). |
+| **Settings** | Per-person look (Liquid glass or Static, six theme colours, light/dark/system), work schedule (days off, week start, daily hours target, the work timer and its forgotten-timer limit), roles and permissions, live notifications, the post-login loading screen (four theme-coloured animations), an SMTP override with a test email, and email templates (three layouts, colour presets, live preview). |
 | **UI** | Mobile-first, with frosted glass or solid panels, dark mode, a notched shortcut bar, Dynamic Island–style toasts, searchable pickers that scale to thousands of records, and in-app 403 and 404 pages. |
 
 ## Tech stack
@@ -220,7 +220,7 @@ Infrastructure comes from `.env`. Business settings are edited in the app under 
 | Settings tab | Who | Stored | Notes |
 | --- | --- | --- | --- |
 | **Look** | Everyone | Each person's browser (`localStorage`) | Liquid glass / Static, theme colour, light / dark / system. Defaults: Liquid glass, Forest, System. |
-| **Work Schedule** | Super Admin | Database | Days off, first day of the week, daily hours target. Drives reports, the calendar, the dashboard and "this week". |
+| **Work Schedule** | Super Admin | Database | Days off, first day of the week, daily hours target. Drives reports, the calendar, the dashboard and "this week". Also the work timer (auto time log) on/off, and after how many hours a forgotten timer is stopped. |
 | **Roles & Permissions** | Super Admin | Database (Spatie) | See [Roles and permissions](#roles-and-permissions). |
 | **Notifications** | Super Admin | Database (Reverb secret encrypted) | In-app notifications on/off, notification emails on/off, and the live push. See [Notifications](#live-notifications-reverb). |
 | **Loading Screen** | Super Admin | Database | Shown once after sign-in: Jumping Boxes, Equalizer, Handoff or Spinner, drawn in each viewer's theme colours, with duration, transparency and blur. |
@@ -472,8 +472,15 @@ Only `/app` (the WebSocket) needs to be public. The app sends its pushes to `127
 - [ ] A real mailer configured and tested
 - [ ] Roles & Permissions reviewed for your organisation
 - [ ] Database, `storage/app/private` (attachments) and `storage/app/public` (photos) backups scheduled
+- [ ] The scheduler's cron entry added (below)
 
-There are no scheduled commands, so no cron entry for `schedule:run` is needed.
+The scheduler stops forgotten work timers (`timers:stop-stale`, every five minutes). Add one cron entry for the web server's user:
+
+```cron
+* * * * * cd /var/www/handloft && php artisan schedule:run >> /dev/null 2>&1
+```
+
+Without it, a forgotten timer is still never counted past the limit; it just keeps showing as running until someone stops it.
 
 ## Updating an installation
 

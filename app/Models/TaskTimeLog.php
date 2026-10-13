@@ -7,9 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * One day's worked-hours entry against a task. A task that spans several days
- * accumulates several of these (one per person per day) instead of a single
- * end-of-task hours figure — see WorkHistory for that separate, one-shot record.
+ * One worked-time entry against a task, for a day. A person can have several on the same task and
+ * day (each work-timer session, or another manual log); the day's time is their sum. See WorkHistory
+ * for the separate, one-shot end-of-task record.
  */
 #[Fillable(['task_id', 'user_id', 'logged_date', 'hours', 'note'])]
 class TaskTimeLog extends Model

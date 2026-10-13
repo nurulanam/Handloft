@@ -43,6 +43,8 @@ use Illuminate\Database\Eloquent\Model;
     'reverb_client_host',
     'reverb_client_port',
     'reverb_client_scheme',
+    'work_timer_enabled',
+    'work_timer_max_hours',
 ])]
 class AppSetting extends Model
 {
@@ -67,6 +69,8 @@ class AppSetting extends Model
             'reverb_app_secret' => 'encrypted',
             'reverb_port' => 'integer',
             'reverb_client_port' => 'integer',
+            'work_timer_enabled' => 'boolean',
+            'work_timer_max_hours' => 'integer',
         ];
     }
 
@@ -84,6 +88,8 @@ class AppSetting extends Model
             'off_days' => [0, 6],
             'week_starts_on' => 1,
             'daily_hours_target' => 8,
+            'work_timer_enabled' => true,
+            'work_timer_max_hours' => 10,
         ]);
     }
 

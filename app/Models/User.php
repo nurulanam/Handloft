@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Activitylog\LogOptions;
@@ -79,5 +80,15 @@ class User extends Authenticatable
     public function starredTasks(): BelongsToMany
     {
         return $this->belongsToMany(Task::class, 'task_stars')->withTimestamps();
+    }
+
+    /**
+     * The work timer this person has running, if any (at most one at a time).
+     *
+     * @return HasOne<TaskTimer, $this>
+     */
+    public function runningTimer(): HasOne
+    {
+        return $this->hasOne(TaskTimer::class);
     }
 }

@@ -6,6 +6,7 @@ use App\Enums\TaskActivityType;
 use App\Enums\TaskStatus;
 use App\Models\Task;
 use App\Models\TaskTimeLog;
+use App\Models\TaskTimer;
 use App\Models\User;
 use App\Models\WorkHistory;
 use App\Notifications\TaskAssigned;
@@ -14,7 +15,9 @@ use App\Notifications\TaskRejected;
 use App\Notifications\TaskSubmittedForQa;
 use App\Support\DeferredNotification;
 use App\Support\Duration;
+use App\Support\WorkTimer;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class TaskWorkflowService
@@ -122,6 +125,8 @@ class TaskWorkflowService
      */
     public function markDone(Task $task, User $reporter): void
     {
+        $this->stopTimersOn($task);
+
         DB::transaction(function () use ($task, $reporter) {
             $now = now();
 
@@ -150,41 +155,149 @@ class TaskWorkflowService
     }
 
     /**
-     * Log (or update) one day's worked hours on a task. A person gets at most
-     * one entry per day — logging the same day again updates that entry
-     * rather than adding a second one, so the running total stays correct.
+     * Add a time entry. Every log is its own entry, so a person can log the same task several times a
+     * day (e.g. a morning and an afternoon session) and the day's time is the sum of them.
      */
     public function logTime(Task $task, User $user, CarbonInterface $date, float $hours, ?string $note = null): TaskTimeLog
     {
-        // Not a plain updateOrCreate(): the `date` cast stores `logged_date`
-        // as a full datetime string, so a raw string match condition would
-        // never find the existing row and would hit the unique constraint on
-        // the next insert attempt instead. whereDate() compares by calendar
-        // day regardless of the stored format.
-        $log = TaskTimeLog::query()
-            ->where('task_id', $task->id)
-            ->where('user_id', $user->id)
-            ->whereDate('logged_date', $date->toDateString())
-            ->first();
-
-        $isNewEntry = $log === null;
-
-        $log ??= new TaskTimeLog([
+        $log = TaskTimeLog::create([
             'task_id' => $task->id,
             'user_id' => $user->id,
             'logged_date' => $date->toDateString(),
+            'hours' => $hours,
+            'note' => $note,
         ]);
 
-        $log->fill(['hours' => $hours, 'note' => $note])->save();
-
-        // Only the first time someone logs a given day earns a timeline
-        // entry — re-submitting the same day again is a correction, not a
-        // new event, so it shouldn't keep stacking "logged Xh on Y" lines.
-        if ($isNewEntry) {
-            $this->recordActivity($task, TaskActivityType::MetaUpdated, $user, "{$user->name} logged ".Duration::forHumans($hours)." on {$date->format('d M Y')}", now());
-        }
+        $this->recordActivity($task, TaskActivityType::MetaUpdated, $user, "{$user->name} logged ".Duration::forHumans($hours)." on {$date->format('d M Y')}", now());
 
         return $log;
+    }
+
+    /**
+     * Hours a person has logged on a task for one day, across all of that day's entries (optionally
+     * leaving one entry out, when it's the one being corrected).
+     */
+    public function hoursLoggedOn(Task $task, User $user, CarbonInterface $date, ?int $exceptLogId = null): float
+    {
+        return (float) TaskTimeLog::query()
+            ->where('task_id', $task->id)
+            ->where('user_id', $user->id)
+            ->whereDate('logged_date', $date->toDateString())
+            ->when($exceptLogId, fn ($q) => $q->whereKeyNot($exceptLogId))
+            ->sum('hours');
+    }
+
+    /**
+     * Add one work-timer session as its own entry. A day never goes past 24 hours
+     * for one person on one task; returns the hours actually added.
+     */
+    public function addTime(Task $task, User $user, CarbonInterface $date, float $hours, ?string $note = null): float
+    {
+        $added = round(max(0, min($hours, 24 - $this->hoursLoggedOn($task, $user, $date))), 2);
+
+        if ($added <= 0) {
+            return 0.0;
+        }
+
+        TaskTimeLog::create([
+            'task_id' => $task->id,
+            'user_id' => $user->id,
+            'logged_date' => $date->toDateString(),
+            'hours' => $added,
+            'note' => $note,
+        ]);
+
+        return $added;
+    }
+
+    /**
+     * Mark a task as being worked on right now. A person has one timer at a time, so a timer running
+     * on another task is stopped (and logged) first. When the assignee starts work on a To Do task,
+     * it moves to In Progress, as dragging it there would.
+     */
+    public function startTimer(Task $task, User $user): TaskTimer
+    {
+        $running = $user->runningTimer()->first();
+
+        if ($running?->task_id === $task->id) {
+            return $running;
+        }
+
+        if ($running) {
+            $this->stopTimer($running);
+        }
+
+        return DB::transaction(function () use ($task, $user) {
+            $timer = TaskTimer::create(['task_id' => $task->id, 'user_id' => $user->id, 'started_at' => now()]);
+
+            if ($task->status === TaskStatus::Todo && $task->isAssignedTo($user)) {
+                $task->update(['status' => TaskStatus::InProgress]);
+                $this->recordActivity($task, TaskActivityType::StatusChanged, $user, "{$user->name} started work, moved this to In Progress", now());
+            }
+
+            return $timer;
+        });
+    }
+
+    /**
+     * Stop a work timer and log the time it ran, split across calendar days when it ran past midnight.
+     * A timer is never counted beyond Settings → Work schedule's limit (a forgotten timer), and under a
+     * minute isn't logged. Returns the hours logged; 0 when someone else already stopped it.
+     */
+    public function stopTimer(TaskTimer $timer, bool $automatic = false): float
+    {
+        return DB::transaction(function () use ($timer, $automatic) {
+            // Whoever deletes the row logs the time, so a double click or the scheduled clean-up
+            // racing a manual stop can't log the same session twice.
+            if (TaskTimer::query()->whereKey($timer->id)->delete() === 0) {
+                return 0.0;
+            }
+
+            $task = $timer->task;
+            $user = $timer->user;
+            $start = Carbon::parse($timer->started_at);
+            $end = now();
+            $maxHours = WorkTimer::maxHours();
+            $capped = $maxHours !== null && $start->copy()->addHours($maxHours)->lessThan($end);
+
+            if ($capped) {
+                $end = $start->copy()->addHours($maxHours);
+            }
+
+            $logged = 0.0;
+            $cursor = $start->copy();
+
+            while ($cursor->lessThan($end)) {
+                $segmentEnd = $cursor->copy()->addDay()->startOfDay()->min($end);
+                $minutes = intdiv((int) $cursor->diffInSeconds($segmentEnd, true), 60);
+
+                if ($minutes > 0) {
+                    $logged += $this->addTime($task, $user, $cursor, round($minutes / 60, 2), 'Work timer');
+                }
+
+                $cursor = $segmentEnd;
+            }
+
+            if ($logged > 0) {
+                $suffix = match (true) {
+                    $capped => " (stopped automatically after {$maxHours}h)",
+                    $automatic => ' (stopped automatically)',
+                    default => '',
+                };
+
+                $this->recordActivity($task, TaskActivityType::MetaUpdated, $user, "{$user->name} logged ".Duration::forHumans($logged)." with the work timer{$suffix}", now());
+            }
+
+            return $logged;
+        });
+    }
+
+    /**
+     * Stop every timer running on a task (it's finished, so nobody is working on it any more).
+     */
+    public function stopTimersOn(Task $task): void
+    {
+        $task->timers()->get()->each(fn (TaskTimer $timer) => $this->stopTimer($timer, automatic: true));
     }
 
     public function deleteTimeLog(TaskTimeLog $timeLog, User $actor): void
@@ -250,6 +363,10 @@ class TaskWorkflowService
 
         if ($from === $to) {
             return;
+        }
+
+        if ($to === TaskStatus::Done) {
+            $this->stopTimersOn($task);
         }
 
         DB::transaction(function () use ($task, $from, $to, $admin) {

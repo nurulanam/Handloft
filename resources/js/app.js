@@ -47,6 +47,25 @@ document.addEventListener('alpine:init', () => {
     // (Create Task/Project); pages editing an already-saved record just wire
     // each option's click straight to a Livewire save method and ignore
     // value/label, since the server round-trip re-renders the real value.
+    // A running work timer's clock (H:MM:SS). It's given the seconds already elapsed on the server,
+    // not a start time, so a browser clock that's off doesn't skew it.
+    Alpine.data('elapsedClock', (elapsedSeconds = 0) => ({
+        startedAt: Date.now() - elapsedSeconds * 1000,
+        text: '',
+        init() {
+            this.tick();
+            this.interval = setInterval(() => this.tick(), 1000);
+        },
+        destroy() {
+            clearInterval(this.interval);
+        },
+        tick() {
+            const total = Math.max(0, Math.floor((Date.now() - this.startedAt) / 1000));
+            const pad = (n) => String(n).padStart(2, '0');
+            this.text = `${Math.floor(total / 3600)}:${pad(Math.floor((total % 3600) / 60))}:${pad(total % 60)}`;
+        },
+    }));
+
     Alpine.data('dropdownMenu', (initialValue = '', initialLabel = '') => ({
         open: false,
         value: initialValue,

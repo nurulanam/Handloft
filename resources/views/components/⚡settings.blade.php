@@ -29,6 +29,10 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
 
     public string $daily_hours_target = '8';
 
+    public bool $work_timer_enabled = true;
+
+    public string $work_timer_max_hours = '10';
+
     public bool $show_loading_screen = true;
 
     public int $loading_screen_seconds = 3;
@@ -167,6 +171,8 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
         $this->off_days = array_map('strval', WorkSchedule::offDays());
         $this->week_starts_on = (string) WorkSchedule::weekStartsOn();
         $this->daily_hours_target = WorkSchedule::dailyTarget() !== null ? rtrim(rtrim(number_format(WorkSchedule::dailyTarget(), 2), '0'), '.') : '';
+        $this->work_timer_enabled = \App\Support\WorkTimer::enabled();
+        $this->work_timer_max_hours = (string) (\App\Support\WorkTimer::maxHours() ?? '');
     }
 
     /**
@@ -193,6 +199,8 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
             'off_days.*' => ['integer', 'between:0,6', 'distinct'],
             'week_starts_on' => ['required', Rule::in(['0', '1', '6'])],
             'daily_hours_target' => ['nullable', 'numeric', 'between:0.5,24'],
+            'work_timer_enabled' => ['boolean'],
+            'work_timer_max_hours' => ['nullable', 'integer', 'between:1,'.\App\Support\WorkTimer::MAX_HOURS_LIMIT],
         ], [
             'off_days.max' => 'Keep at least one working day in the week.',
         ]);
@@ -201,9 +209,30 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
             'off_days' => collect($data['off_days'] ?? [])->map(fn ($day) => (int) $day)->unique()->sort()->values()->all(),
             'week_starts_on' => (int) $data['week_starts_on'],
             'daily_hours_target' => $data['daily_hours_target'] !== null && $data['daily_hours_target'] !== '' ? (float) $data['daily_hours_target'] : null,
+            'work_timer_enabled' => (bool) $data['work_timer_enabled'],
+            'work_timer_max_hours' => filled($data['work_timer_max_hours']) ? (int) $data['work_timer_max_hours'] : null,
         ]);
 
-        $this->dispatch('notify', message: 'Work schedule saved.', type: 'success');
+        // Turning the timer off stops (and logs) the ones running now, so none is left ticking with no
+        // way to start another.
+        $stopped = 0;
+
+        if (! $data['work_timer_enabled']) {
+            $workflow = app(\App\Services\TaskWorkflowService::class);
+
+            \App\Models\TaskTimer::query()->each(function (\App\Models\TaskTimer $timer) use ($workflow, &$stopped) {
+                $workflow->stopTimer($timer, automatic: true);
+                $stopped++;
+            });
+
+            if ($stopped > 0) {
+                $this->dispatch('timer-changed');
+            }
+        }
+
+        $this->dispatch('notify', message: $stopped > 0
+            ? "Work schedule saved. {$stopped} running ".\Illuminate\Support\Str::plural('timer', $stopped).' stopped and logged.'
+            : 'Work schedule saved.', type: 'success');
     }
 
     public function saveLoadingScreen(): void
@@ -825,6 +854,40 @@ new #[Layout('layouts.app')] #[Title('Settings')] class extends Component
                                     </p>
                                 </div>
                                 @error('daily_hours_target') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                            </div>
+                        </div>
+
+                        <div class="grid gap-4 px-4 py-5 sm:px-6 lg:grid-cols-3 lg:gap-6">
+                            <div>
+                                <h3 class="text-sm font-semibold text-zinc-900">Work timer</h3>
+                                <p class="text-xs text-zinc-500">People press Start working on a task; when they stop, the time is logged for them.</p>
+                            </div>
+                            <div class="space-y-4 lg:col-span-2">
+                                <label class="flex cursor-pointer items-center gap-3">
+                                    <span class="relative inline-flex shrink-0">
+                                        <input type="checkbox" wire:model.live="work_timer_enabled" class="peer sr-only">
+                                        <span class="h-7 w-12 rounded-full bg-zinc-300 transition-colors peer-checked:bg-brand peer-focus-visible:ring-4 peer-focus-visible:ring-brand/20"></span>
+                                        <span class="absolute left-1 top-1 size-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5"></span>
+                                    </span>
+                                    <span class="min-w-0">
+                                        <span class="block text-sm font-semibold text-zinc-900">Auto time log</span>
+                                        <span class="block text-xs text-zinc-500">{{ $work_timer_enabled ? 'On. Anyone who can log time on a task can start a timer.' : 'Off. Time is logged by hand only; saving stops any timer running now.' }}</span>
+                                    </span>
+                                </label>
+
+                                <div @class(['transition-opacity', 'pointer-events-none opacity-40' => ! $work_timer_enabled])>
+                                    <p class="mb-1.5 text-xs font-semibold text-zinc-700">Stop a forgotten timer after</p>
+                                    <div class="inline-grid grid-cols-6 rounded-lg border border-zinc-300 bg-surface p-0.5">
+                                        @foreach (['4' => '4h', '8' => '8h', '10' => '10h', '12' => '12h', '24' => '24h', '' => 'Never'] as $value => $limitLabel)
+                                            <label class="cursor-pointer">
+                                                <input type="radio" wire:model.live="work_timer_max_hours" value="{{ $value }}" class="peer sr-only">
+                                                <span class="block rounded-md px-2.5 py-1.5 text-center text-sm font-medium text-zinc-600 peer-checked:bg-brand peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-brand-lime/50">{{ $limitLabel }}</span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                    <p class="mt-1.5 text-xs text-zinc-500">A timer is never counted past this, so a forgotten one can't add a whole night. It's stopped automatically by the scheduler.</p>
+                                    @error('work_timer_max_hours') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                                </div>
                             </div>
                         </div>
                     </div>
