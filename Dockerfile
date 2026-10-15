@@ -1,16 +1,14 @@
+# Build frontend assets
 FROM node:22-alpine AS assets
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY . .
 
-COPY app ./app
-COPY public ./public
-COPY resources ./resources
-COPY vite.config.js ./
-RUN npm run build
+RUN npm ci && npm run build
 
+
+# PHP / Laravel application
 FROM php:8.3-cli
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -19,7 +17,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libjpeg62-turbo-dev \
         libonig-dev \
         libpng-dev \
-        libpq-dev \
         libsqlite3-dev \
         libzip-dev \
         unzip \
@@ -29,8 +26,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         intl \
         mbstring \
         opcache \
-        pdo_mysql \
-        pdo_pgsql \
         pdo_sqlite \
         zip \
     && apt-get clean \
@@ -41,21 +36,23 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 WORKDIR /app
 
 COPY . .
+
 RUN composer install \
         --no-dev \
         --no-interaction \
         --prefer-dist \
         --optimize-autoloader \
     && mkdir -p \
-        database \
         storage/framework/cache/data \
         storage/framework/sessions \
         storage/framework/views \
         storage/logs \
         bootstrap/cache \
+        database \
     && touch database/database.sqlite \
     && php artisan storage:link --force \
-    && chown -R www-data:www-data database storage bootstrap/cache
+    && chown -R www-data:www-data \
+        database storage bootstrap/cache
 
 COPY --from=assets /app/public/build ./public/build
 
@@ -66,4 +63,4 @@ EXPOSE 10000
 
 USER www-data
 
-CMD ["sh", "-c", "php artisan migrate --force && exec php artisan serve --host=0.0.0.0 --port=\"${PORT:-10000}\""]
+CMD ["sh", "-c", "php artisan migrate --force && php artisan db:seed --force && php artisan config:cache && exec php artisan serve --host 0.0.0.0 --port ${PORT:-10000}"]
