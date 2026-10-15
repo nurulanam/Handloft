@@ -7,6 +7,7 @@ use App\Support\MailSettings;
 use App\Support\NotificationChannels;
 use Illuminate\Foundation\DevCommands;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\URL;
 
 class AppServiceProvider extends ServiceProvider
 {
