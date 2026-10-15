@@ -5,7 +5,11 @@ WORKDIR /app
 
 COPY . .
 
-RUN npm ci && npm run build
+RUN npm ci \
+    && npm run build \
+    && test -f public/build/manifest.json \
+    && echo "Vite manifest generated successfully" \
+    && ls -lah public/build
 
 
 # PHP / Laravel application
@@ -54,7 +58,7 @@ RUN composer install \
     && chown -R www-data:www-data \
         database storage bootstrap/cache
 
-COPY --from=assets /app/public/build ./public/build
+COPY --from=assets /app/public/build /app/public/build
 
 ENV APP_ENV=production \
     APP_DEBUG=false
