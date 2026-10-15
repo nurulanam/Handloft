@@ -23,6 +23,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if (app()->environment('production')) {
+            URL::forceScheme('https');
+        }
         MailSettings::applyFromDatabase();
         // Fresh for every boot (long-running processes like tests or Octane boot more than once).
         LiveUpdates::reset();
