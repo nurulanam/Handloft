@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+.git
+.github
+.idea
+.vscode
+node_modules
+vendor
+public/build
+public/hot
+public/storage
+storage/logs/*
+database/*.sqlite*
+docker-compose*.yml
+Dockerfile*
