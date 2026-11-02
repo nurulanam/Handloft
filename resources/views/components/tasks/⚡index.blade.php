@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Concerns\SearchesPickerOptions;
 use App\Livewire\Concerns\SubmitsForQa;
 use App\Livewire\Concerns\TogglesStars;
 use App\Enums\TaskActivityType;
@@ -16,7 +17,7 @@ use Livewire\WithPagination;
 
 new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
 {
-    use SubmitsForQa, TogglesStars, WithPagination;
+    use SearchesPickerOptions, SubmitsForQa, TogglesStars, WithPagination;
 
     #[Url]
     public string $tab = 'all';
@@ -84,19 +85,12 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
             return;
         }
 
-        // Submitting for QA testing always requires a reviewer to already be
-        // assigned (someone has to approve/reject it) and logs the assignee's
-        // hours worked so far, so open a modal instead of updating directly.
+        // Submitting for QA testing logs the assignee's hours worked so far and, when nobody suitable
+        // is on the task yet, asks who will review it — so open a modal instead of updating directly.
         if ($newStatus === TaskStatus::QaTesting) {
-            if (! $task->qa_id) {
-                $this->dispatch('notify', message: 'Assign a QA / Reviewer to this task before submitting it for QA testing.', type: 'error');
-
-                return;
-            }
-
             $this->submittingTaskId = $task->id;
             $this->submission_note = '';
-            $this->resetQaTimeLog();
+            $this->resetQaSubmission();
 
             return;
         }
@@ -151,7 +145,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
     {
         $this->submittingTaskId = null;
         $this->submission_note = '';
-        $this->resetQaTimeLog();
+        $this->resetQaSubmission();
         $this->resetErrorBag();
     }
 
@@ -233,6 +227,8 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                 'boardTruncated' => $matchingCount > $boardLimit,
                 'boardShown' => $tasks->count(),
                 'boardTotal' => $matchingCount,
+                // The reviewer chosen in the Submit for QA window (only needed while the modal is open).
+                'qa_reviewer_name' => $this->qa_reviewer_id ? User::query()->whereKey($this->qa_reviewer_id)->value('name') : null,
             ];
         }
 
@@ -240,6 +236,8 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
             'tasks' => $query->paginate(15),
             'statuses' => TaskStatus::cases(),
             'board' => null,
+            // The reviewer chosen in the Submit for QA window (only needed while the modal is open).
+            'qa_reviewer_name' => $this->qa_reviewer_id ? User::query()->whereKey($this->qa_reviewer_id)->value('name') : null,
         ];
     }
 };
@@ -430,6 +428,30 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                 <div class="w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
                     <h3 class="text-lg font-semibold text-zinc-900">Submit for QA Testing</h3>
                     <p class="mt-1 truncate text-sm text-zinc-500"><span class="font-mono text-xs font-semibold text-violet-700">{{ $submittingTask->task_key }}</span> {{ $submittingTask->title }}</p>
+
+                    @if ($this->needsQaReviewer($submittingTask))
+                        {{-- Nobody suitable on the task yet: pick a reviewer here so the submission isn't blocked. --}}
+                        <div class="mt-4">
+                            <label class="block text-sm font-medium text-zinc-700">QA / Reviewer <span class="text-red-600">*</span></label>
+                            <p class="mb-1.5 text-xs text-zinc-500">
+                                @if ($submittingTask->qa)
+                                    You're the assigned reviewer — someone else has to approve this.
+                                @else
+                                    The task has no reviewer assigned yet.
+                                @endif
+                            </p>
+                            <x-form.picker
+                                model="qa_reviewer_id"
+                                source="people"
+                                :value="$qa_reviewer_id"
+                                :label="$qa_reviewer_name"
+                                avatar
+                                placeholder="Choose who will review this"
+                                align="left"
+                            />
+                            @error('qa_reviewer_id') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                    @endif
 
                     <x-tasks.qa-time-log :task="$submittingTask" :error="$errors->first('qa_log_date') ?: ($errors->first('qa_log_hours') ?: $errors->first('qa_log_minutes'))" />
 

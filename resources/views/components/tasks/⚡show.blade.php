@@ -117,7 +117,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
     {
         $this->showSubmitQaModal = false;
         $this->submission_note = '';
-        $this->resetQaTimeLog();
+        $this->resetQaSubmission();
         $this->resetErrorBag();
     }
 
@@ -272,14 +272,10 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         }
 
         if ($newStatus === TaskStatus::QaTesting) {
-            if (! $this->task->qa_id) {
-                $this->dispatch('notify', message: 'Assign a QA / Reviewer to this task before submitting it for QA testing.', type: 'error');
-
-                return;
-            }
-
+            // Nobody suitable to review it yet? The window asks for a reviewer rather than blocking
+            // the move with an alert (see SubmitsForQa::needsQaReviewer()).
             $this->submission_note = '';
-            $this->resetQaTimeLog();
+            $this->resetQaSubmission();
             $this->showSubmitQaModal = true;
 
             return;
@@ -762,6 +758,8 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
             'currentAssignee' => $this->task->currentAssignee(),
             // People, projects and parent tasks are searched on demand (SearchesPickerOptions), not listed here.
             'subtaskAssigneeName' => $this->subtask_assigned_to ? User::query()->whereKey($this->subtask_assigned_to)->value('name') : null,
+            // The reviewer chosen in the Submit for QA window (only needed while the modal is open).
+            'qa_reviewer_name' => $this->qa_reviewer_id ? User::query()->whereKey($this->qa_reviewer_id)->value('name') : null,
             'availableStatuses' => $nextStatuses,
             'allAttachments' => $allAttachments = $taskAttachments->concat($commentAttachments)->sortByDesc('created_at')->values(),
             // For the viewer: just the images and PDFs, in gallery order.
@@ -1412,6 +1410,30 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
             <div class="w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
                 <h3 class="text-lg font-semibold text-zinc-900">Submit for QA Testing</h3>
                 <p class="mt-1 text-sm text-zinc-500">{{ $task->title }}</p>
+
+                @if ($this->needsQaReviewer($task))
+                    {{-- Nobody suitable on the task yet: pick a reviewer here so the submission isn't blocked. --}}
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-zinc-700">QA / Reviewer <span class="text-red-600">*</span></label>
+                        <p class="mb-1.5 text-xs text-zinc-500">
+                            @if ($task->qa)
+                                You're the assigned reviewer — someone else has to approve this.
+                            @else
+                                The task has no reviewer assigned yet.
+                            @endif
+                        </p>
+                        <x-form.picker
+                            model="qa_reviewer_id"
+                            source="people"
+                            :value="$qa_reviewer_id"
+                            :label="$qa_reviewer_name"
+                            avatar
+                            placeholder="Choose who will review this"
+                            align="left"
+                        />
+                        @error('qa_reviewer_id') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                    </div>
+                @endif
 
                 <x-tasks.qa-time-log :task="$task" :error="$errors->first('qa_log_date') ?: ($errors->first('qa_log_hours') ?: $errors->first('qa_log_minutes'))" />
 

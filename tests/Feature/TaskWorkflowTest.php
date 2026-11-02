@@ -165,7 +165,42 @@ class TaskWorkflowTest extends TestCase
         $this->assertSame(TaskStatus::Todo, $task->fresh()->status);
     }
 
-    public function test_moving_to_qa_testing_requires_a_qa_reviewer_assigned(): void
+    public function test_moving_to_qa_testing_without_a_reviewer_opens_the_window_to_pick_one(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+        $qa = $this->teamMember('Qadir');
+
+        $workflow = app(TaskWorkflowService::class);
+        $task = $workflow->createTask(['title' => 'Website Audit', 'status' => TaskStatus::InProgress], $rahim, $karim);
+
+        // Rather than blocking with an alert, the window opens and asks who will review it.
+        $component = Livewire::actingAs($karim)
+            ->test('tasks.show', ['task' => $task])
+            ->call('saveStatus', 'qa_testing')
+            ->assertSet('showSubmitQaModal', true)
+            ->assertSee('QA / Reviewer')
+            ->set('qa_reviewer_id', '')
+            ->call('submitForQa')
+            ->assertHasErrors('qa_reviewer_id');
+
+        // Nothing moved yet, and no reviewer was invented.
+        $this->assertSame(TaskStatus::InProgress, $task->fresh()->status);
+        $this->assertNull($task->fresh()->qa_id);
+
+        // Choosing one assigns them and submits in the same step.
+        $component
+            ->set('qa_reviewer_id', (string) $qa->id)
+            ->call('submitForQa')
+            ->assertHasNoErrors();
+
+        $task->refresh();
+
+        $this->assertSame(TaskStatus::QaTesting, $task->status);
+        $this->assertSame($qa->id, $task->qa_id);
+    }
+
+    public function test_the_submitter_cannot_make_themselves_the_qa_reviewer(): void
     {
         $rahim = $this->teamMember('Rahim');
         $karim = $this->teamMember('Karim');
@@ -176,9 +211,122 @@ class TaskWorkflowTest extends TestCase
         Livewire::actingAs($karim)
             ->test('tasks.show', ['task' => $task])
             ->call('saveStatus', 'qa_testing')
-            ->assertDispatched('notify');
+            ->set('qa_reviewer_id', (string) $karim->id)
+            ->call('submitForQa')
+            ->assertHasErrors('qa_reviewer_id');
 
         $this->assertSame(TaskStatus::InProgress, $task->fresh()->status);
+        $this->assertNull($task->fresh()->qa_id);
+    }
+
+    public function test_the_reviewer_chosen_in_the_window_is_recorded_on_the_timeline(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+        $qa = $this->teamMember('Qadir');
+
+        $workflow = app(TaskWorkflowService::class);
+        $task = $workflow->createTask(['title' => 'Website Audit', 'status' => TaskStatus::InProgress], $rahim, $karim);
+
+        Livewire::actingAs($karim)
+            ->test('tasks.show', ['task' => $task])
+            ->call('saveStatus', 'qa_testing')
+            ->set('qa_reviewer_id', (string) $qa->id)
+            ->call('submitForQa')
+            ->assertHasNoErrors();
+
+        $this->assertSame($qa->id, $task->fresh()->qa_id);
+        $this->assertTrue($task->activities()->where('description', 'like', 'QA / Reviewer set to Qadir%')->exists());
+    }
+
+    public function test_the_reviewer_field_is_skipped_when_the_submitter_is_not_the_assigned_reviewer(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+        $qa = $this->teamMember('Qadir');
+
+        $workflow = app(TaskWorkflowService::class);
+        $task = $workflow->createTask(['title' => 'Website Audit', 'status' => TaskStatus::InProgress, 'qa_id' => $qa->id], $rahim, $karim);
+
+        Livewire::actingAs($karim)
+            ->test('tasks.show', ['task' => $task])
+            ->call('saveStatus', 'qa_testing')
+            ->set('qa_reviewer_id', (string) $rahim->id)
+            ->call('submitForQa')
+            ->assertHasNoErrors();
+
+        // The existing reviewer stands — an unused field must not be able to hijack the assignment.
+        $this->assertSame(TaskStatus::QaTesting, $task->fresh()->status);
+        $this->assertSame($qa->id, $task->fresh()->qa_id);
+    }
+
+    public function test_the_submitter_who_is_also_the_assigned_reviewer_must_pick_someone_else(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+        $qa = $this->teamMember('Qadir');
+
+        $workflow = app(TaskWorkflowService::class);
+        // Karim is both the assignee and the named reviewer — he can't approve his own work.
+        $task = $workflow->createTask(['title' => 'Website Audit', 'status' => TaskStatus::InProgress, 'qa_id' => $karim->id], $rahim, $karim);
+
+        Livewire::actingAs($karim)
+            ->test('tasks.show', ['task' => $task])
+            ->call('saveStatus', 'qa_testing')
+            ->assertSee('someone else has to approve this')
+            ->call('submitForQa')
+            ->assertHasErrors('qa_reviewer_id');
+
+        $this->assertSame(TaskStatus::InProgress, $task->fresh()->status);
+
+        Livewire::actingAs($karim)
+            ->test('tasks.show', ['task' => $task])
+            ->call('saveStatus', 'qa_testing')
+            ->set('qa_reviewer_id', (string) $qa->id)
+            ->call('submitForQa')
+            ->assertHasNoErrors();
+
+        $this->assertSame(TaskStatus::QaTesting, $task->fresh()->status);
+        $this->assertSame($qa->id, $task->fresh()->qa_id);
+    }
+
+    public function test_reopening_the_window_clears_the_reviewer_chosen_before(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+        $qa = $this->teamMember('Qadir');
+
+        $workflow = app(TaskWorkflowService::class);
+        $task = $workflow->createTask(['title' => 'Website Audit', 'status' => TaskStatus::InProgress], $rahim, $karim);
+
+        Livewire::actingAs($karim)
+            ->test('tasks.show', ['task' => $task])
+            ->call('saveStatus', 'qa_testing')
+            ->set('qa_reviewer_id', (string) $qa->id)
+            ->call('cancelSubmitForQa')
+            ->call('saveStatus', 'qa_testing')
+            ->assertSet('qa_reviewer_id', '');
+    }
+
+    public function test_a_task_already_reviewed_by_someone_else_does_not_ask_for_a_reviewer(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+        $qa = $this->teamMember('Qadir');
+
+        $workflow = app(TaskWorkflowService::class);
+        $task = $workflow->createTask(['title' => 'Website Audit', 'status' => TaskStatus::InProgress, 'qa_id' => $qa->id], $rahim, $karim);
+
+        Livewire::actingAs($karim)
+            ->test('tasks.show', ['task' => $task])
+            ->call('saveStatus', 'qa_testing')
+            ->assertSet('showSubmitQaModal', true)
+            ->assertDontSee('Choose who will review this')
+            ->call('submitForQa')
+            ->assertHasNoErrors();
+
+        $this->assertSame(TaskStatus::QaTesting, $task->fresh()->status);
+        $this->assertSame($qa->id, $task->fresh()->qa_id);
     }
 
     public function test_assignee_moving_to_qa_testing_uses_logged_time_to_create_work_history(): void
@@ -450,10 +598,11 @@ class TaskWorkflowTest extends TestCase
         $this->assertSame(TaskStatus::Todo, $task->fresh()->status);
     }
 
-    public function test_dragging_a_card_to_qa_testing_without_a_reviewer_shows_a_notification(): void
+    public function test_dragging_a_card_to_qa_testing_without_a_reviewer_opens_the_window_to_pick_one(): void
     {
         $rahim = $this->teamMember('Rahim');
         $karim = $this->teamMember('Karim');
+        $qa = $this->teamMember('Qadir');
 
         $workflow = app(TaskWorkflowService::class);
         $task = $workflow->createTask(['title' => 'Website Audit', 'status' => TaskStatus::InProgress], $rahim, $karim);
@@ -461,10 +610,17 @@ class TaskWorkflowTest extends TestCase
         Livewire::actingAs($karim)
             ->test('tasks.index')
             ->call('moveTask', $task->id, 'qa_testing')
+            ->assertSet('submittingTaskId', $task->id)
+            ->assertSee('QA / Reviewer')
+            ->set('qa_reviewer_id', (string) $qa->id)
+            ->call('submitForQa')
             ->assertSet('submittingTaskId', null)
-            ->assertDispatched('notify');
+            ->assertHasNoErrors();
 
-        $this->assertSame(TaskStatus::InProgress, $task->fresh()->status);
+        $task->refresh();
+
+        $this->assertSame(TaskStatus::QaTesting, $task->status);
+        $this->assertSame($qa->id, $task->qa_id);
     }
 
     public function test_dragging_a_card_to_qa_testing_opens_the_hours_modal_in_place(): void
