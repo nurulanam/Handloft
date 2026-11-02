@@ -79,8 +79,12 @@ final class Attachments
         return self::INLINE_TYPES[self::extension($name)] ?? null;
     }
 
-    public static function taskOf(TaskAttachment|TaskCommentAttachment $attachment): Task
+    /**
+     * The task an attachment belongs to. Null when a comment has since been deleted, so the
+     * controller can 404 instead of failing on a missing relation.
+     */
+    public static function taskOf(TaskAttachment|TaskCommentAttachment $attachment): ?Task
     {
-        return $attachment instanceof TaskAttachment ? $attachment->task : $attachment->comment->task;
+        return $attachment instanceof TaskAttachment ? $attachment->task : $attachment->comment?->task;
     }
 }

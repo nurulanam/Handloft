@@ -1,10 +1,13 @@
 <?php
 
 use App\Enums\ProjectStatus;
+use App\Enums\TaskActivityType;
 use App\Models\Project;
+use App\Models\Task;
 use App\Models\User;
 use App\Notifications\ProjectCoordinatorAssigned;
 use App\Support\DeferredNotification;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -17,6 +20,11 @@ new #[Layout('layouts.app')] #[Title('Project')] class extends Component
     use \App\Livewire\Concerns\SearchesPickerOptions;
 
     public Project $project;
+
+    /** Set while the delete-project confirmation is open. */
+    public bool $showDeleteProject = false;
+
+    public string $delete_reason = '';
 
     public function mount(Project $project): void
     {
@@ -61,6 +69,57 @@ new #[Layout('layouts.app')] #[Title('Project')] class extends Component
         $this->project->refresh();
     }
 
+    /**
+     * Delete the project. It's soft-deleted (kept in the database, hidden from the app); its tasks are
+     * left in place but detached from it, so nothing is lost.
+     */
+    public function deleteProject(): void
+    {
+        Gate::authorize('delete', $this->project);
+
+        $data = Validator::make(['reason' => $this->delete_reason], [
+            'reason' => ['required', 'string', 'max:255'],
+        ], [
+            'reason.required' => 'Say why this project is being deleted.',
+        ])->validate();
+
+        $project = $this->project;
+        $taskCount = $project->tasks()->count();
+
+        DB::transaction(function () use ($taskCount) {
+            activity()
+                ->causedBy(auth()->user())
+                ->performedOn($this->project)
+                ->withProperties(['reason' => $this->delete_reason, 'tasks_detached' => $taskCount])
+                ->log('Project deleted');
+
+            // Tasks outlive the project: they keep their own history and simply stop belonging to it.
+            $this->project->tasks()->get()->each(function (Task $task) {
+                $task->update(['project_id' => null]);
+
+                $task->activities()->create([
+                    'causer_id' => auth()->id(),
+                    'type' => TaskActivityType::MetaUpdated,
+                    'description' => 'Project "'.$this->project->name.'" deleted — reason: '.$this->delete_reason.' by '.auth()->user()->name,
+                    'occurred_at' => now(),
+                ]);
+            });
+
+            $this->project->delete();
+        });
+
+        $this->dispatch('notify', message: 'Project deleted.', type: 'success');
+
+        $this->redirect(route('projects.index'), navigate: true);
+    }
+
+    public function cancelDeleteProject(): void
+    {
+        $this->showDeleteProject = false;
+        $this->delete_reason = '';
+        $this->resetErrorBag('reason');
+    }
+
     public function with(): array
     {
         $tasks = $this->project->topLevelTasks()->get(['id', 'status', 'deadline']);
@@ -81,6 +140,7 @@ new #[Layout('layouts.app')] #[Title('Project')] class extends Component
 
         return [
             'canEdit' => Gate::allows('update', $this->project),
+            'canDelete' => Gate::allows('delete', $this->project),
             'total' => $total,
             'counts' => $counts,
             'overdue' => $tasks->filter(fn ($task) => $task->deadline && $task->deadline->isPast() && $task->status !== \App\Enums\TaskStatus::Done)->count(),
@@ -120,6 +180,13 @@ new #[Layout('layouts.app')] #[Title('Project')] class extends Component
         </div>
 
         <div class="flex shrink-0 items-center gap-2">
+            @if ($canDelete)
+                <button type="button" wire:click="$set('showDeleteProject', true)" class="inline-flex shrink-0 items-center gap-2 rounded-xl border border-red-200 bg-surface px-3.5 py-2 text-sm font-semibold text-red-600 shadow-xs transition hover:border-red-300 hover:bg-red-50" title="Delete project">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clip-rule="evenodd" /></svg>
+                    <span class="hidden sm:inline">Delete</span>
+                </button>
+            @endif
+
             @if ($canEdit)
                 <a href="{{ route('projects.edit', $project) }}" wire:navigate class="btn-secondary py-2" title="Edit project">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4"><path d="m5.433 13.917 1.262-3.155A4 4 0 0 1 7.58 9.42l6.92-6.918a2.121 2.121 0 0 1 3 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 0 1-.65-.65Z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0 0 10 3H4.75A2.75 2.75 0 0 0 2 5.75v9.5A2.75 2.75 0 0 0 4.75 18h9.5A2.75 2.75 0 0 0 17 15.25V10a.75.75 0 0 0-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5Z" /></svg>
@@ -148,6 +215,36 @@ new #[Layout('layouts.app')] #[Title('Project')] class extends Component
             </div>
         </div>
     </div>
+
+    {{-- Delete confirmation. The project is only hidden from the app, never removed from the database. --}}
+    @if ($showDeleteProject)
+        <div class="fixed inset-0 z-40 flex items-center justify-center bg-zinc-900/50 px-4" wire:keydown.escape.window="cancelDeleteProject">
+            <div class="w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
+                <h3 class="text-lg font-semibold text-zinc-900">Delete this project?</h3>
+                <p class="mt-1 text-sm text-zinc-500">{{ $project->name }}</p>
+                <p class="mt-3 rounded-xl bg-amber-50 px-3 py-2.5 text-xs text-amber-800 ring-1 ring-inset ring-amber-200">
+                    The project is hidden from the app but kept in the database.
+                    @if ($project->tasks()->exists())
+                        Its {{ $project->tasks()->count() }} {{ \Illuminate\Support\Str::plural('task', $project->tasks()->count()) }} are kept and simply become unassigned from it — nothing is deleted.
+                    @endif
+                </p>
+
+                <div class="mt-4">
+                    <label for="delete-project-reason" class="block text-sm font-medium text-zinc-700">Reason <span class="text-red-600">*</span></label>
+                    <textarea id="delete-project-reason" wire:model="delete_reason" rows="3" placeholder="Why is this project being deleted?" class="field-input mt-1.5"></textarea>
+                    @error('reason') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                </div>
+
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" wire:click="cancelDeleteProject" class="btn-secondary">Cancel</button>
+                    <button type="button" wire:click="deleteProject" wire:loading.attr="disabled" wire:target="deleteProject" class="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
+                        <span wire:loading.remove wire:target="deleteProject">Delete project</span>
+                        <span wire:loading wire:target="deleteProject">Deleting…</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
 
     {{-- Overview: progress, where the work is, who coordinates it and the timeline. --}}
     <section class="relative grid gap-5 rounded-2xl border border-zinc-200 bg-surface p-4 sm:p-6 lg:grid-cols-[auto_1fr_auto] lg:items-center lg:gap-8 has-[[aria-expanded=true]]:z-20">

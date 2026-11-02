@@ -33,8 +33,12 @@ new class extends Component
 
     public function with(): array
     {
+        $timer = auth()->user()->runningTimer()->with('task')->first();
+
+        // A timer whose task has been deleted (soft-deleted rows are excluded from the relation)
+        // simply shows nothing rather than blanking the header on every page.
         return [
-            'timer' => auth()->user()->runningTimer()->with('task')->first(),
+            'timer' => $timer?->task ? $timer : null,
         ];
     }
 };

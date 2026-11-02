@@ -20,7 +20,11 @@ class AttachmentController extends Controller
     {
         $attachment = $kind === 'comment' ? TaskCommentAttachment::findOrFail($id) : TaskAttachment::findOrFail($id);
 
-        Gate::authorize('view', Attachments::taskOf($attachment));
+        // A comment attachment whose comment (and so task) has since been deleted is gone too.
+        $task = Attachments::taskOf($attachment);
+        abort_if($task === null, 404);
+
+        Gate::authorize('view', $task);
 
         $disk = Attachments::diskFor($attachment->path);
         abort_if($disk === null, 404);

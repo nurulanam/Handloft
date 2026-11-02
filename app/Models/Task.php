@@ -15,12 +15,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable(['title', 'description', 'created_by', 'task_category_id', 'project_id', 'qa_id', 'parent_task_id', 'priority', 'status', 'start_date', 'deadline', 'notes'])]
 class Task extends Model
 {
     /** @use HasFactory<TaskFactory> */
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     /**
      * Prefix for the human-readable task key (e.g. "HL-42"), Jira-style.

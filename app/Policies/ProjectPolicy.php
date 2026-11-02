@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Enums\Role;
 use App\Models\Project;
 use App\Models\User;
 
@@ -37,5 +38,14 @@ class ProjectPolicy
     public function update(User $user, Project $project): bool
     {
         return $user->can('manage-projects') || $project->created_by === $user->id;
+    }
+
+    /**
+     * Determine whether the user can delete the project. Deleting is destructive (it takes the
+     * project and its place in every task list out of the app), so it stays with Super Admins.
+     */
+    public function delete(User $user, Project $project): bool
+    {
+        return $user->hasRole(Role::SuperAdmin->value);
     }
 }

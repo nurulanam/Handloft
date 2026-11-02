@@ -13,6 +13,7 @@ use App\Services\TaskWorkflowService;
 use App\Support\Attachments;
 use App\Support\Duration;
 use App\Support\Html;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -36,6 +37,21 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
     public string $description = '';
 
     public ?string $editingField = null;
+
+    /** Set while the task's title is being renamed in place. */
+    public bool $editingTitle = false;
+
+    public string $titleValue = '';
+
+    /** Set while the delete-task confirmation is open. */
+    public bool $showDeleteTask = false;
+
+    public string $delete_reason = '';
+
+    /** The comment being edited in place (null when none is). */
+    public ?int $editingCommentId = null;
+
+    public string $editingCommentBody = '';
 
     public string $due_date_value = '';
 
@@ -69,6 +85,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
 
         $this->task = $task;
         $this->description = (string) $task->description;
+        $this->titleValue = $task->title;
         $this->log_date = now()->toDateString();
     }
 
@@ -159,6 +176,44 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         }
 
         $this->description = (string) $this->task->description;
+    }
+
+    /**
+     * Rename the task in place, from the heading on its page.
+     */
+    public function startEditTitle(): void
+    {
+        Gate::authorize('updateMeta', $this->task);
+
+        $this->titleValue = $this->task->title;
+        $this->editingTitle = true;
+    }
+
+    public function cancelEditTitle(): void
+    {
+        $this->editingTitle = false;
+        $this->titleValue = $this->task->title;
+        $this->resetErrorBag('titleValue');
+    }
+
+    public function saveTitle(): void
+    {
+        Gate::authorize('updateMeta', $this->task);
+
+        $data = $this->validate([
+            'titleValue' => ['required', 'string', 'max:255'],
+        ], [
+            'titleValue.required' => 'Give the task a title.',
+        ]);
+
+        if ($data['titleValue'] !== $this->task->title) {
+            $this->task->update(['title' => $data['titleValue']]);
+            $this->logMetaChange('Title changed to "'.$data['titleValue'].'"');
+            $this->task->refresh();
+        }
+
+        $this->editingTitle = false;
+        $this->titleValue = $this->task->title;
     }
 
     /**
@@ -394,6 +449,80 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         $this->commentAttachments = array_values($this->commentAttachments);
     }
 
+    /**
+     * Edit one of your own comments (author only — see TaskCommentPolicy).
+     */
+    public function startEditComment(int $commentId): void
+    {
+        $comment = $this->commentFor($commentId);
+
+        Gate::authorize('update', $comment);
+
+        $this->editingCommentId = $comment->id;
+        $this->editingCommentBody = $comment->body;
+        $this->resetErrorBag('editingCommentBody');
+    }
+
+    public function cancelEditComment(): void
+    {
+        $this->editingCommentId = null;
+        $this->editingCommentBody = '';
+        $this->resetErrorBag('editingCommentBody');
+    }
+
+    public function saveComment(): void
+    {
+        if ($this->editingCommentId === null) {
+            return;
+        }
+
+        $comment = $this->commentFor($this->editingCommentId);
+
+        Gate::authorize('update', $comment);
+
+        $data = $this->validate([
+            'editingCommentBody' => ['required', 'string'],
+        ], [
+            'editingCommentBody.required' => 'A comment can\'t be empty.',
+        ]);
+
+        if ($data['editingCommentBody'] !== $comment->body) {
+            $comment->update(['body' => $data['editingCommentBody']]);
+            $this->logMetaChange('Comment edited');
+        }
+
+        $this->cancelEditComment();
+    }
+
+    /**
+     * Remove one of your own comments. It's soft-deleted, so it disappears from the thread but stays
+     * in the database (and can be restored).
+     */
+    public function deleteComment(int $commentId): void
+    {
+        $comment = $this->commentFor($commentId);
+
+        Gate::authorize('delete', $comment);
+
+        $comment->delete();
+
+        if ($this->editingCommentId === $comment->id) {
+            $this->cancelEditComment();
+        }
+
+        $this->logMetaChange('Comment removed');
+        $this->dispatch('notify', message: 'Comment removed.', type: 'success');
+    }
+
+    /**
+     * A comment on this task, looked up by id so a crafted request can't reach
+     * a comment belonging to another task.
+     */
+    private function commentFor(int $commentId): \App\Models\TaskComment
+    {
+        return $this->task->comments()->findOrFail($commentId);
+    }
+
     public function addAttachments(): void
     {
         Gate::authorize('updateMeta', $this->task);
@@ -558,6 +687,47 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         ]);
     }
 
+    /**
+     * Delete the task. It is soft-deleted (kept in the database, hidden from the app), together with
+     * its subtasks and any comment thread — the files, logged time and history stay attached.
+     */
+    public function deleteTask(TaskWorkflowService $workflow): void
+    {
+        Gate::authorize('delete', $this->task);
+
+        $data = Validator::make(['reason' => $this->delete_reason], [
+            'reason' => ['required', 'string', 'max:255'],
+        ], [
+            'reason.required' => 'Say why this task is being deleted.',
+        ])->validate();
+
+        // Nobody is working on it any more, and a timer row can't outlive its task.
+        $workflow->stopTimersOn($this->task);
+
+        $subtasks = $this->task->children()->count();
+
+        DB::transaction(function () use ($data, $subtasks) {
+            $this->logMetaChange('Task deleted'.($subtasks > 0 ? " with {$subtasks} ".str('subtask')->plural($subtasks) : '').' — reason: '.$data['reason']);
+
+            // The task's own comments go with it (soft-deleted too); the message above is the record
+            // of why, since a soft-deleted task can't show its activity to anyone any more.
+            $this->task->comments()->get()->each->delete();
+            $this->task->children()->get()->each->delete();
+            $this->task->delete();
+        });
+
+        $this->dispatch('notify', message: 'Task deleted.', type: 'success');
+
+        $this->redirect(route('tasks.index'), navigate: true);
+    }
+
+    public function cancelDeleteTask(): void
+    {
+        $this->showDeleteTask = false;
+        $this->delete_reason = '';
+        $this->resetErrorBag('reason');
+    }
+
     public function with(): array
     {
         $canEditMeta = Gate::allows('updateMeta', $this->task);
@@ -600,6 +770,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                 ->values(),
             'canReassign' => Gate::allows('reassign', $this->task),
             'canEditStatus' => $nextStatuses->isNotEmpty(),
+            'canDelete' => Gate::allows('delete', $this->task),
             'canEditMeta' => Gate::allows('updateMeta', $this->task),
             'canComment' => Gate::allows('comment', $this->task),
             'isStarred' => auth()->user()->starredTasks()->where('tasks.id', $this->task->id)->exists(),
@@ -640,7 +811,32 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                     </svg>
                 </button>
             </div>
-            <h1 class="mt-2 text-2xl font-semibold tracking-tight text-zinc-900 sm:text-[1.75rem] sm:leading-9">{{ $task->title }}</h1>
+            @if ($editingTitle)
+                <div class="mt-2 flex items-center gap-2">
+                    <input
+                        wire:model="titleValue"
+                        type="text"
+                        wire:keydown.enter="saveTitle"
+                        wire:keydown.escape="cancelEditTitle"
+                        class="field-input max-w-xl text-xl font-semibold sm:text-[1.375rem]"
+                        aria-label="Task title"
+                        autofocus
+                    >
+                    <button type="button" wire:click="saveTitle" wire:loading.attr="disabled" wire:target="saveTitle" class="btn-primary shrink-0 px-3 py-2">Save</button>
+                    <button type="button" wire:click="cancelEditTitle" class="btn-secondary shrink-0 px-3 py-2">Cancel</button>
+                </div>
+                @error('titleValue') <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p> @enderror
+            @else
+                <div class="mt-2 flex items-center gap-3">
+                    <h1 class="min-w-0 text-2xl font-semibold tracking-tight break-words text-zinc-900 sm:text-[1.75rem] sm:leading-9">{{ $task->title }}</h1>
+                    @if ($canEditMeta)
+                        <button type="button" wire:click="startEditTitle" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-brand transition-colors hover:bg-brand/5">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5"><path d="m5.433 13.917 1.262-3.155A4 4 0 0 1 7.58 9.42l6.92-6.918a2.121 2.121 0 0 1 3 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 0 1-.65-.65Z" /></svg>
+                            Edit
+                        </button>
+                    @endif
+                </div>
+            @endif
             <p class="mt-1.5 flex items-center gap-2 text-sm text-zinc-500">
                 <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-ink-700 text-[9px] font-semibold text-white">{{ \App\Support\Avatar::initials($task->creator->name) }}</span>
                 <span>Created by <span class="font-medium text-zinc-700">{{ $task->creator->name }}</span> on {{ $task->created_at->format('d M Y') }}</span>
@@ -702,8 +898,48 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                 </div>
             @endif
         </div>
+
+        @if ($canDelete)
+            {{-- Delete sits directly beside the status pill as one group; the gap between them keeps a
+                 mis-click on Delete from landing on "move to next status" instead. --}}
+            <div class="flex shrink-0 items-center gap-2">
+                <button type="button" wire:click="$set('showDeleteTask', true)" class="inline-flex shrink-0 items-center gap-2 rounded-xl border border-red-200 bg-surface px-3.5 py-2 text-sm font-semibold text-red-600 shadow-xs transition hover:border-red-300 hover:bg-red-50" title="Delete task">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clip-rule="evenodd" /></svg>
+                    <span class="hidden sm:inline">Delete</span>
+                </button>
+            </div>
+        @endif
         </div>
     </div>
+
+    {{-- Delete confirmation. The task is only hidden from the app, never removed from the database. --}}
+    @if ($showDeleteTask)
+        <div class="fixed inset-0 z-40 flex items-center justify-center bg-zinc-900/50 px-4" wire:keydown.escape.window="cancelDeleteTask">
+            <div class="w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
+                <h3 class="text-lg font-semibold text-zinc-900">Delete this task?</h3>
+                <p class="mt-1 break-words text-sm text-zinc-500">
+                    <span class="font-mono text-xs font-semibold text-violet-700">{{ $task->task_key }}</span> {{ $task->title }}
+                </p>
+                <p class="mt-3 rounded-xl bg-amber-50 px-3 py-2.5 text-xs text-amber-800 ring-1 ring-inset ring-amber-200">
+                    The task{{ $task->children()->exists() ? ', its subtasks' : '' }}{{ $task->comments()->exists() ? ' and its comments' : '' }} are hidden from the app but kept in the database. Logged time, files and history stay attached.
+                </p>
+
+                <div class="mt-4">
+                    <label for="delete-task-reason" class="block text-sm font-medium text-zinc-700">Reason <span class="text-red-600">*</span></label>
+                    <textarea id="delete-task-reason" wire:model="delete_reason" rows="3" placeholder="Why is this task being deleted?" class="field-input mt-1.5"></textarea>
+                    @error('reason') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                </div>
+
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" wire:click="cancelDeleteTask" class="btn-secondary">Cancel</button>
+                    <button type="button" wire:click="deleteTask" wire:loading.attr="disabled" wire:target="deleteTask" class="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
+                        <span wire:loading.remove wire:target="deleteTask">Delete task</span>
+                        <span wire:loading wire:target="deleteTask">Deleting…</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
 
     {{-- On phones both column wrappers are display:contents, so every card becomes its own grid row and
          the order-* classes put status and Details right under the title instead of after the whole
@@ -848,14 +1084,40 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
 
                 <div class="space-y-4">
                     @forelse ($task->comments as $comment)
-                        <div class="flex gap-3">
+                        <div class="flex gap-3" wire:key="comment-{{ $comment->id }}">
                             <x-user-avatar :user="$comment->user" class="size-8 shrink-0 rounded-full text-[11px]" />
                             <div class="flex-1">
                                 <div class="flex items-center gap-2">
                                     <span class="text-sm font-medium text-zinc-900">{{ $comment->user->name }}</span>
                                     <span class="text-xs text-zinc-400">{{ $comment->created_at->format('d M Y — h:i A') }}</span>
+                                    @if ($comment->isEdited())
+                                        <span class="text-xs text-zinc-400" title="Edited {{ $comment->updated_at->format('d M Y — h:i A') }}">· edited</span>
+                                    @endif
+                                    @if ($comment->user_id === auth()->id())
+                                        <span class="ml-auto flex items-center gap-1">
+                                            @if ($editingCommentId !== $comment->id)
+                                                <button type="button" wire:click="startEditComment({{ $comment->id }})" class="flex size-7 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700" title="Edit comment">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4"><path d="m5.433 13.917 1.262-3.155A4 4 0 0 1 7.58 9.42l6.92-6.918a2.121 2.121 0 0 1 3 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 0 1-.65-.65Z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0 0 10 3H4.75A2.75 2.75 0 0 0 2 5.75v9.5A2.75 2.75 0 0 0 4.75 18h9.5A2.75 2.75 0 0 0 17 15.25V10a.75.75 0 0 0-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5Z" /></svg>
+                                                </button>
+                                            @endif
+                                            <button type="button" wire:click="deleteComment({{ $comment->id }})" wire:confirm="Delete this comment? It's kept in the database but hidden from the thread." class="flex size-7 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600" title="Delete comment">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4"><path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clip-rule="evenodd" /></svg>
+                                            </button>
+                                        </span>
+                                    @endif
                                 </div>
-                                <p class="mt-1 whitespace-pre-line rounded-xl rounded-tl-sm bg-zinc-50 px-3.5 py-2.5 text-sm text-zinc-700">{{ $comment->body }}</p>
+                                @if ($editingCommentId === $comment->id)
+                                    <div class="mt-1.5">
+                                        <textarea wire:model="editingCommentBody" rows="3" class="field-input resize-y" aria-label="Edit comment" autofocus></textarea>
+                                        @error('editingCommentBody') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                                        <div class="mt-2 flex justify-end gap-2">
+                                            <button type="button" wire:click="cancelEditComment" class="btn-secondary px-3 py-1.5">Cancel</button>
+                                            <button type="button" wire:click="saveComment" wire:loading.attr="disabled" wire:target="saveComment" class="btn-primary px-3 py-1.5">Save</button>
+                                        </div>
+                                    </div>
+                                @else
+                                    <p class="mt-1 whitespace-pre-line rounded-xl rounded-tl-sm bg-zinc-50 px-3.5 py-2.5 text-sm text-zinc-700">{{ $comment->body }}</p>
+                                @endif
                                 @if ($comment->attachments->isNotEmpty())
                                     @php $commentFiles = $allAttachments->whereIn('id', $comment->attachments->map(fn ($a) => 'comment-'.$a->id)); @endphp
                                     <div class="mt-2 flex flex-wrap gap-2">

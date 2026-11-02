@@ -141,4 +141,13 @@ class TaskPolicy
     {
         return $this->view($user, $task);
     }
+
+    /**
+     * Determine whether the user can delete the task (leaving it viewable in the database, but gone
+     * from the app). Like deleting a project, this stays with Super Admins.
+     */
+    public function delete(User $user, Task $task): bool
+    {
+        return $user->hasRole(Role::SuperAdmin->value);
+    }
 }
