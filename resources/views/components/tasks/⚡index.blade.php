@@ -15,17 +15,27 @@ use Livewire\Attributes\Url;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
-use Livewire\WithPagination;
 
 new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
 {
-    use RejectsTask, SearchesPickerOptions, SubmitsForQa, TogglesStars, WithPagination;
+    use RejectsTask, SearchesPickerOptions, SubmitsForQa, TogglesStars;
 
     #[Url]
     public string $tab = 'all';
 
     #[Url]
     public string $view = 'board';
+
+    /** How many cards each board column shows to begin with, and how many more "Load more" adds. */
+    private const LANE_PAGE = 5;
+
+    /** How many rows the list shows to begin with, and how many more "Load more" adds. */
+    private const LIST_PAGE = 10;
+
+    /** @var array<string, int> Cards currently shown per board column, keyed by status. */
+    public array $laneLimits = [];
+
+    public int $listLimit = self::LIST_PAGE;
 
     public ?int $submittingTaskId = null;
 
@@ -49,6 +59,12 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
     public function updated(string $name): void
     {
         $this->resetErrorBag($name);
+
+        // A different tab or view starts again from the first few items.
+        if (in_array($name, ['tab', 'view'], true)) {
+            $this->laneLimits = [];
+            $this->listLimit = self::LIST_PAGE;
+        }
     }
 
     public function tabs(): array
@@ -65,6 +81,26 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
      */
     #[On('tasks-changed')]
     public function refreshBoard(): void {}
+
+    /**
+     * Show more cards in one board column.
+     */
+    public function loadMoreInLane(string $status): void
+    {
+        if (TaskStatus::tryFrom($status) === null) {
+            return;
+        }
+
+        $this->laneLimits[$status] = ($this->laneLimits[$status] ?? self::LANE_PAGE) + self::LANE_PAGE * 2;
+    }
+
+    /**
+     * Show more rows in the list.
+     */
+    public function loadMoreInList(): void
+    {
+        $this->listLimit += self::LIST_PAGE;
+    }
 
     public function moveTask(int $taskId, string $status): void
     {
@@ -246,26 +282,37 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
         }
 
         if ($this->view === 'board') {
-            $boardLimit = 200;
-            $matchingCount = (clone $query)->count();
-            $tasks = (clone $query)->limit($boardLimit)->get();
+            // One grouped count for every column's total, then only each column's first few cards —
+            // never the whole task table. Most recently touched first, so a card just moved into
+            // a column is at the top of it.
+            $totals = (clone $query)->reorder()->toBase()->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
+
+            $board = collect(TaskStatus::cases())->mapWithKeys(function (TaskStatus $status) use ($query, $totals) {
+                $total = (int) ($totals[$status->value] ?? 0);
+                $limit = $this->laneLimits[$status->value] ?? self::LANE_PAGE;
+
+                return [$status->value => [
+                    'tasks' => $total === 0
+                        ? collect()
+                        : (clone $query)->reorder()->where('status', $status)->orderByDesc('updated_at')->orderByDesc('id')->limit($limit)->get(),
+                    'total' => $total,
+                ]];
+            });
 
             return [
                 'tasks' => null,
                 'statuses' => TaskStatus::cases(),
-                'board' => collect(TaskStatus::cases())->mapWithKeys(
-                    fn (TaskStatus $status) => [$status->value => $tasks->where('status', $status)->values()]
-                ),
-                'boardTruncated' => $matchingCount > $boardLimit,
-                'boardShown' => $tasks->count(),
-                'boardTotal' => $matchingCount,
+                'board' => $board,
                 // The reviewer chosen in the Submit for QA window (only needed while the modal is open).
                 'qa_reviewer_name' => $this->qa_reviewer_id ? User::query()->whereKey($this->qa_reviewer_id)->value('name') : null,
             ];
         }
 
+        $listTotal = (clone $query)->count();
+
         return [
-            'tasks' => $query->paginate(15),
+            'tasks' => $query->orderByDesc('id')->limit($this->listLimit)->get(),
+            'listTotal' => $listTotal,
             'statuses' => TaskStatus::cases(),
             'board' => null,
             // The reviewer chosen in the Submit for QA window (only needed while the modal is open).
@@ -324,14 +371,6 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
     @endunless
 
     @if ($view === 'board')
-        @if ($boardTruncated)
-            <div class="rounded-xl bg-amber-50 px-4 py-2.5 text-sm text-amber-800 ring-1 ring-inset ring-amber-200">
-                Showing the {{ $boardShown }} most recent of {{ $boardTotal }} matching tasks on the board.
-                <button type="button" wire:click="$set('view', 'list')" class="font-medium underline hover:text-amber-900">Switch to List view</button>
-                to see and page through all of them.
-            </div>
-        @endif
-
         <div
             :data-dragging="draggingId !== null && moved ? '' : null"
             x-data="{
@@ -377,7 +416,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                 $laneDots = ['todo' => 'bg-zinc-400', 'in_progress' => 'bg-sky-500', 'qa_testing' => 'bg-amber-500', 'rejected' => 'bg-red-500', 'ready_to_deploy' => 'bg-lime-500', 'done' => 'bg-brand'];
             @endphp
             @foreach ($statuses as $status)
-                @php $lane = $board[$status->value]; $columnEmpty = $lane->isEmpty(); @endphp
+                @php $lane = $board[$status->value]['tasks']; $laneTotal = $board[$status->value]['total']; $columnEmpty = $lane->isEmpty(); @endphp
                 <section
                     class="flex shrink-0 flex-col rounded-2xl bg-zinc-100/70 ring-1 ring-inset ring-zinc-200/70 transition sm:w-[17.5rem]"
                     x-on:mouseenter="if (draggingId !== null) overStatus = '{{ $status->value }}'"
@@ -387,7 +426,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                     <header class="flex items-center gap-2 px-3.5 pb-2 pt-3">
                         <span class="size-2.5 rounded-full {{ $laneDots[$status->value] ?? 'bg-zinc-400' }}"></span>
                         <h3 class="flex-1 text-sm font-semibold text-zinc-900">{{ $status->label() }}</h3>
-                        <span class="rounded-full bg-surface px-2 py-0.5 text-xs font-semibold tabular-nums text-zinc-600 ring-1 ring-zinc-200/80">{{ $lane->count() }}</span>
+                        <span class="rounded-full bg-surface px-2 py-0.5 text-xs font-semibold tabular-nums text-zinc-600 ring-1 ring-zinc-200/80">{{ $laneTotal }}</span>
                     </header>
 
                     {{-- On phones an empty column shows only its header rather than a whole empty box. --}}
@@ -449,6 +488,12 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                             <p class="rounded-xl border border-dashed border-zinc-300/80 px-2 py-6 text-center text-xs text-zinc-400" x-text="draggingId !== null && moved ? 'Drop here' : 'No tasks'">No tasks</p>
                         @else
                             <p x-show="draggingId !== null && moved && overStatus === '{{ $status->value }}'" x-cloak class="rounded-xl border border-dashed border-brand/40 px-2 py-3 text-center text-xs font-medium text-brand">Drop here</p>
+                        @endif
+
+                        @if ($laneTotal > $lane->count())
+                            <button type="button" x-on:mousedown.stop wire:click="loadMoreInLane('{{ $status->value }}')" wire:loading.attr="disabled" wire:target="loadMoreInLane('{{ $status->value }}')" class="w-full rounded-xl px-2 py-2 text-center text-xs font-semibold text-brand transition hover:bg-brand/5 disabled:opacity-60">
+                                Load more · {{ $laneTotal - $lane->count() }} more
+                            </button>
                         @endif
                     </div>
                 </section>
@@ -605,6 +650,11 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
             </table>
         </div>
 
-        {{ $tasks->links() }}
+        @if ($listTotal > $tasks->count())
+            <div class="flex items-center justify-center gap-3 pt-1 text-sm text-zinc-500">
+                <span>Showing {{ $tasks->count() }} of {{ $listTotal }}</span>
+                <button type="button" wire:click="loadMoreInList" wire:loading.attr="disabled" wire:target="loadMoreInList" class="btn-secondary">Load more</button>
+            </div>
+        @endif
     @endif
 </div>

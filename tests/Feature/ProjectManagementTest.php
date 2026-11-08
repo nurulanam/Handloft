@@ -195,7 +195,7 @@ class ProjectManagementTest extends TestCase
             ->set('tab', 'all');
 
         $board = $component->viewData('board');
-        $allTaskIds = collect($board)->flatten()->pluck('id');
+        $allTaskIds = collect($board)->flatMap(fn ($lane) => $lane['tasks'])->pluck('id');
 
         $this->assertTrue($allTaskIds->contains($inProjectA->id));
         $this->assertCount(1, $allTaskIds);

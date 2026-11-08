@@ -77,6 +77,7 @@ class LiveNotificationTest extends TestCase
     {
         Mail::fake();
         $this->mock(BroadcastManager::class, function ($mock) {
+            $mock->shouldReceive('queue')->andThrow(new \RuntimeException('Reverb is down'));
             $mock->shouldReceive('event')->andThrow(new \RuntimeException('Reverb is down'));
             $mock->shouldReceive('connection')->andThrow(new \RuntimeException('Reverb is down'));
         });

@@ -71,35 +71,36 @@ class PerformanceAndPaginationTest extends TestCase
         $this->assertSame(3, $projects->first()->task_count);
     }
 
-    public function test_kanban_board_caps_results_and_flags_when_truncated(): void
+    public function test_kanban_board_loads_only_the_first_few_cards_per_column_but_counts_them_all(): void
     {
         $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
 
-        Task::factory()->count(210)->create(['created_by' => $admin->id]);
+        Task::factory()->count(30)->create(['created_by' => $admin->id, 'status' => 'todo']);
 
         $component = Livewire::actingAs($admin)
             ->test('tasks.index')
             ->set('tab', 'all')
             ->set('view', 'board');
 
-        $this->assertTrue($component->viewData('boardTruncated'));
-        $this->assertSame(210, $component->viewData('boardTotal'));
-        $this->assertSame(200, $component->viewData('boardShown'));
-        $component->assertSee('Showing the 200 most recent of 210 matching tasks');
+        $todo = $component->viewData('board')['todo'];
+
+        $this->assertCount(5, $todo['tasks']);
+        $this->assertSame(30, $todo['total']);
     }
 
-    public function test_kanban_board_does_not_flag_truncation_under_the_limit(): void
+    public function test_kanban_board_query_count_does_not_grow_with_the_number_of_tasks(): void
     {
         $admin = User::where('email', 'admin@handloft.test')->firstOrFail();
 
-        Task::factory()->count(5)->create(['created_by' => $admin->id]);
+        Task::factory()->count(40)->create(['created_by' => $admin->id]);
 
-        $component = Livewire::actingAs($admin)
-            ->test('tasks.index')
-            ->set('tab', 'all')
-            ->set('view', 'board');
+        DB::enableQueryLog();
+        Livewire::actingAs($admin)->test('tasks.index')->set('tab', 'all')->set('view', 'board');
+        $queryCount = count(DB::getQueryLog());
+        DB::disableQueryLog();
 
-        $this->assertFalse($component->viewData('boardTruncated'));
+        // Fixed: totals + a short query (and its eager loads) per column, whatever the table holds.
+        $this->assertLessThan(70, $queryCount);
     }
 
     public function test_starred_page_is_paginated(): void

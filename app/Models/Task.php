@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 
 #[Fillable(['title', 'description', 'created_by', 'task_category_id', 'project_id', 'qa_id', 'parent_task_id', 'priority', 'status', 'start_date', 'deadline', 'notes'])]
 class Task extends Model
@@ -35,12 +36,16 @@ class Task extends Model
      */
     protected static function booted(): void
     {
+        // After the surrounding transaction (if any) commits, so a browser that refreshes the moment
+        // it hears never reads the old state.
         $announce = function (self $task): void {
-            try {
-                TasksChanged::dispatch($task->id);
-            } catch (\Throwable $e) {
-                report($e);
-            }
+            DB::afterCommit(function () use ($task) {
+                try {
+                    TasksChanged::dispatch($task->id);
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            });
         };
 
         static::saved($announce);
