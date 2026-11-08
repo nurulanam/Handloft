@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Concerns\SearchesPickerOptions;
+use App\Models\Client;
 use App\Models\Project;
 use App\Models\User;
 use App\Notifications\ProjectCoordinatorAssigned;
@@ -27,6 +28,11 @@ new #[Layout('layouts.app')] #[Title('Project')] class extends Component
 
     public string $coordinator_id = '';
 
+    public string $client_id = '';
+
+    /** A client typed in because they aren't in the list yet; used instead of $client_id. */
+    public string $new_client = '';
+
     public string $start_date = '';
 
     public string $deadline = '';
@@ -40,6 +46,7 @@ new #[Layout('layouts.app')] #[Title('Project')] class extends Component
             $this->name = $project->name;
             $this->description = (string) $project->description;
             $this->coordinator_id = (string) ($project->coordinator_id ?? '');
+            $this->client_id = (string) ($project->client_id ?? '');
             $this->start_date = $project->start_date?->toDateString() ?? '';
             $this->deadline = $project->deadline?->toDateString() ?? '';
         }
@@ -66,6 +73,8 @@ new #[Layout('layouts.app')] #[Title('Project')] class extends Component
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'coordinator_id' => ['nullable', 'exists:users,id'],
+            'client_id' => ['nullable', 'exists:clients,id,deleted_at,NULL'],
+            'new_client' => ['nullable', 'string', 'max:255'],
             'start_date' => ['nullable', 'date'],
             'deadline' => ['nullable', 'date', 'after_or_equal:start_date'],
         ], [
@@ -77,6 +86,7 @@ new #[Layout('layouts.app')] #[Title('Project')] class extends Component
             'name' => $data['name'],
             'description' => Html::sanitize($data['description']),
             'coordinator_id' => $data['coordinator_id'] ?: null,
+            'client_id' => filled($data['new_client'] ?? null) ? Client::named($data['new_client'])->id : ($data['client_id'] ?: null),
             'start_date' => $data['start_date'] ?: null,
             'deadline' => $data['deadline'] ?: null,
         ];
@@ -110,6 +120,7 @@ new #[Layout('layouts.app')] #[Title('Project')] class extends Component
 
         return [
             'coordinatorName' => $this->coordinator_id ? User::query()->whereKey($this->coordinator_id)->value('name') : null,
+            'clientName' => $this->client_id ? Client::query()->whereKey($this->client_id)->value('name') : null,
             'days' => $days,
         ];
     }
@@ -154,6 +165,16 @@ new #[Layout('layouts.app')] #[Title('Project')] class extends Component
                 <x-form.card title="Coordinator" description="Keeps the project on track." icon='<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'>
                     <x-form.field error="coordinator_id" hint="They're notified when you choose them.">
                         <x-form.picker model="coordinator_id" :value="$coordinator_id" source="people" :label="$coordinatorName" avatar clearable clear-label="No coordinator" placeholder="Choose a coordinator" />
+                    </x-form.field>
+                </x-form.card>
+
+                <x-form.card title="Client" description="Who this work is for." icon='<path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/><path d="M9 9v.01"/><path d="M9 12v.01"/><path d="M9 15v.01"/>'>
+                    <x-form.field error="client_id">
+                        <x-form.picker model="client_id" :value="$client_id" source="clients" :label="$clientName" clearable clear-label="No client" placeholder="Choose a client" />
+                    </x-form.field>
+
+                    <x-form.field label="Not in the list?" for="new-client" error="new_client" hint="Type a new client's name and it's added when you save." optional>
+                        <input id="new-client" wire:model="new_client" type="text" maxlength="255" placeholder="e.g. Acme Ltd" autocomplete="off" class="field-input">
                     </x-form.field>
                 </x-form.card>
 

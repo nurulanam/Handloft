@@ -6,6 +6,7 @@ use App\Livewire\Concerns\SubmitsForQa;
 use App\Livewire\Concerns\TogglesStars;
 use App\Enums\TaskActivityType;
 use App\Enums\TaskStatus;
+use App\Models\Client;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\TaskWorkflowService;
@@ -43,6 +44,10 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
 
     public string $submission_note = '';
 
+    /** Show only the tasks of this client's projects (empty = everyone). */
+    #[Url(as: 'client')]
+    public string $client_id = '';
+
     public ?int $projectId = null;
 
     public function mount(?int $projectId = null): void
@@ -61,7 +66,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
         $this->resetErrorBag($name);
 
         // A different tab or view starts again from the first few items.
-        if (in_array($name, ['tab', 'view'], true)) {
+        if (in_array($name, ['tab', 'view', 'client_id'], true)) {
             $this->laneLimits = [];
             $this->listLimit = self::LIST_PAGE;
         }
@@ -257,7 +262,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
         $userId = auth()->id();
 
         $query = Task::query()
-            ->with(['category', 'currentAssignment.assignedTo', 'creator', 'timers.user', 'starredBy' => fn ($q) => $q->where('users.id', $userId)])
+            ->with(['category', 'project.client', 'currentAssignment.assignedTo', 'creator', 'timers.user', 'starredBy' => fn ($q) => $q->where('users.id', $userId)])
             ->latest();
 
         $query->when($this->projectId, fn ($q) => $q->where('project_id', $this->projectId));
@@ -281,6 +286,13 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
             };
         }
 
+        // A client's tasks are the tasks of that client's projects (subtasks share their parent's project).
+        if (! $this->projectId && $this->client_id !== '') {
+            $query->whereHas('project', fn ($project) => $project->where('client_id', (int) $this->client_id));
+        }
+
+        $clientName = $this->client_id !== '' ? Client::query()->whereKey((int) $this->client_id)->value('name') : null;
+
         if ($this->view === 'board') {
             // One grouped count for every column's total, then only each column's first few cards —
             // never the whole task table. Most recently touched first, so a card just moved into
@@ -303,6 +315,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                 'tasks' => null,
                 'statuses' => TaskStatus::cases(),
                 'board' => $board,
+                'clientName' => $clientName,
                 // The reviewer chosen in the Submit for QA window (only needed while the modal is open).
                 'qa_reviewer_name' => $this->qa_reviewer_id ? User::query()->whereKey($this->qa_reviewer_id)->value('name') : null,
             ];
@@ -313,6 +326,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
         return [
             'tasks' => $query->orderByDesc('id')->limit($this->listLimit)->get(),
             'listTotal' => $listTotal,
+            'clientName' => $clientName,
             'statuses' => TaskStatus::cases(),
             'board' => null,
             // The reviewer chosen in the Submit for QA window (only needed while the modal is open).
@@ -367,6 +381,13 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                     {{ $label }}
                 </button>
             @endforeach
+        </div>
+    @endunless
+
+    @unless ($projectId)
+        {{-- Filter by client: everything for one customer, across all their projects. --}}
+        <div class="flex max-w-sm items-center gap-2">
+            <x-form.picker model="client_id" :value="$client_id" source="clients" :label="$clientName" clearable clear-label="All clients" placeholder="Filter by client" align="left" />
         </div>
     @endunless
 
@@ -456,6 +477,9 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                                 </div>
 
                                 <p class="mt-1.5 line-clamp-2 text-sm font-medium leading-snug text-zinc-900 group-hover:text-brand">{{ $task->title }}</p>
+                                @if ($task->project?->client)
+                                    <p class="mt-1 truncate text-[11px] text-zinc-400" title="Client">{{ $task->project->client->name }}</p>
+                                @endif
 
                                 @if ($task->parent_task_id || $task->isConnectedTo(auth()->user()))
                                     <div class="mt-1.5 flex flex-wrap items-center gap-1">
@@ -586,6 +610,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                         </div>
                         <p class="mt-1 truncate text-sm font-medium text-zinc-900">{{ $task->title }}</p>
                         <p class="mt-0.5 truncate text-xs text-zinc-500">
+                            @if ($task->project?->client){{ $task->project->client->name }} · @endif
                             {{ $task->currentAssignment?->assignedTo?->name ?? 'Unassigned' }}
                             · {{ $task->priority->label() }}
                             @if ($task->deadline)

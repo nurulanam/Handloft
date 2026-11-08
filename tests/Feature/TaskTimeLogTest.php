@@ -371,6 +371,27 @@ class TaskTimeLogTest extends TestCase
         $this->assertSame(0, TaskTimeLog::where('id', $log->id)->count());
     }
 
+    public function test_time_logged_on_a_deleted_task_can_still_be_corrected_and_removed(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+        $manager = $this->manager('Manager Mike');
+        $task = $this->createTask($rahim, $karim);
+        $workflow = app(TaskWorkflowService::class);
+
+        $edited = $workflow->logTime($task, $karim, now()->subDay(), 2.0);
+        $removed = $workflow->logTime($task, $karim, now()->subDays(2), 1.0);
+
+        $task->delete();
+
+        $workflow->editTimeLog($edited->fresh(), 3.0, $manager, 'Typo');
+        $workflow->deleteTimeLog($removed->fresh(), $manager);
+
+        $this->assertSame('3.00', (string) $edited->fresh()->hours);
+        $this->assertNull(TaskTimeLog::find($removed->id));
+        $this->assertTrue(Task::withTrashed()->find($task->id)->activities()->where('description', 'like', '%removed a time entry%')->exists());
+    }
+
     public function test_unrelated_team_member_cannot_delete_someone_elses_time_log(): void
     {
         $rahim = $this->teamMember('Rahim');

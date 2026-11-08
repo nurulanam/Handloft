@@ -425,6 +425,7 @@
                                     ['label' => 'All Projects', 'route' => 'projects.index'],
                                     ['label' => 'Create Project', 'route' => 'projects.create', 'hidden' => auth()->user()->cannot('create', \App\Models\Project::class)],
                                 ]],
+                                ['label' => 'Clients', 'route' => 'clients.index', 'icon' => 'clients'],
                                 ['label' => 'Tasks', 'icon' => 'tasks', 'children' => [
                                     ['label' => 'All Tasks', 'route' => 'tasks.index'],
                                     ['label' => 'Create Task', 'route' => 'tasks.create'],

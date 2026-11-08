@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['name', 'description', 'status', 'created_by', 'coordinator_id', 'start_date', 'deadline'])]
+#[Fillable(['name', 'description', 'client_id', 'status', 'created_by', 'coordinator_id', 'start_date', 'deadline'])]
 class Project extends Model
 {
     /** @use HasFactory<ProjectFactory> */
@@ -29,6 +29,14 @@ class Project extends Model
             'start_date' => 'date',
             'deadline' => 'date',
         ];
+    }
+
+    /**
+     * @return BelongsTo<Client, $this>
+     */
+    public function client(): BelongsTo
+    {
+        return $this->belongsTo(Client::class);
     }
 
     /**

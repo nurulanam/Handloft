@@ -173,6 +173,9 @@ new #[Layout('layouts.app')] #[Title('Project')] class extends Component
                 Projects
             </a>
             <h1 class="text-2xl font-semibold tracking-tight text-zinc-900 sm:text-[1.75rem] sm:leading-9">{{ $project->name }}</h1>
+            @if ($project->client)
+                <p class="mt-0.5 text-sm font-medium text-brand">{{ $project->client->name }}</p>
+            @endif
             <p class="mt-1.5 flex items-center gap-2 text-sm text-zinc-500">
                 <x-user-avatar :user="$project->creator" class="size-5 shrink-0 rounded-full text-[9px]" />
                 <span>Created by <span class="font-medium text-zinc-700">{{ $project->creator->name }}</span> on {{ $project->created_at->format('d M Y') }}</span>

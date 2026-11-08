@@ -94,7 +94,7 @@
             @if ($searchable)
                 <div class="relative mb-1">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-zinc-400"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg>
-                    <input x-ref="search" x-model="query" @if ($remote) @input="search()" @endif type="text" placeholder="{{ $remote ? match ($source) { 'people' => 'Search people…', 'projects' => 'Search projects…', default => 'Search by title or key…' } : 'Search…' }}" class="w-full rounded-lg border-0 bg-zinc-100 py-2 pl-8 pr-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-brand/20">
+                    <input x-ref="search" x-model="query" @if ($remote) @input="search()" @endif type="text" placeholder="{{ $remote ? match ($source) { 'people' => 'Search people…', 'projects' => 'Search projects…', 'clients' => 'Search clients…', default => 'Search by title or key…' } : 'Search…' }}" class="w-full rounded-lg border-0 bg-zinc-100 py-2 pl-8 pr-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-brand/20">
                 </div>
             @endif
 

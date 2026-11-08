@@ -819,6 +819,9 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                 @if ($task->project)
                     <span class="text-zinc-300">/</span>
                     <a href="{{ route('projects.show', $task->project) }}" wire:navigate class="max-w-48 truncate font-medium transition-colors hover:text-brand">{{ $task->project->name }}</a>
+                    @if ($task->project->client)
+                        <span class="hidden truncate text-zinc-400 sm:inline">· {{ $task->project->client->name }}</span>
+                    @endif
                 @endif
                 @if ($task->parent)
                     <span class="text-zinc-300">/</span>

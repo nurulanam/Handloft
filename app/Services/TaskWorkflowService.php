@@ -302,9 +302,7 @@ class TaskWorkflowService
 
     public function deleteTimeLog(TaskTimeLog $timeLog, User $actor): void
     {
-        $task = $timeLog->task;
-
-        $this->recordActivity($task, TaskActivityType::MetaUpdated, $actor, "{$actor->name} removed a time entry for {$timeLog->logged_date->format('d M Y')}", now());
+        $this->recordTimeLogActivity($timeLog, $actor, "{$actor->name} removed a time entry for {$timeLog->logged_date->format('d M Y')}");
 
         $timeLog->delete();
     }
@@ -327,13 +325,21 @@ class TaskWorkflowService
 
         $timeLog->update(['hours' => $newHours]);
 
-        $this->recordActivity(
-            $timeLog->task,
-            TaskActivityType::MetaUpdated,
-            $editor,
-            "{$editor->name} updated the time log for {$timeLog->logged_date->format('d M Y')} to ".Duration::forHumans($newHours),
-            now()
-        );
+        $this->recordTimeLogActivity($timeLog, $editor, "{$editor->name} updated the time log for {$timeLog->logged_date->format('d M Y')} to ".Duration::forHumans($newHours));
+    }
+
+    /**
+     * Note a time-log change on its task's timeline. The task may have been deleted since the time was
+     * logged (its hours still show in reports and can still be corrected), so look it up including
+     * deleted ones; if it is gone entirely there's no timeline to write to.
+     */
+    private function recordTimeLogActivity(TaskTimeLog $timeLog, User $actor, string $description): void
+    {
+        $task = Task::withTrashed()->find($timeLog->task_id);
+
+        if ($task) {
+            $this->recordActivity($task, TaskActivityType::MetaUpdated, $actor, $description, now());
+        }
     }
 
     /**

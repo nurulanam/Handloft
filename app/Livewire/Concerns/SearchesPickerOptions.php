@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Concerns;
 
+use App\Models\Client;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
@@ -35,6 +36,14 @@ trait SearchesPickerOptions
                 ->limit(Picker::LIMIT)
                 ->get(['id', 'name', 'department'])
                 ->map(fn (User $user) => ['value' => (string) $user->id, 'label' => $user->name, 'hint' => $user->department])
+                ->all(),
+
+            'clients' => Client::query()
+                ->when($query !== '', fn (Builder $q) => $q->where('name', 'like', $like))
+                ->orderBy('name')
+                ->limit(Picker::LIMIT)
+                ->get(['id', 'name'])
+                ->map(fn (Client $client) => ['value' => (string) $client->id, 'label' => $client->name, 'hint' => null])
                 ->all(),
 
             'projects' => Project::query()

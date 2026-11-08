@@ -53,7 +53,7 @@ new #[Layout('layouts.app')] #[Title('Projects')] class extends Component
         $statusCounts = Project::query()->selectRaw('status, count(*) as total')->groupBy('status')->toBase()->pluck('total', 'status');
 
         $projects = Project::query()
-            ->with(['creator', 'coordinator'])
+            ->with(['creator', 'coordinator', 'client'])
             // Both counts are computed in this one query via withCount rather than per-project queries
             // (Project::taskCount()/completedCount() fall back to those only when not eager-loaded), so
             // this page stays a fixed number of queries no matter how many projects there are.
@@ -195,7 +195,7 @@ new #[Layout('layouts.app')] #[Title('Projects')] class extends Component
                                     <span class="flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold {{ $tileFor($project) }}">{{ mb_strtoupper(mb_substr($project->name, 0, 1)) }}</span>
                                     <span class="min-w-0">
                                         <span class="block truncate text-sm font-semibold text-zinc-900 group-hover:text-brand">{{ $project->name }}</span>
-                                        <span class="block truncate text-xs text-zinc-500">{{ $project->description ? \Illuminate\Support\Str::limit(strip_tags($project->description), 60) : 'No description' }}</span>
+                                        <span class="block truncate text-xs text-zinc-500">{{ $project->client ? $project->client->name.' · ' : '' }}{{ $project->description ? \Illuminate\Support\Str::limit(strip_tags($project->description), 60) : 'No description' }}</span>
                                     </span>
                                 </a>
                             </td>
