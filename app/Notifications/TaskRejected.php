@@ -12,15 +12,20 @@ class TaskRejected extends Notification
 {
     use BroadcastsInstantly;
 
-    public function __construct(private readonly Task $task, private readonly User $rejectedBy) {}
+    public function __construct(private readonly Task $task, private readonly User $rejectedBy, private readonly ?string $reason = null) {}
 
     public function toMail(object $notifiable): MailMessage
     {
-        return (new MailMessage)
+        $mail = (new MailMessage)
             ->subject("Task rejected: {$this->task->task_key}")
             ->greeting("Hi {$notifiable->name},")
-            ->line("{$this->rejectedBy->name} rejected \"{$this->task->title}\" during QA testing.")
-            ->action('View Task', route('tasks.show', $this->task))
+            ->line("{$this->rejectedBy->name} rejected \"{$this->task->title}\" during QA testing.");
+
+        if ($this->reason) {
+            $mail->line("Reason: {$this->reason}");
+        }
+
+        return $mail->action('View Task', route('tasks.show', $this->task))
             ->line('Thanks for using '.config('app.name').'!');
     }
 
@@ -35,6 +40,7 @@ class TaskRejected extends Notification
             'task_title' => $this->task->title,
             'rejected_by' => $this->rejectedBy->name,
             'message' => "{$this->rejectedBy->name} rejected \"{$this->task->title}\"",
+            'reason' => $this->reason,
             'url' => route('tasks.show', $this->task),
         ];
     }

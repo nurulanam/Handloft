@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Concerns\RejectsTask;
 use App\Livewire\Concerns\SearchesPickerOptions;
 use App\Livewire\Concerns\SubmitsForQa;
 use App\Livewire\Concerns\TogglesStars;
@@ -17,7 +18,7 @@ use Livewire\WithPagination;
 
 new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
 {
-    use SearchesPickerOptions, SubmitsForQa, TogglesStars, WithPagination;
+    use RejectsTask, SearchesPickerOptions, SubmitsForQa, TogglesStars, WithPagination;
 
     #[Url]
     public string $tab = 'all';
@@ -26,6 +27,8 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
     public string $view = 'board';
 
     public ?int $submittingTaskId = null;
+
+    public ?int $rejectingTaskId = null;
 
     public string $submission_note = '';
 
@@ -95,6 +98,14 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
             return;
         }
 
+        // Rejecting needs a reason from the reviewer, so ask for it in a window first.
+        if ($newStatus === TaskStatus::Rejected) {
+            $this->rejectingTaskId = $task->id;
+            $this->resetRejection();
+
+            return;
+        }
+
         if ($newStatus === TaskStatus::Done) {
             app(TaskWorkflowService::class)->markDone($task, auth()->user());
 
@@ -139,6 +150,19 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
         }
 
         $this->submittingTaskId = null;
+    }
+
+    public function confirmReject(TaskWorkflowService $workflow): void
+    {
+        $this->rejectTaskWithReason(Task::findOrFail($this->rejectingTaskId), $workflow);
+
+        $this->rejectingTaskId = null;
+    }
+
+    public function cancelReject(): void
+    {
+        $this->rejectingTaskId = null;
+        $this->resetRejection();
     }
 
     public function cancelSubmitForQa(): void
@@ -421,6 +445,29 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                 </section>
             @endforeach
         </div>
+
+        {{-- Reject task modal: the reviewer must say why --}}
+        @if ($rejectingTaskId && ($rejectingTask = \App\Models\Task::find($rejectingTaskId)))
+                <div class="fixed inset-0 z-40 flex items-center justify-center bg-zinc-900/50 px-4" wire:keydown.escape.window="cancelReject">
+                    <div class="w-full max-w-md rounded-2xl bg-surface p-6 shadow-2xl">
+                        <h3 class="text-lg font-semibold text-zinc-900">Reject task</h3>
+                        <p class="mt-1 truncate text-sm text-zinc-500">{{ $rejectingTask->task_key }} {{ $rejectingTask->title }}</p>
+                        <div class="mt-4">
+                            <label class="block text-sm font-medium text-zinc-700">Reason for rejection <span class="text-red-600">*</span></label>
+                            <p class="mb-1.5 text-xs text-zinc-500">This is posted as a comment and sent to the assignee.</p>
+                            <textarea wire:model="rejection_reason" rows="4" class="field-input mt-1.5" placeholder="What needs to be fixed?" autofocus></textarea>
+                            @error('rejection_reason') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                        <div class="mt-6 flex justify-end gap-3">
+                            <button type="button" wire:click="cancelReject" class="btn-secondary">Cancel</button>
+                            <button type="button" wire:click="confirmReject" wire:loading.attr="disabled" wire:target="confirmReject" class="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-60">
+                                <span wire:loading.remove wire:target="confirmReject">Reject task</span>
+                                <span wire:loading wire:target="confirmReject">Rejecting…</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            @endif
 
         {{-- Submit for QA Testing modal (opened by dropping a card on the QA Testing column) --}}
         @if ($submittingTaskId && ($submittingTask = \App\Models\Task::find($submittingTaskId)))

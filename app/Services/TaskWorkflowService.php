@@ -337,6 +337,26 @@ class TaskWorkflowService
     }
 
     /**
+     * Send a task back from QA with the reviewer's reason. The reason is posted as a comment on the
+     * task (so it stays in the thread) and sent to the assignee with the notification.
+     */
+    public function rejectTask(Task $task, User $reviewer, string $reason): void
+    {
+        DB::transaction(function () use ($task, $reviewer, $reason) {
+            $task->update(['status' => TaskStatus::Rejected]);
+
+            $this->recordActivity($task, TaskActivityType::StatusChanged, $reviewer, "{$reviewer->name} moved this to Rejected", now());
+
+            $task->comments()->create([
+                'user_id' => $reviewer->id,
+                'body' => "Rejected in QA: {$reason}",
+            ]);
+
+            $this->notifyUnlessSelf($task->currentAssignee(), $reviewer, new TaskRejected($task, $reviewer, $reason));
+        });
+    }
+
+    /**
      * Notify whoever needs to know about a Rejected / Ready to Deploy move.
      * Called from the Livewire components that perform these status changes
      * directly (board drag, status dropdown) rather than through a shared
@@ -346,7 +366,7 @@ class TaskWorkflowService
     public function notifyStatusChange(Task $task, TaskStatus $to, User $actor): void
     {
         match ($to) {
-            TaskStatus::Rejected => $this->notifyUnlessSelf($task->currentAssignee(), $actor, new TaskRejected($task, $actor)),
+            TaskStatus::Rejected => $this->notifyUnlessSelf($task->currentAssignee(), $actor, new TaskRejected($task, $actor)), // reason-less fallback; the UI goes through rejectTask()
             TaskStatus::ReadyToDeploy => $this->notifyUnlessSelf($task->creator, $actor, new TaskReadyToDeploy($task, $actor)),
             default => null,
         };

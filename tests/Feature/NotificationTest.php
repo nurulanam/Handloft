@@ -145,10 +145,15 @@ class NotificationTest extends TestCase
 
         Livewire::actingAs($qa)
             ->test('tasks.show', ['task' => $task])
-            ->call('saveStatus', 'rejected');
+            ->call('saveStatus', 'rejected')
+            ->set('rejection_reason', 'Login button is broken on mobile')
+            ->call('confirmReject');
         $this->flushDeferredNotifications();
 
-        Notification::assertSentTo($karim, TaskRejected::class);
+        Notification::assertSentTo($karim, TaskRejected::class, function (TaskRejected $n) use ($karim) {
+            return $n->toArray($karim)['reason'] === 'Login button is broken on mobile';
+        });
+        $this->assertDatabaseHas('task_comments', ['task_id' => $task->id, 'user_id' => $qa->id, 'body' => 'Rejected in QA: Login button is broken on mobile']);
     }
 
     public function test_rejecting_a_task_from_the_board_notifies_the_assignee(): void
@@ -164,7 +169,9 @@ class NotificationTest extends TestCase
 
         Livewire::actingAs($qa)
             ->test('tasks.index')
-            ->call('moveTask', $task->id, 'rejected');
+            ->call('moveTask', $task->id, 'rejected')
+            ->set('rejection_reason', 'Layout breaks')
+            ->call('confirmReject');
         $this->flushDeferredNotifications();
 
         Notification::assertSentTo($karim, TaskRejected::class);

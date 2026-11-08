@@ -366,9 +366,29 @@ class TaskWorkflowTest extends TestCase
 
         Livewire::actingAs($qa)
             ->test('tasks.show', ['task' => $task])
-            ->call('saveStatus', 'rejected');
+            ->call('saveStatus', 'rejected')
+            ->set('rejection_reason', 'Needs fixes')
+            ->call('confirmReject');
 
         $this->assertSame(TaskStatus::Rejected, $task->fresh()->status);
+    }
+
+    public function test_rejecting_requires_a_reason(): void
+    {
+        $rahim = $this->teamMember('Rahim');
+        $karim = $this->teamMember('Karim');
+        $qa = $this->teamMember('Qadir');
+
+        $task = app(TaskWorkflowService::class)->createTask(['title' => 'Website Audit', 'status' => TaskStatus::QaTesting, 'qa_id' => $qa->id], $rahim, $karim);
+
+        Livewire::actingAs($qa)
+            ->test('tasks.show', ['task' => $task])
+            ->call('saveStatus', 'rejected')
+            ->assertSet('showRejectModal', true)
+            ->call('confirmReject')
+            ->assertHasErrors('rejection_reason');
+
+        $this->assertSame(TaskStatus::QaTesting, $task->fresh()->status);
     }
 
     public function test_qa_reviewer_can_mark_ready_to_deploy(): void
@@ -457,7 +477,9 @@ class TaskWorkflowTest extends TestCase
 
         Livewire::actingAs($qa)
             ->test('tasks.show', ['task' => $task])
-            ->call('saveStatus', 'rejected');
+            ->call('saveStatus', 'rejected')
+            ->set('rejection_reason', 'Needs fixes')
+            ->call('confirmReject');
 
         $this->assertSame(TaskStatus::Rejected, $task->fresh()->status);
     }
