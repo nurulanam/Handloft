@@ -246,6 +246,20 @@ let liveUserId = null;
 let liveWasConnected = false;
 const announce = () => window.dispatchEvent(new CustomEvent('notification-received'));
 
+// A task was created, moved or edited by someone: open task boards refresh (debounced, so a burst
+// of changes causes one refresh).
+let tasksChangedTimer = null;
+const announceTasksChanged = (event) => {
+    console.debug('[live] tasks changed', event);
+    clearTimeout(tasksChangedTimer);
+    tasksChangedTimer = setTimeout(() => {
+        // Not mid-drag, so a card isn't yanked away from under the pointer.
+        if (! document.querySelector('[data-dragging]')) {
+            window.Livewire?.dispatch('tasks-changed');
+        }
+    }, 300);
+};
+
 function listenForLiveNotifications() {
     const config = liveConfig();
     const userId = (config?.enabled && document.querySelector('meta[name="user-id"]')?.content) || null;
@@ -265,6 +279,7 @@ function listenForLiveNotifications() {
 
             if (liveWasConnected) {
                 announce();
+                announceTasksChanged();
             }
 
             liveWasConnected = true;
@@ -277,12 +292,14 @@ function listenForLiveNotifications() {
 
     if (liveUserId) {
         echo.leave(`App.Models.User.${liveUserId}`);
+        echo.leave('tasks');
     }
 
     liveUserId = userId;
 
     if (userId) {
         echo.private(`App.Models.User.${userId}`).notification(announce);
+        echo.private('tasks').listen('.tasks.changed', announceTasksChanged);
     }
 }
 

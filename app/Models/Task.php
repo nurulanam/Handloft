@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Events\TasksChanged;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use Database\Factories\TaskFactory;
@@ -27,6 +28,25 @@ class Task extends Model
      * Prefix for the human-readable task key (e.g. "HL-42"), Jira-style.
      */
     public const KEY_PREFIX = 'HL';
+
+    /**
+     * Let open task boards know about every change. A broadcast problem (e.g. Reverb is down) must
+     * never stop the task from saving, so it is reported and swallowed.
+     */
+    protected static function booted(): void
+    {
+        $announce = function (self $task): void {
+            try {
+                TasksChanged::dispatch($task->id);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        };
+
+        static::saved($announce);
+        static::deleted($announce);
+        static::restored($announce);
+    }
 
     /**
      * @return array<string, string>

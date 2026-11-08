@@ -10,6 +10,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Services\TaskWorkflowService;
 use Illuminate\Support\Facades\Gate;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -57,6 +58,13 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
             'assigned-to-me' => 'Assigned to Me',
         ];
     }
+
+    /**
+     * Someone created, moved or edited a task (see TasksChanged): being an action, this makes
+     * Livewire re-render the board with the latest data.
+     */
+    #[On('tasks-changed')]
+    public function refreshBoard(): void {}
 
     public function moveTask(int $taskId, string $status): void
     {
@@ -229,7 +237,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
                 // to Deploy and needs my final sign-off.
                 'assigned-to-me' => $query->where(function ($q) use ($userId) {
                     $q->whereHas('currentAssignment', fn ($q2) => $q2->where('assigned_to', $userId))
-                        ->orWhere(fn ($q2) => $q2->where('qa_id', $userId)->where('status', TaskStatus::QaTesting))
+                        ->orWhere(fn ($q2) => $q2->where('qa_id', $userId)->whereIn('status', [TaskStatus::QaTesting, TaskStatus::Rejected, TaskStatus::ReadyToDeploy]))
                         ->orWhere(fn ($q2) => $q2->where('created_by', $userId)->where('status', TaskStatus::ReadyToDeploy));
                 }),
                 // "All Tasks" means everything the viewer is allowed to see.
@@ -325,6 +333,7 @@ new #[Layout('layouts.app')] #[Title('Tasks')] class extends Component
         @endif
 
         <div
+            :data-dragging="draggingId !== null && moved ? '' : null"
             x-data="{
                 draggingId: null,
                 overStatus: null,

@@ -47,7 +47,7 @@ new #[Layout('layouts.app')] #[Title('For You')] class extends Component
             ->where('status', '!=', TaskStatus::Done)
             ->where(function ($q) use ($userId) {
                 $q->whereHas('currentAssignment', fn ($q2) => $q2->where('assigned_to', $userId))
-                    ->orWhere(fn ($q2) => $q2->where('qa_id', $userId)->where('status', TaskStatus::QaTesting))
+                    ->orWhere(fn ($q2) => $q2->where('qa_id', $userId)->whereIn('status', [TaskStatus::QaTesting, TaskStatus::Rejected, TaskStatus::ReadyToDeploy]))
                     ->orWhere(fn ($q2) => $q2->where('created_by', $userId)->where('status', TaskStatus::ReadyToDeploy));
             });
 
@@ -102,6 +102,8 @@ new #[Layout('layouts.app')] #[Title('For You')] class extends Component
     $why = function ($task) {
         return match (true) {
             $task->qa_id === auth()->id() && $task->status === \App\Enums\TaskStatus::QaTesting => ['Review', 'bg-amber-50 text-amber-700'],
+            $task->qa_id === auth()->id() && $task->status === \App\Enums\TaskStatus::Rejected && $task->currentAssignee()?->id !== auth()->id() => ['Awaiting fix', 'bg-red-50 text-red-700'],
+            $task->qa_id === auth()->id() && $task->status === \App\Enums\TaskStatus::ReadyToDeploy && $task->created_by !== auth()->id() => ['Reviewed', 'bg-lime-50 text-lime-700'],
             $task->created_by === auth()->id() && $task->status === \App\Enums\TaskStatus::ReadyToDeploy => ['Sign-off', 'bg-lime-50 text-lime-700'],
             default => ['Assigned', 'bg-brand/10 text-brand'],
         };

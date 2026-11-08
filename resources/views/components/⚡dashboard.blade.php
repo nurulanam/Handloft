@@ -76,7 +76,7 @@ new #[Layout('layouts.app')] #[Title('Dashboard')] class extends Component
                 $q->where(fn (Builder $q) => $q
                     ->whereIn('status', [TaskStatus::Todo, TaskStatus::InProgress, TaskStatus::Rejected])
                     ->whereHas('currentAssignment', fn ($a) => $a->where('assigned_to', $user->id)))
-                    ->orWhere(fn (Builder $q) => $q->where('qa_id', $user->id)->where('status', TaskStatus::QaTesting))
+                    ->orWhere(fn (Builder $q) => $q->where('qa_id', $user->id)->whereIn('status', [TaskStatus::QaTesting, TaskStatus::Rejected, TaskStatus::ReadyToDeploy]))
                     ->orWhere(fn (Builder $q) => $q->where('created_by', $user->id)->where('status', TaskStatus::ReadyToDeploy));
             });
 
@@ -96,7 +96,9 @@ new #[Layout('layouts.app')] #[Title('Dashboard')] class extends Component
                     'reason' => match (true) {
                         $task->status === TaskStatus::QaTesting => 'Review',
                         $task->status === TaskStatus::ReadyToDeploy && $task->created_by === $user->id => 'Sign off',
+                        $task->status === TaskStatus::Rejected && $task->qa_id === $user->id && $task->currentAssignee()?->id !== $user->id => 'Awaiting fix',
                         $task->status === TaskStatus::Rejected => 'Fix',
+                        $task->status === TaskStatus::ReadyToDeploy && $task->qa_id === $user->id && $task->created_by !== $user->id => 'Reviewed',
                         default => null,
                     },
                     'due' => match (true) {
