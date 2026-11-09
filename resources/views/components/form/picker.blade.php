@@ -89,6 +89,7 @@
             x-transition:enter-end="translate-y-0 opacity-100"
             x-transition:leave="transition duration-100 ease-in"
             x-transition:leave-end="opacity-0"
+            :class="up && 'bottom-full mb-1.5 mt-0'"
             @class(['menu-panel w-72 max-w-[calc(100vw-2rem)]', 'right-0' => $align === 'right', 'left-0' => $align === 'left', 'min-w-full' => ! $inline])
         >
             @if ($searchable)

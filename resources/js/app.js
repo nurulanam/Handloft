@@ -83,6 +83,7 @@ document.addEventListener('alpine:init', () => {
     // `labels` lists every option's label, so the menu can say when a search matches nothing.
     Alpine.data('picker', (initialValue = '', initialLabel = '', labels = []) => ({
         open: false,
+        up: false,
         query: '',
         value: initialValue,
         label: initialLabel,
@@ -91,6 +92,9 @@ document.addEventListener('alpine:init', () => {
         toggle() {
             this.open = ! this.open;
             if (this.open) {
+                // Open upward when the menu (~20rem) won't fit below the field.
+                const rect = this.$el.getBoundingClientRect();
+                this.up = innerHeight - rect.bottom < 340 && rect.top > innerHeight - rect.bottom;
                 this.query = '';
                 this.$nextTick(() => this.$refs.search?.focus());
             }
@@ -113,6 +117,7 @@ document.addEventListener('alpine:init', () => {
     // be sent to the browser. Choosing sets a Livewire property (model) or calls a method (call).
     Alpine.data('remotePicker', ({ value = '', label = '', source, except = null, model = null, call = null, limit = 20 }) => ({
         open: false,
+        up: false,
         query: '',
         value,
         label,
@@ -125,6 +130,9 @@ document.addEventListener('alpine:init', () => {
         toggle() {
             this.open = ! this.open;
             if (this.open) {
+                // Open upward when the menu (~20rem) won't fit below the field.
+                const rect = this.$el.getBoundingClientRect();
+                this.up = innerHeight - rect.bottom < 340 && rect.top > innerHeight - rect.bottom;
                 this.query = '';
                 this.search(true);
                 this.$nextTick(() => this.$refs.search?.focus());
