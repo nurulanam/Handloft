@@ -58,6 +58,19 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
 
     public string $due_date_value = '';
 
+    public string $repeat = '';
+
+    public string $repeat_every = '1';
+
+    /** @var array<int, string> */
+    public array $repeat_on = [];
+
+    public string $repeat_day = '';
+
+    public string $repeat_until = '';
+
+    public string $repeat_max = '';
+
     public string $newComment = '';
 
     /** @var array<int, mixed> */
@@ -245,6 +258,12 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         Gate::authorize('updateMeta', $this->task);
 
         $this->due_date_value = $this->task->deadline?->toDateString() ?? '';
+        $this->repeat = $this->task->repeat?->value ?? '';
+        $this->repeat_every = (string) $this->task->repeat_every;
+        $this->repeat_on = $this->task->repeat === \App\Enums\TaskRepeat::Weekly ? array_map('strval', $this->task->repeat_on ?? []) : [];
+        $this->repeat_day = $this->task->repeat === \App\Enums\TaskRepeat::Monthly ? (string) ($this->task->repeat_on[0] ?? '') : '';
+        $this->repeat_until = $this->task->repeat_until?->toDateString() ?? '';
+        $this->repeat_max = (string) ($this->task->repeat_max ?? '');
         $this->editingField = $field;
     }
 
@@ -382,6 +401,19 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         $this->task->update(['qa_id' => $data['qa_value'] ?: null]);
         $this->logMetaChange('QA/Reviewer updated');
 
+        $this->task->refresh();
+    }
+
+    public function saveRepeat(): void
+    {
+        Gate::authorize('updateMeta', $this->task);
+
+        $data = $this->validate(\App\Enums\TaskRepeat::rules());
+
+        $this->task->update(\App\Enums\TaskRepeat::attributes($data));
+        $this->logMetaChange('Repeat updated');
+
+        $this->editingField = null;
         $this->task->refresh();
     }
 
@@ -1237,7 +1269,7 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
         {{-- Sidebar --}}
         <div class="contents lg:sticky lg:top-20 lg:block lg:space-y-4 lg:self-start">
             {{-- Details: each value is edited in place (for those allowed to). --}}
-            <div class="order-2 relative rounded-2xl border border-zinc-200 bg-surface p-4 sm:p-5 has-[[aria-expanded=true]]:z-20">
+            <div class="order-2 relative rounded-2xl border border-zinc-200 bg-surface p-4 sm:p-5 has-[[aria-expanded=true]]:z-20 {{ $editingField ? 'z-20' : '' }}">
                 <div class="-mx-4 -mt-4 mb-3 flex items-center gap-3 border-b border-zinc-100 px-4 py-3.5 sm:-mx-5 sm:-mt-5 sm:px-5">
                     <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></svg></span>
                     <h2 class="min-w-0 flex-1 text-sm font-semibold text-zinc-900">Details</h2>
@@ -1313,6 +1345,26 @@ new #[Layout('layouts.app')] #[Title('Task')] class extends Component
                         <dt class="flex shrink-0 items-center gap-2 text-sm text-zinc-500"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4 text-zinc-400"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>Project</dt>
                         <dd class="flex min-w-0 justify-end">
                             <x-form.picker variant="inline" call="saveProject" :value="$task->project_id" source="projects" :label="$task->project?->name" clearable clear-label="No project" :placeholder="$canEditMeta ? 'Add project' : 'None'" :disabled="! $canEditMeta" />
+                        </dd>
+                    </div>
+                    <div class="flex min-h-11 items-center justify-between gap-3 py-1.5">
+                        <dt class="flex shrink-0 items-center gap-2 text-sm text-zinc-500"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4 text-zinc-400"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>Repeat</dt>
+                        <dd class="flex min-w-0 justify-end">
+                            <div class="relative">
+                                <button type="button" wire:click="startEditField('repeat')" @disabled(! $canEditMeta) class="-mr-2 rounded-lg px-2 py-1 text-right text-sm transition-colors {{ $task->repeat ? 'text-zinc-900' : 'text-zinc-400' }} {{ $canEditMeta ? 'hover:bg-zinc-100' : 'cursor-default' }}">
+                                    {{ $task->repeat_summary ?? ($canEditMeta ? 'Add repeat' : 'None') }}
+                                </button>
+
+                                @if ($editingField === 'repeat')
+                                    <div class="menu-panel right-0 w-80 max-w-[calc(100vw-2rem)] p-3">
+                                        <x-tasks.repeat-fields :repeat="$repeat" :until="$repeat_until" />
+                                        <div class="mt-3 flex justify-end gap-2">
+                                            <button type="button" wire:click="cancelEditField" class="btn-secondary px-3 py-1.5">Cancel</button>
+                                            <button type="button" wire:click="saveRepeat" class="btn-primary px-3 py-1.5">Save</button>
+                                        </div>
+                                    </div>
+                                @endif
+                            </div>
                         </dd>
                     </div>
                     <div class="flex min-h-11 items-center justify-between gap-3 py-1.5">

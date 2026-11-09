@@ -39,6 +39,19 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
 
     public string $project_id = '';
 
+    public string $repeat = '';
+
+    public string $repeat_every = '1';
+
+    /** @var array<int, string> */
+    public array $repeat_on = [];
+
+    public string $repeat_day = '';
+
+    public string $repeat_until = '';
+
+    public string $repeat_max = '';
+
     public string $notes = '';
 
     /** @var array<int, mixed> */
@@ -80,6 +93,7 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
             'deadline' => ['nullable', 'date', 'after_or_equal:start_date'],
             'task_category_id' => ['nullable', 'exists:task_categories,id'],
             'project_id' => ['nullable', 'exists:projects,id'],
+            ...\App\Enums\TaskRepeat::rules(),
             'notes' => ['nullable', 'string'],
             'attachments.*' => ['file', 'max:10240'],
         ], [
@@ -100,6 +114,7 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
             'deadline' => $data['deadline'] ?: null,
             'task_category_id' => $data['task_category_id'] ?: null,
             'project_id' => $data['project_id'] ?: null,
+            ...\App\Enums\TaskRepeat::attributes($data),
             'qa_id' => $data['qa_id'] ?: null,
             'notes' => $data['notes'] ?: null,
         ], auth()->user(), $assignee);
@@ -243,6 +258,8 @@ new #[Layout('layouts.app')] #[Title('Create Task')] class extends Component
                     <x-form.field label="Category" error="task_category_id" optional>
                         <x-form.picker model="task_category_id" :value="$task_category_id" :options="$categories" clearable clear-label="No category" placeholder="No category" icon='<path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/>' />
                     </x-form.field>
+
+                    <x-tasks.repeat-fields :repeat="$repeat" :until="$repeat_until" />
                 </x-form.card>
 
                 <p class="order-5 flex items-baseline gap-2 px-1 text-xs text-zinc-500">

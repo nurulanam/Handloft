@@ -104,7 +104,7 @@ class TaskWorkflowService
             }
 
             return WorkHistory::updateOrCreate(
-                ['task_id' => $task->id],
+                ['task_id' => $task->id, 'cycle' => $task->repeat_count],
                 [
                     'user_id' => $assignee->id,
                     'assigned_by' => $assignment->assigned_by,

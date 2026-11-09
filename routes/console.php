@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('timers:stop-stale')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('tasks:reopen-repeating')->hourly()->withoutOverlapping();

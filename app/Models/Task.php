@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
-use App\Events\TasksChanged;
 use App\Enums\TaskPriority;
+use App\Enums\TaskRepeat;
 use App\Enums\TaskStatus;
+use App\Events\TasksChanged;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -17,9 +18,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
-#[Fillable(['title', 'description', 'created_by', 'task_category_id', 'project_id', 'qa_id', 'parent_task_id', 'priority', 'status', 'start_date', 'deadline', 'notes'])]
+#[Fillable(['title', 'description', 'created_by', 'task_category_id', 'project_id', 'qa_id', 'parent_task_id', 'priority', 'status', 'start_date', 'deadline', 'repeat', 'repeat_every', 'repeat_on', 'repeat_until', 'repeat_max', 'repeat_count', 'repeat_next_at', 'notes'])]
 class Task extends Model
 {
     /** @use HasFactory<TaskFactory> */
@@ -48,6 +50,19 @@ class Task extends Model
             });
         };
 
+        // A repeating task that is done schedules its comeback; anything else has none.
+        static::saving(function (self $task) {
+            if (! $task->repeat) {
+                $task->repeat_count = 0;
+            }
+
+            if (! $task->repeat || $task->status !== TaskStatus::Done) {
+                $task->repeat_next_at = null;
+            } elseif ($task->repeat_next_at === null || $task->isDirty(['repeat', 'repeat_every', 'repeat_on', 'repeat_until', 'repeat_max'])) {
+                $task->repeat_next_at = $task->nextRepeatDate();
+            }
+        });
+
         static::saved($announce);
         static::deleted($announce);
         static::restored($announce);
@@ -63,7 +78,54 @@ class Task extends Model
             'status' => TaskStatus::class,
             'start_date' => 'date',
             'deadline' => 'date',
+            'repeat' => TaskRepeat::class,
+            'repeat_every' => 'integer',
+            'repeat_on' => 'array',
+            'repeat_until' => 'date',
+            'repeat_next_at' => 'datetime',
         ];
+    }
+
+    /**
+     * When this repeating task should next come back, counting from today; null once the series has
+     * run its course (the end date passed or the repeat limit reached).
+     */
+    public function nextRepeatDate(): ?Carbon
+    {
+        if (! $this->repeat || ($this->repeat_max && $this->repeat_count >= $this->repeat_max)) {
+            return null;
+        }
+
+        $next = $this->repeat->nextAfter(now(), $this->repeat_every ?: 1, $this->repeat_on);
+
+        return $this->repeat_until && $next->gt($this->repeat_until) ? null : $next;
+    }
+
+    /**
+     * "Every 2 weeks on Mon, Wed · 3 more times · until 30 Dec 2026", or null when it doesn't repeat.
+     */
+    protected function repeatSummary(): Attribute
+    {
+        return Attribute::make(get: function () {
+            if (! $this->repeat) {
+                return null;
+            }
+
+            $n = $this->repeat_every ?: 1;
+            $text = $n === 1 ? ucfirst($this->repeat->value) : "Every {$n} ".$this->repeat->unit().'s';
+
+            if ($this->repeat === TaskRepeat::Weekly && $this->repeat_on) {
+                $text .= ' on '.collect($this->repeat_on)->sortBy(fn ($d) => ($d + 6) % 7)->map(fn ($d) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][$d])->implode(', ');
+            } elseif ($this->repeat === TaskRepeat::Monthly && $this->repeat_on) {
+                $text .= ' on day '.$this->repeat_on[0];
+            }
+
+            if ($this->repeat_max) {
+                $text .= ' · '.max($this->repeat_max - $this->repeat_count, 0).' left';
+            }
+
+            return $this->repeat_until ? $text.' · until '.$this->repeat_until->format('d M Y') : $text;
+        });
     }
 
     /**
@@ -165,7 +227,7 @@ class Task extends Model
      */
     public function workHistory(): HasOne
     {
-        return $this->hasOne(WorkHistory::class);
+        return $this->hasOne(WorkHistory::class)->latestOfMany();
     }
 
     /**

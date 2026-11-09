@@ -34,7 +34,7 @@
     $inline = $variant === 'inline';
     $align ??= $inline ? 'right' : 'left';
     $pick = fn (string $v) => $call
-        ? $call.'('.($v === '' ? 'null' : $v).')'
+        ? $call.'('.($v === '' ? 'null' : (ctype_digit($v) ? $v : "'".e($v)."'")).')'
         : "\$set('{$model}', '".e($v)."')";
 @endphp
 

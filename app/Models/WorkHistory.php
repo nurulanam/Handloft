@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
-#[Fillable(['task_id', 'user_id', 'assigned_by', 'assigned_date', 'completed_date', 'completed_time', 'actual_hours', 'status', 'note'])]
+#[Fillable(['task_id', 'cycle', 'user_id', 'assigned_by', 'assigned_date', 'completed_date', 'completed_time', 'actual_hours', 'status', 'note'])]
 class WorkHistory extends Model
 {
     /** @use HasFactory<WorkHistoryFactory> */
